@@ -21,7 +21,7 @@ flowchart LR
   VIEW --> UI
 ```
 
-Choose React 19, stable Fiber 9, Three.js, Vite, Node.js with TypeScript, Fastify, WebSocket transport, and Zod schemas. Use a pnpm workspace, Vitest for model tests, and Playwright for browser scenarios. Pin exact versions during the initial implementation spike; no dependency lockfile exists yet.
+Stack in repo: React 19, `@react-three/fiber` 9, Three.js, Vite, Node.js 22+, TypeScript strict, WebSocket transport (`ws`), Zod from `@ember/domain`, pnpm workspace with `pnpm-lock.yaml`. Fastify is listed on `ember-server` for the planned HTTP surface but is **not** the live entrypoint today—the loopback WebSocket hub in `ws-server.ts` is. Vitest covers model and server tests; Playwright is specified for browser scenarios but not yet wired in CI.
 
 Run locally first. Package one server process serving the built browser app and handling WebSockets; use workers inside that process. A single long-lived deployment container is sufficient for the MVP. Do not introduce a database, message broker, Kubernetes, or serverless per-tick functions.
 
@@ -33,9 +33,8 @@ Run locally first. Package one server process serving the built browser app and 
 | `simulation` | Truth state, clock, motion, fire, damage, end conditions | LLM requests |
 | `knowledge` | Observation history and scoped projections | Implicit global synchronization |
 | `forecast` | Candidate futures conditioned on one knowledge snapshot | Hidden world state or truth seed |
-| `navigation` | Complete timed mission search and feasibility | Unchecked movement commands |
 | `agents` | Objectives, lifecycle, independent selection, explanations | Coordinator omniscience |
-| `reservations` | Segment occupancy and time allocations | Other agents' fire beliefs |
+| `navigation` (includes reservations) | Complete timed mission search, segment occupancy, time allocations | Other agents' fire beliefs |
 | `communication` | Recipient resolution, evidence references, command validation, audio priority | Feasibility overrides |
 | `web` | Three.js presentation and accessible DOM controls | Authoritative world advancement |
 | `replay` | Recorded state/decision playback and evaluation export | Re-running LLM calls |
@@ -58,7 +57,7 @@ tests/fixtures/
 docs/
 ```
 
-These directories are a build plan, not existing code. Keep public module interfaces narrow; avoid a shared object that exposes the entire world.
+These directories exist in the monorepo. Keep public module interfaces narrow; avoid a shared object that exposes the entire world. Timed segment **reservations** are implemented inside `packages/navigation`, not a separate package.
 
 ## State and contracts
 
@@ -91,7 +90,7 @@ evaluateMission(input: ScopedPlanningInput): PlanResult
 replay(log, scenarioVersion): ReplayResult
 ```
 
-Names are proposed interfaces; they are not claims of implemented APIs.
+The table above is the contract shape. In code, `Incident` in `@ember/simulation` is the authoritative handle; replay uses `replayRecord` / bundle readers and `revealFire` in `@ember/replay` rather than a single `replay(log)` that rebuilds truth from events alone. Session-level wiring lives in `apps/server`.
 
 ## Event order and concurrency
 
@@ -113,6 +112,8 @@ The coordinator serializer must whitelist fields. Do not send the private world 
 
 ## Browser/server transport
 
+### Target HTTP/WebSocket contract
+
 - `POST /incidents`: instantiate scenario and return briefing projection.
 - `POST /incidents/:id/start`: idempotently begin the five-minute clock.
 - `WS /incidents/:id/events`: versioned snapshots, deltas, receipts, observations, reports, and audio metadata.
@@ -121,9 +122,15 @@ The coordinator serializer must whitelist fields. Do not send the private world 
 - `GET /incidents/:id/replay`: ended-run log and authorized truth snapshots.
 - `GET /health`: server readiness, with no secrets.
 
-Authenticate each connection with an unguessable session token issued for that incident; do not use a globally accessible demo state. Keep provider keys server-side. Validate message shapes and cap text/audio sizes before provider or planner work. These controls enforce the simulation's own information rules.
+Authenticate each connection with an unguessable session token issued for that incident; do not use a globally accessible demo state. Keep provider keys server-side. Validate message shapes and cap text/audio sizes before provider or planner work.
 
 Send state at 5 Hz with sequence numbers; publish critical reports immediately between regular snapshots. Reconnect requests a fresh snapshot and resumes from the last acknowledged event. If the browser disconnects, the incident continues. Commands that arrive after the deadline are not applied.
+
+### As implemented (2026-10-03)
+
+- **Live server:** one loopback WebSocket per `startServer()` session; JSON messages in `apps/server/src/protocol.ts` (`say`, push-to-talk, `inspect`, coordinator `view`, transcript, receipts, audio notices). Pump interval 200 ms; outbound views are full `CoordinatorView` snapshots validated against domain schemas. Message size capped at 64 KiB.
+- **Web client:** `CoordinatorViewClient` validates every frame; mock incident socket and recorded replay for offline UI; optional `POST /incidents/:id/start` when a REST base URL is configured.
+- **Not yet:** multi-incident HTTP API, session tokens, separate voice socket, delta encoding at 5 Hz, `GET /replay` from server. See [SERVER_AND_EVALUATION.md](SERVER_AND_EVALUATION.md).
 
 ## Persistence and replay
 

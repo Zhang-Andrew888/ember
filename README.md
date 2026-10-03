@@ -2,7 +2,7 @@
 
 A five-minute wildfire coordination simulation with autonomous ground crews, incomplete information, conversational control, and a Three.js incident view.
 
-**Status:** design package completed on 2026-10-03. This workspace contains specifications, not an implemented or benchmarked application. The user delegated the remaining design choices after the interview. Defaults below are concrete implementation starting points, not measured wildfire parameters or performance claims.
+**Status:** design package completed 2026-10-03; **implementation merged the same day** (sim + web lanes). The monorepo contains a working TypeScript simulation, no-provider conversation layer, loopback WebSocket server, Three.js coordinator UI, offline evaluation harness, and Vitest coverage across model and UI code. Grok Voice, real OSM scenario extraction, full HTTP incident API, and Playwright browser gates remain integration work—see [implementation plan](docs/IMPLEMENTATION_PLAN.md) and [server and evaluation](docs/SERVER_AND_EVALUATION.md). Numeric defaults are game parameters, not validated wildfire physics; held-out evaluation numbers are real but scenario-specific (read caveats before citing them).
 
 ## Read in this order
 
@@ -18,6 +18,7 @@ A five-minute wildfire coordination simulation with autonomous ground crews, inc
 | [openJiuwen evaluation](docs/OPENJIUWEN_EVALUATION.md) | Evidence, fit assessment, decision, and reconsideration path |
 | [Implementation plan](docs/IMPLEMENTATION_PLAN.md) | Ordered vertical slices with acceptance gates |
 | [Validation and demo](docs/VALIDATION.md) | Behavioral checks, honest comparisons, performance targets, and showcase |
+| [Server and evaluation](docs/SERVER_AND_EVALUATION.md) | Live WebSocket hub, offline CLIs, measured held-out results, scenario checker |
 
 Architectural decisions are in [docs/adr](docs/adr/README.md). The product specification consolidates the interview decisions; technical details live in the focused documents above.
 

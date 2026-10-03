@@ -1,6 +1,18 @@
 # Validation, evaluation, and demo
 
-This document specifies checks to implement. No application tests, benchmarks, provider calls, or evaluation runs have been completed yet.
+This document is the acceptance checklist. **Much of the model and communication matrix is covered by Vitest** in `packages/*` and `apps/server`; the web lane added unit tests and manual/browser verification documented in [OVERNIGHT_LOG.md](../OVERNIGHT_LOG.md). **Held-out evaluation runs exist** (`apps/server/evaluation-results/`); read [SERVER_AND_EVALUATION.md](SERVER_AND_EVALUATION.md) for numbers and caveats. Real Grok/microphone smoke tests and Playwright screenshot gates are still open items from Slice 0/6.
+
+## Verification status (2026-10-03)
+
+| Area | Coverage |
+|---|---|
+| Model invariants (table below) | Broad Vitest coverage; `packages/simulation/src/fuzz.test.ts` randomizes command order for six seeds |
+| Reservation and autonomy | `packages/navigation`, `packages/agents`, `apps/server/src/session.test.ts`, chaos/robustness tests |
+| Communication cases 1–15 | `packages/communication` + server conversation tests; **not** live provider or microphone |
+| Frontend/information checks | Web lane: schema-validating client, dev scenario presets, a11y fixes, mock PTT; **no** automated Playwright suite in CI yet |
+| Performance targets | Measured in offline evaluation harness (step p95, replan p95); client FPS measured in sandbox only—see OVERNIGHT_LOG |
+| Fair comparison protocol | Implemented as `runEvaluation` three variants + `ScriptedCoordinatorPolicy` v2; JSON reports on disk |
+| Two-minute presentation | Not packaged as release artifact |
 
 ## Required model invariants
 
@@ -134,4 +146,4 @@ Different policies may end at different times when sites resolve. Final health i
 
 Use recorded/condensed portions of a five-minute-capable run where necessary; do not imply that the two-minute presentation is the entire interaction duration. Rehearse a showcase seed separately from evaluation seeds. The system should still run live, and the presentation must not fabricate its outcomes.
 
-Release evidence consists of the check results, measured timings, scenario/version metadata, screenshots, one recorded command/event trace, and the comparison report. Until these exist, describe the project as designed or implemented-to-date, not validated.
+Release evidence still missing for a full product sign-off: Playwright captures on a named machine, real-provider smoke test, production `vite build` on target hardware, and rehearsed demo recording. **Existing evidence:** green CI on typecheck/lint/test, held-out JSON comparison reports, representative failure lists in evaluation output, and session logs with browser verification notes. Describe headline evaluation wins/losses only with the scenario and policy caveats in [SERVER_AND_EVALUATION.md](SERVER_AND_EVALUATION.md).

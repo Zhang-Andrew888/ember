@@ -39,7 +39,9 @@ The server uses a monotonic clock to schedule fixed steps. Do not derive fire pr
 
 Use a locally packaged OpenStreetMap road extract from the Oakland hills around Montclair as the acquisition region. Select a connected 1.6 km patch containing a loop with two approaches, a junction suitable for a constrained segment, and branches for three sites. This is an acquisition decision; no extract or verified node IDs are included in this documentation delivery.
 
-During the first build slice, export the graph, validate connectivity, then freeze node/edge IDs in a versioned scenario file. If the first crop lacks the required loop, shift the crop within the same region rather than inventing a road and calling it real. A synthetic graph fixture is acceptable for unit tests and the first technical spike, but the final demo requires the real extract.
+During the first build slice, export the graph, validate connectivity, then freeze node/edge IDs in a versioned scenario file. If the first crop lacks the required loop, shift the crop within the same region rather than inventing a road and calling it real.
+
+**As implemented:** the shipped MVP uses an **authored synthetic graph** in `packages/simulation/src/scenario.ts` (including a second south-east road so three crews can reach work). It passes `validateScenario` and all five executable `scenarioGates` checks; offline evaluation and the WebSocket demo run against this graph. The Oakland OSM extract remains the documented acquisition target for a future scenario file—use `pnpm --filter ember-server exec tsx src/check-scenario-cli.ts` on candidate JSON before freezing IDs. The placeholder file `scenarios/scenario-v1.placeholder.json` is not complete.
 
 Preserve source identifiers, source date, and attribution metadata. Display “© OpenStreetMap contributors” linked to the source copyright page. Package source/license information with the extract; do not depend on live map tiles during a run. [OpenStreetMap copyright and attribution](https://www.openstreetmap.org/copyright).
 
@@ -140,4 +142,6 @@ Stop further simulation and commands immediately at the terminal step. No extra 
 
 Version all parameter changes. First tune travel/work durations to create at least two meaningful coordinator interventions in a typical five-minute run. Then tune spread and wind timing to produce useful alternative routes and occasional forecast recovery. Finally tune damage so partial protection affects outcomes.
 
-Maintain one rehearsed showcase seed, at least five development seeds, and held-out evaluation seeds. Never tune to a target headline win rate. Geography extraction, seed selection, and measured performance are implementation deliverables, not already completed assets.
+Maintain one rehearsed showcase seed, at least five development seeds, and held-out evaluation seeds. Never tune to a target headline win rate.
+
+**Seeds in repo:** `SHOWCASE_SEED`, `DEV_SEEDS` (5), and `HELD_OUT_SEEDS` (20) drive `apps/server` evaluation CLIs; held-out seeds include every fourth with an earlier wind shift and every fourth-plus-one with a wider spread rate. Geography extraction from OSM is still outstanding; seed selection and measured performance for the synthetic scenario are recorded in `apps/server/evaluation-results/` and [SERVER_AND_EVALUATION.md](SERVER_AND_EVALUATION.md).

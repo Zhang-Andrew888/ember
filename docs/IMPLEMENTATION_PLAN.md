@@ -1,6 +1,25 @@
 # Implementation plan
 
-This is an ordered build backlog, not a claim that code exists. No development deadline or team capacity was supplied; use acceptance gates rather than a fabricated schedule. The scope is fixed by [the product specification](../EMBER_LINE.md), and the remaining engineering defaults have been selected.
+This document keeps the original ordered backlog and acceptance gates. **Implementation status** (after ~117 commits merged 2026-10-03) is summarized below; the slice sections still describe intent and exit criteria.
+
+## Implementation status (2026-10-03)
+
+| Slice | Summary | Status |
+|---|---|---|
+| 0 | Provider spike, real map extract, mic/TTS proof | **Open** — no xAI keys or OSM crop in repo; synthetic scenario + `ScriptedInterpreter` stand in |
+| 1 | Seeded incident, clock, debrief, event log | **Done (sim)** — `packages/simulation`, `packages/replay`; **web** — briefing, end overlay, mock/live hooks |
+| 2 | Knowledge, forecasts, filtered views | **Done (sim)** — `packages/knowledge`, `packages/forecast`, coordinator projections tested |
+| 3 | Mission search, autonomy, retreat | **Done (sim)** — `packages/navigation`, `packages/agents` |
+| 4 | Full team, reservations, scout | **Done (sim)** — session wiring in `apps/server`; synthetic graph includes second approach road |
+| 5 | Full Grok conversation | **Partial** — `packages/communication` + server bridge with **no-provider** adapter; validation cases 1–15 covered in tests except real mic/provider |
+| 6 | Three.js experience | **Mostly done (web)** — scene, a11y, PTT stub, replay view, dev `?scenario=` presets; **blocked:** route emphasis and forecast layer need domain fields (contract issues #1, #2) |
+| 7 | Replay, evaluation, demo | **Partial** — bundle replay, metrics, three-variant harness, failure injection, JSON reports; **open:** two-minute rehearsed demo assets, real provider sessions |
+
+**CI:** `pnpm typecheck`, `pnpm lint`, and `pnpm test` run in GitHub Actions. Test counts grew with both lanes (sim lane ~268 tests at handoff; web lane ~132; shared packages overlap—run locally for current totals).
+
+**Where to look:** [SERVER_AND_EVALUATION.md](SERVER_AND_EVALUATION.md), [apps/server/README.md](../apps/server/README.md), [OVERNIGHT_LOG.md](../OVERNIGHT_LOG.md).
+
+No development deadline or team capacity was supplied; use acceptance gates rather than a fabricated schedule. The scope is fixed by [the product specification](../EMBER_LINE.md).
 
 ## Slice 0 — integration and data proof
 
