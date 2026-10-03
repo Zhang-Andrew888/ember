@@ -1,6 +1,21 @@
-import { forwardRef, useEffect, useImperativeHandle, useMemo } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
+import { Vector3 } from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+
+const FOCUS_TRANSITION_MS = 250;
+
+interface FocusAnimation {
+  readonly fromTarget: Vector3;
+  readonly toTarget: Vector3;
+  readonly fromPosition: Vector3;
+  readonly toPosition: Vector3;
+  readonly start: number;
+}
+
+function easeOutCubic(t: number): number {
+  return 1 - Math.pow(1 - t, 3);
+}
 
 export interface CameraControlsHandle {
   reset(): void;
@@ -24,6 +39,7 @@ export const CameraControls = forwardRef<CameraControlsHandle, CameraControlsPro
   ref,
 ) {
   const { camera, gl } = useThree();
+  const animationRef = useRef<FocusAnimation | null>(null);
 
   const controls = useMemo(() => {
     const instance = new OrbitControls(camera, gl.domElement);
@@ -49,20 +65,48 @@ export const CameraControls = forwardRef<CameraControlsHandle, CameraControlsPro
   useImperativeHandle(
     ref,
     () => ({
-      reset: () => controls.reset(),
+      reset: () => {
+        // Full-fidelity instant restore (position/target/zoom together);
+        // not tweened - see focusOn for the animated-transition case.
+        animationRef.current = null;
+        controls.reset();
+      },
       focusOn: (x, z) => {
         const deltaX = x - controls.target.x;
         const deltaZ = z - controls.target.z;
-        controls.target.set(x, 0, z);
-        camera.position.x += deltaX;
-        camera.position.z += deltaZ;
-        controls.update();
+        const toTarget = new Vector3(x, 0, z);
+        const toPosition = new Vector3(camera.position.x + deltaX, camera.position.y, camera.position.z + deltaZ);
+
+        if (reducedMotion) {
+          animationRef.current = null;
+          controls.target.copy(toTarget);
+          camera.position.copy(toPosition);
+          controls.update();
+          return;
+        }
+
+        // Animate transitions over 250ms (docs/FRONTEND.md).
+        animationRef.current = {
+          fromTarget: controls.target.clone(),
+          toTarget,
+          fromPosition: camera.position.clone(),
+          toPosition,
+          start: performance.now(),
+        };
       },
     }),
-    [controls, camera],
+    [controls, camera, reducedMotion],
   );
 
   useFrame(() => {
+    const animation = animationRef.current;
+    if (animation) {
+      const t = Math.min(1, (performance.now() - animation.start) / FOCUS_TRANSITION_MS);
+      const eased = easeOutCubic(t);
+      controls.target.lerpVectors(animation.fromTarget, animation.toTarget, eased);
+      camera.position.lerpVectors(animation.fromPosition, animation.toPosition, eased);
+      if (t >= 1) animationRef.current = null;
+    }
     controls.update();
   });
 
