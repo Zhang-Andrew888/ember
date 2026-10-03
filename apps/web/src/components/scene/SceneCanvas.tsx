@@ -1,6 +1,9 @@
 import { forwardRef, useMemo } from "react";
 import { Canvas, type RootState } from "@react-three/fiber";
 import { Terrain } from "./Terrain.js";
+import { Trees } from "./Trees.js";
+import { QualityProvider } from "./quality/QualityContext.js";
+import { effectiveQuality } from "./quality/tiers.js";
 import { Roads } from "./Roads.js";
 import { FireCells } from "./FireCells.js";
 import { SiteMarkers, RefugeMarkers } from "./SiteMarkers.js";
@@ -41,6 +44,7 @@ export const SceneCanvas = forwardRef<CameraControlsHandle, SceneCanvasProps>(fu
   { entities, showFireCells, showRoutes, showForecast, selectedAgentId, onInspectAgent, onInspectCell, onReady, reducedMotion },
   controlsRef,
 ) {
+  const quality = useMemo(() => effectiveQuality("high", reducedMotion), [reducedMotion]);
   const refuges = listRefugeNodes(scenarioMap);
   const routeLines = useMemo(
     () => entities.routes.map((line) => ({ ...line, selected: line.agentId === selectedAgentId })),
@@ -51,7 +55,7 @@ export const SceneCanvas = forwardRef<CameraControlsHandle, SceneCanvasProps>(fu
     <Canvas
       orthographic
       camera={{ position: INITIAL_CAMERA_POSITION, zoom: INITIAL_ZOOM, near: 1, far: 4000 }}
-      dpr={[1, 1.5]}
+      dpr={[1, quality.dprMax]}
       onCreated={onReady}
       // The scene is static between interactions - render on demand
       // (camera move, new snapshot, pulse animation) instead of a
@@ -64,7 +68,9 @@ export const SceneCanvas = forwardRef<CameraControlsHandle, SceneCanvasProps>(fu
       <fog attach="fog" args={[ATMOSPHERE.fog, ATMOSPHERE.fogNear, ATMOSPHERE.fogFar]} />
       <hemisphereLight args={[ATMOSPHERE.skyFill, ATMOSPHERE.groundFill, 0.85]} />
       <directionalLight position={[-420, 300, 260]} color={ATMOSPHERE.key} intensity={1.0} />
+      <QualityProvider value={quality}>
       <Terrain />
+      <Trees fireCells={entities.fireCells} reducedMotion={reducedMotion} />
       <Roads />
       {showForecast && entities.forecast ? <ForecastLayer layer={entities.forecast} /> : null}
       <RefugeMarkers refuges={refuges} />
@@ -79,6 +85,7 @@ export const SceneCanvas = forwardRef<CameraControlsHandle, SceneCanvasProps>(fu
         onInspectAgent={onInspectAgent}
       />
       <CameraControls ref={controlsRef} reducedMotion={reducedMotion} />
+      </QualityProvider>
     </Canvas>
   );
 });

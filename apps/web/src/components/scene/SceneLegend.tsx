@@ -1,4 +1,4 @@
-import { forwardRef } from "react";
+import { forwardRef, useState } from "react";
 import { colors } from "../../styles/colors.js";
 import { formatIncidentClock } from "../../format/time.js";
 import type { ForecastLayer } from "./sceneLayers.js";
@@ -29,8 +29,16 @@ export const SceneLegend = forwardRef<HTMLDivElement, SceneLegendProps>(function
   { showFireCells, onToggleFireCells, showRoutes, onToggleRoutes, showForecast, onToggleForecast, forecast, onResetCamera, fireCells, onInspectCell },
   ref,
 ) {
+  // The key is collapsed on narrower viewports so it never hides routes or forecast.
+  const [keyOpen, setKeyOpen] = useState(() => typeof window !== "undefined" && window.innerWidth >= 1280);
   return (
     <div ref={ref} className="scene-legend" role="group" aria-label="Map layers and camera">
+      <details
+        className="scene-legend__keybox"
+        open={keyOpen}
+        onToggle={(event) => setKeyOpen(event.currentTarget.open)}
+      >
+      <summary>Legend</summary>
       <ul className="scene-legend__key">
         <li>
           <span className="scene-legend__swatch" style={{ background: colors.observedFire }} />
@@ -53,6 +61,11 @@ export const SceneLegend = forwardRef<HTMLDivElement, SceneLegendProps>(function
           Refuge
         </li>
       </ul>
+      <p className="scene-legend__source">
+        Map: {scenarioMap.version}
+        {scenarioMap.source.kind === "local-snapshot" ? " (local snapshot; scenarios/ has no valid file)" : ""}
+      </p>
+      </details>
       <div className="scene-legend__controls">
         <label className="scene-legend__toggle">
           <input type="checkbox" checked={showFireCells} onChange={onToggleFireCells} />
@@ -69,10 +82,6 @@ export const SceneLegend = forwardRef<HTMLDivElement, SceneLegendProps>(function
         <p className="scene-legend__forecast" role="status" data-reliability={forecast?.reliability ?? "none"}>
           {forecast ? forecast.headline : "Forecast: not yet built"}
           {forecast?.explanation ? ` — ${forecast.explanation}` : ""}
-        </p>
-        <p className="scene-legend__source">
-          Map: {scenarioMap.version}
-          {scenarioMap.source.kind === "local-snapshot" ? " (local snapshot; scenarios/ has no valid file)" : ""}
         </p>
         <button type="button" onClick={onResetCamera}>
           Reset camera
