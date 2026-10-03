@@ -33,6 +33,7 @@ export function makeEnsemble(
   });
   const reliability = options.reliability ?? "reliable";
   return {
+    version: 1,
     inputHash: "test",
     knowledgeRevision: options.revision ?? 0,
     members: reliability === "reliable" ? members : [],

@@ -6,7 +6,7 @@ import { FitAccumulator, fitMember, type FitObservation } from "./fit.js";
 import {
   boundaryCandidates,
   buildMember,
-  extremeIds,
+  capSupportedMembers,
   noShiftCandidates,
   perturb,
   priorCandidates,
@@ -29,6 +29,7 @@ export function snapshotScopeHash(snapshot: AgentKnowledgeSnapshot): string {
 export class ForecastService {
   readonly events: ForecastEvent[] = [];
   private ensemble: ForecastEnsemble | null = null;
+  private version = 0;
   private readonly ctx: RolloutContext;
   private contradictedHash: string | null = null;
   private lastRebuildHash: string | null = null;
@@ -96,8 +97,10 @@ export class ForecastService {
       return this.ensemble;
     }
 
-    const members = this.replenish(survivors.members, fitObs, horizonEndMs, hash);
+    const kept = capSupportedMembers(survivors.members, this.config.memberCount, this.config.maxMembers);
+    const members = this.replenish(kept, fitObs, horizonEndMs, hash);
     this.ensemble = {
+      version: ++this.version,
       inputHash: hash,
       knowledgeRevision: snapshot.revision,
       members,
@@ -135,9 +138,10 @@ export class ForecastService {
       ];
       const supported = this.supported(candidates, fitObs, horizonEndMs).members;
       if (supported.length >= this.config.minSupportedForRecovery) {
-        const kept = this.capKeepingExtremes(supported);
+        const kept = capSupportedMembers(supported, this.config.memberCount, this.config.maxMembers);
         const members = this.replenish(kept, fitObs, horizonEndMs, `${hash}:${factor}`);
         this.ensemble = {
+          version: ++this.version,
           inputHash: hash,
           knowledgeRevision: snapshot.revision,
           members,
@@ -185,6 +189,7 @@ export class ForecastService {
       buildMember(this.ctx, this.config, c.id, c.kind, c.params, horizonEndMs),
     );
     return {
+      version: ++this.version,
       inputHash: hash,
       knowledgeRevision: snapshot.revision,
       members: [],
@@ -266,19 +271,6 @@ export class ForecastService {
     return { pass: true, failedObservationId: null };
   }
 
-  private capKeepingExtremes(members: ForecastMember[]): ForecastMember[] {
-    if (members.length <= this.config.memberCount) return members;
-    const extremes = extremeIds(members);
-    const keep = members.filter((m) => extremes.has(m.id));
-    const room = Math.max(0, this.config.memberCount - keep.length);
-    const others = members.filter((m) => !extremes.has(m.id));
-    const stride = others.length / Math.max(1, room);
-    const picked: ForecastMember[] = [];
-    for (let i = 0; i < room && i * stride < others.length; i++) picked.push(others[Math.floor(i * stride)]!);
-    const ids = new Set([...keep, ...picked].map((m) => m.id));
-    return members.filter((m) => ids.has(m.id)).slice(0, this.config.maxMembers);
-  }
-
   /** Seeded perturbations of supported members, kept only if they are themselves supported. */
   private replenish(
     supported: ForecastMember[],
@@ -287,12 +279,13 @@ export class ForecastService {
     seed: string,
   ): ForecastMember[] {
     const members = [...supported];
-    if (members.length >= this.config.memberCount || members.length === 0) return members;
+    const target = Math.min(this.config.memberCount, this.config.maxMembers);
+    if (members.length >= target || members.length === 0) return members;
     const rng = streamRng(seed, "forecast-replenish");
     const bounds = this.config.physicalBounds;
     let attempts = 0;
-    const maxAttempts = (this.config.memberCount - members.length) * 8;
-    while (members.length < this.config.memberCount && attempts < maxAttempts) {
+    const maxAttempts = (target - members.length) * 8;
+    while (members.length < target && attempts < maxAttempts) {
       const base = supported[attempts % supported.length]!;
       const cand = perturb(base.params, rng, bounds, `${base.id}~${attempts}`);
       attempts += 1;
