@@ -5,6 +5,7 @@ export { CrewController, type ControllerOptions } from "./controller.js";
 export { DispatchController } from "./dispatch.js";
 export { ScoutController, edgeImportance } from "./scout.js";
 export { EvidenceTracker } from "./evidence.js";
-export { explain } from "./explain.js";
+export { explain, explainCode } from "./explain.js";
 export { runControllers, type RunLog } from "./testing.js";
 export * from "./crew-roles.js";
+export * from "./autonomy.js";
