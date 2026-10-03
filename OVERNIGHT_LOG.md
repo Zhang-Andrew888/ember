@@ -83,6 +83,9 @@ real Oakland extract.
   message for the seed, private parameters and truth fire state.
 - `packages/simulation/src/fuzz.test.ts`: random orders for six seeds; physical invariants (single-capacity
   exclusivity, work caps, monotone damage, permanent closures, lost agents frozen) and exact replay hold.
+- `packages/simulation/src/validate.ts`: `validateScenario` (referential integrity, connectivity, ignition outside refuge areas;
+  `Incident` refuses invalid scenarios) and `scenarioGates` (the SIMULATION.md geometry acceptance constraints as executable
+  checks). The synthetic scenario passes all five; use them to test a real map crop once one is extracted.
 - Not done: the real Grok adapter (needs provider access / Slice 0); the two-minute
   presentation and screenshots (web lane); agent-loss injection.
 

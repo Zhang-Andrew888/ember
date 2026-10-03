@@ -16,3 +16,4 @@ export {
 export * from "./record.js";
 export { canonicalJson, hashText, hashValue } from "./model/index.js";
 export { SIM_DEFAULTS } from "./model/index.js";
+export { scenarioGates, validateScenario, type GateResult } from "./validate.js";

@@ -17,6 +17,7 @@ import { GRID_EDGE, KnowledgeStore, STALE_AFTER_MS, type AgentKnowledgeSnapshot 
 import { SIM_DEFAULTS, cellsWithin, hashValue } from "./model/index.js";
 import { SimInput, type AppliedInput, type InputReceipt } from "./inputs.js";
 import { SimScenario } from "./scenario.js";
+import { validateScenario } from "./validate.js";
 import { World, derivePrivateParameters, type PrivateOverrides, type SimNotice } from "./world.js";
 
 export interface IncidentOptions {
@@ -99,6 +100,8 @@ export class Incident {
 
   constructor(options: IncidentOptions) {
     this.scenario = SimScenario.parse(options.scenario);
+    const problems = validateScenario(this.scenario);
+    if (problems.length > 0) throw new Error(`invalid scenario: ${problems.join("; ")}`);
     this.seed = options.seed;
     this.overrides = options.overrides ?? {};
     this.id = IncidentId.parse(options.incidentId ?? `incident-${this.seed}`);
