@@ -66,6 +66,8 @@ export class SessionHub {
     if (wasRecording) this.noteCaptureEnded(id);
     this.outboxes.delete(id);
     this.backpressureClosed.delete(id);
+    const playing = this.bridge.scheduler.nowPlaying;
+    if (playing !== null) this.bridge.acknowledgeSpeechPlayback(playing.id);
   }
 
   /** Per-client records still held. Closed sockets must not remain in any of these. */
@@ -174,6 +176,9 @@ export class SessionHub {
         submit(u.text, `resend-${id}-${u.releasedMs}`);
         return;
       }
+      case "audio_finished":
+        this.bridge.acknowledgeSpeechPlayback(msg.itemId);
+        return;
     }
   }
 

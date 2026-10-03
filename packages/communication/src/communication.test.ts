@@ -331,6 +331,18 @@ function scheduler(revisions: Record<string, number> = {}) {
 }
 
 describe("audio scheduler", () => {
+  it("keeps the second routine item pending until finished when using RecordingSink (Grok browser-ack path)", () => {
+    const { s, sink, events } = scheduler();
+    s.enqueue(item("one", 4, "first line", 1));
+    s.enqueue(item("two", 4, "second line", 2));
+    expect(sink.spoken).toEqual(["first line"]);
+    expect(s.pending().map((p) => p.id)).toEqual(["two"]);
+    expect(events.filter((e) => e.kind === "started").map((e) => e.itemId)).toEqual(["one"]);
+    s.finished("one");
+    expect(sink.spoken[1]).toBe("second line");
+    expect(events.filter((e) => e.kind === "started").map((e) => e.itemId)).toEqual(["one", "two"]);
+  });
+
   it("speaks the exact committed text and plays one item at a time in priority then event order", () => {
     const { s, sink } = scheduler();
     s.enqueue(item("r1", 4, "Crew 1 is heading to Ridge Cabins.", 1));

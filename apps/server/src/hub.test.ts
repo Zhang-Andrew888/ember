@@ -4,9 +4,11 @@ import { buildSyntheticScenario, type SimScenario } from "@ember/simulation";
 import { cellIndexOf } from "@ember/simulation/model";
 import { ConversationBridge } from "./conversation.js";
 import { LiveRun, SessionHub } from "./hub.js";
-import { parseServerWire } from "./protocol.js";
+import { encodeClient, parseServerWire } from "./protocol.js";
+import type { SpeechItem, SpeechTier } from "@ember/communication";
 import { IncidentSession } from "./session.js";
 import { ViewRecorder } from "./view-recorder.js";
+import { SpeechAudioStore } from "./xai/speech-audio-store.js";
 
 vi.setConfig({ testTimeout: 300_000 });
 
@@ -205,6 +207,38 @@ describe("wire protocol and information boundary", () => {
     hub.handle(id, JSON.stringify({ type: "resend" }), 9000);
     expect(hub.drain(id)).toEqual([]);
     expect(session.incident.inputLog).toHaveLength(0);
+  });
+
+  it("emits a second started audio cue after the client acknowledges the first prepared line", () => {
+    const base = setup();
+    const bridge = new ConversationBridge(base.session, { grokTts: true, speechStore: new SpeechAudioStore() });
+    const hub = new SessionHub(base.session, bridge, new ViewRecorder());
+    const id = hub.connect();
+    hub.drain(id);
+    const speech = (speechId: string, text: string): SpeechItem => ({
+      id: speechId,
+      eventId: `ev-${speechId}`,
+      agentId: "crew-1",
+      text,
+      tier: 4 as SpeechTier,
+      createdMs: 0,
+      planRevision: 1,
+    });
+    bridge.scheduler.enqueue(speech("one", "first prepared line"), true);
+    bridge.scheduler.enqueue(speech("two", "second prepared line"), true);
+    hub.afterStep();
+    const firstBatch = hub.drain(id).map(wire).filter((m) => m.type === "audio" && m.event === "started");
+    expect(firstBatch).toHaveLength(1);
+    expect(firstBatch[0]?.type === "audio" ? firstBatch[0].itemId : null).toBe("one");
+    expect(bridge.scheduler.nowPlaying?.id).toBe("one");
+
+    hub.handle(id, encodeClient({ type: "audio_finished", itemId: "one" }), 5000);
+    expect(bridge.scheduler.nowPlaying?.id).toBe("two");
+
+    hub.afterStep();
+    const secondBatch = hub.drain(id).map(wire).filter((m) => m.type === "audio" && m.event === "started");
+    expect(secondBatch).toHaveLength(1);
+    expect(secondBatch[0]?.type === "audio" ? secondBatch[0].itemId : null).toBe("two");
   });
 
   it("releases capture and backpressure state across connect/disconnect churn", () => {

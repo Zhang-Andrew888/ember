@@ -33,7 +33,8 @@ export type OutboundClientMessage =
   | { type: "ptt_begin" }
   | { type: "ptt_release"; transcript: string }
   | { type: "ptt_lost_focus"; transcript: string }
-  | { type: "inspect"; agentId: string };
+  | { type: "inspect"; agentId: string }
+  | { type: "audio_finished"; itemId: string };
 
 export function encodeClient(message: OutboundClientMessage): string {
   return JSON.stringify({ protocolVersion: WIRE_PROTOCOL_VERSION, message });

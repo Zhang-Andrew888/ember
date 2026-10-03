@@ -22,7 +22,7 @@ import type { SpeechAudioStore } from "./xai/speech-audio-store.js";
 import { completeIntentInterpretation } from "./xai/chat.js";
 import { grokIntentEnabled } from "./xai/env.js";
 import { synthesizeSpeech } from "./xai/tts.js";
-import type { SpeechItem, SpeechTier } from "@ember/communication";
+import type { SpeechItem, SpeechSink, SpeechTier } from "@ember/communication";
 
 /** Spoken/transcript sentence per end reason (the web debrief uses the same wording). */
 const END_REASON_SENTENCE: Record<EndReason, string> = {
@@ -119,11 +119,27 @@ export class ConversationBridge {
       incidentEnded: () => inc.ended,
     });
     asyncDeliver.fn = (seq, env) => this.applyOutcomes(this.gateway.deliver(seq, env));
+    const recording = this.sink;
+    let scheduler!: AudioScheduler;
+    const playbackSink: SpeechSink = {
+      play: (item) => {
+        recording.play(item);
+        // Without browser playback (non-Grok), advance immediately so the queue does not stall on RecordingSink.
+        if (!this.grokTts) scheduler.finished(item.id);
+      },
+      stop: () => recording.stop(),
+    };
     this.scheduler = new AudioScheduler({
-      sink: this.sink,
+      sink: playbackSink,
       currentPlanRevision: (agent) => (inc.scenario.agents.some((a) => a.id === agent) ? inc.projectAgent(agent as AgentId).planRevision : 0),
       onEvent: (e) => this.events.push(e),
     });
+    scheduler = this.scheduler;
+  }
+
+  /** Client finished playing (or failed) a prepared clip; advances the server-side queue. */
+  acknowledgeSpeechPlayback(itemId: string): void {
+    this.scheduler.finished(itemId);
   }
 
   /** What the coordinator has actually received: sensor observations that show fire. */
