@@ -1081,3 +1081,130 @@ relevant doc in the repo has now been read end to end at least once this
 session. Will keep watching for further instructions and periodically
 re-verify CI/build health until 10:00 ET, rather than manufacturing
 further speculative changes without a concrete lead.
+
+---
+
+# Final summary (09:31 ET / 13:31 UTC) — session end
+
+Per the active overnight-run instruction ("From 09:30, start no new work:
+get to a green, pushed state and write a final summary in
+OVERNIGHT_LOG.md"), this is that summary. No code changes follow this
+entry; the session continues only to monitor for notifications/new
+instructions until 10:00 ET, per the same instruction.
+
+## Current state
+
+- **Branch:** `lane/web`, head `43d06af`.
+- **CI:** green on every one of the 45 commits that make up this
+  session's work, verified via the GitHub Actions API after each push
+  (not assumed) - most recently reconfirmed at 09:31 ET, both as a
+  direct push-triggered run and again as the pull-request-triggered run
+  on the same head SHA.
+- **Pull request:** [#5](https://github.com/Zhang-Andrew888/ember/pull/5),
+  `lane/web` → `main`, open, mergeable (no conflicts against `main`),
+  45 commits / 61 files / +5,979 -7 lines. Full extensive description
+  with merge instructions for Andrew, written at the user's explicit
+  request this session.
+- **Working tree:** clean. Nothing uncommitted.
+- **Tests:** 132 passing, 17 files, 0 failures, 0 skipped.
+- **Lane discipline:** every commit this entire session touches only
+  `apps/web/**` and this file (`OVERNIGHT_LOG.md`) at the repo root.
+  `packages/domain`, `tests/fixtures/coordinator-view.fixture.ts`, and
+  every sim-lane path are untouched, confirmed by `git log --name-only`
+  across the full commit range, not assumed.
+
+## What this session built, in one pass
+
+Starting from an empty `apps/web`, in order:
+
+1. Map/geometry + format utilities, a schema-validating
+   `CoordinatorViewClient` over an injectable `WebSocketLike`, and a
+   hand-authored mock incident socket (Slice 1's explicitly-sanctioned
+   temporary harness).
+2. The full Three.js/R3F scene (Slice 6): terrain, roads, instanced fire
+   cells, site/refuge/agent markers, bounded orbit camera.
+3. The surrounding accessible DOM UI (briefing, top bar, conversation
+   panel, urgent strip, agent rail, end overlay) and `App.tsx` wiring.
+4. A systematic pass closing out the Slice 6 exit gate against
+   `docs/IMPLEMENTATION_PLAN.md`'s literal text, finding and fixing 5 real
+   bugs along the way (label overlap, markers sinking into terrain,
+   un-animated camera focus, color-only site status plus a mock-data
+   continuity bug, missing fire-cell inspection).
+5. After a cross-session message mix-up was clarified by the user, a
+   6-item backlog, each item independently verified (unit test,
+   Playwright screenshot, or measurement), never just typechecked:
+   - Product-critical UI states: 8 dev-only `?scenario=` presets, one
+     real correctness bug found and fixed (contradicted fire-cell
+     observations weren't resolved to the freshest one).
+   - Accessibility audit: fire-cell keyboard/screen-reader path, a real
+     focus-trap violation behind the end overlay (fixed with native
+     `inert`), a WCAG 1.4.11 contrast failure.
+   - Rendering performance: measured and cut idle frame cost ~55% by
+     fixing a `frameloop="demand"`-defeating animation loop.
+   - Conversation UI: a mock voice-capture adapter and exact-text
+     speech-playback stub, wired into a fully functional push-to-talk
+     control.
+   - Replay view: a seekable timeline over a recorded mock event log,
+     which surfaced a latent `CameraControls` dispose bug present since
+     the very first scene commit (never manifested until something
+     actually unmounted a `<CameraControls>` instance).
+   - Test coverage audit: one real gap found and filled
+     (`scenarioMap.ts`'s data integrity), the rest deliberately left
+     uncovered with reasoning recorded rather than silently skipped.
+6. A full diff self-review once the backlog was exhausted, finding
+   nothing further (confirmed, not assumed).
+7. An extended follow-on pass - explicitly instructed to keep going
+   rather than stop at that gate - that re-read every web-lane-relevant
+   project doc (`docs/FRONTEND.md`, `docs/COMMUNICATION.md`,
+   `docs/VALIDATION.md`, `docs/ARCHITECTURE.md`,
+   `docs/IMPLEMENTATION_PLAN.md`, `EMBER_LINE.md`) end to end against
+   what had actually shipped, specifically hunting for requirements never
+   exercised by any test or live check. This found 5 more real,
+   previously-invisible bugs (replay focus-on-mount, no keyboard cancel
+   for push-to-talk, a narrow-viewport layout bug that made the composer
+   unreachable, site damage conveyed by color alone with zero inspection
+   path, stale audio outliving the debrief overlay at incident end) -
+   each verified bidirectionally (bug reproduced with the fix disabled,
+   fix reconfirmed restored), not just checked once. One further
+   suspected bug (push-to-talk not stopping at incident end) was
+   implemented, then *disproven* live and correctly reverted rather than
+   shipped unverified - documented as a deliberate non-change.
+8. Document-driven hunting reached genuine diminishing returns (several
+   consecutive clean checks: long transcript, high-DPI rendering, two
+   push-to-talk reproductions) once every relevant doc had been read.
+   From there, this session held a stable, green, fully-verified state
+   and monitored periodically for new instructions rather than
+   manufacturing further speculative changes.
+9. At the user's explicit request, opened PR #5 with an extensive
+   description and merge instructions.
+
+## What's deliberately not done, and why
+
+- **Route emphasis and forecast layer** (two Slice 6 exit-gate clauses):
+  blocked on `CoordinatorView` having no route/mission-plan or forecast
+  field at all. Two contract-change issues (#1, #2) were opened early
+  this session with concrete suggested shapes and remain open -
+  `packages/domain` was never edited directly to work around this, per
+  `AGENTS.md`'s contract-change process.
+- **A fire-cell inspection-panel staleness edge case:** architecturally
+  plausible (the panel holds a snapshot reference, not a live lookup) but
+  no existing scenario or mock data path can trigger it, so it was left
+  undone rather than shipped as an unverifiable fix.
+- **A real production `vite build`:** pathologically slow in this
+  sandbox (no GPU, resource-constrained) and not a CI gate; `vite dev`
+  was used for every live verification instead. Flagged in the PR as
+  worth a real check before any actual deployment.
+- **Rendering performance numbers:** measured and recorded, but
+  explicitly labeled as describing this sandbox's software-rendered
+  headless Chromium, not real target hardware - never presented as a
+  real-hardware claim.
+
+## Handoff
+
+Everything of substance for whoever reviews this next - Andrew, in
+particular - is in PR #5's description (what's built, the full list of
+14 real bugs found and fixed with commit SHAs, known limitations, CI
+status, testing performed, and explicit merge instructions) and, at
+finer grain with the reasoning behind every non-obvious decision, in the
+log entries above this one in this same file. Nothing is pending beyond
+human review: `lane/web` is green, pushed, and PR'd.
