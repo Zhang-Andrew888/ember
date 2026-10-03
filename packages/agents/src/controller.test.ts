@@ -530,5 +530,11 @@ describe("per-crew communication style", () => {
     expect(plain.text.some((t) => /^Crew 1 is heading to Ridge Cabins/.test(t))).toBe(true);
     expect(radio.text.some((t) => /^Crew 1, heading to Ridge Cabins/.test(t))).toBe(true);
     expect(radio.last).toMatch(/^Crew 1,/);
+describe("controller capabilities", () => {
+  it("expose the role's documented speed and work rate, and a crew plans from its own work rate", () => {
+    const scenario = scenarioWith({ fire: far });
+    const c = crew(scenario);
+    expect(c.capabilities).toEqual({ speedMps: 4, workRate: 1 });
+    expect(new CrewController({ agentId: crew1, callsign: "Scout", role: "scout", map: scenario.map }).capabilities.workRate).toBe(0);
   });
 });

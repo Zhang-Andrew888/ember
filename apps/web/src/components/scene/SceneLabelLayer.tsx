@@ -17,6 +17,8 @@ export interface LabelDescriptor {
   readonly z: number;
   readonly text: string;
   readonly variant: "agent" | "site" | "refuge" | "route" | "forecast";
+  /** Old information: dashed, dimmed label (text carries the age too). */
+  readonly stale?: boolean;
 }
 
 export interface SceneLabelLayerProps {
@@ -95,7 +97,7 @@ export function SceneLabelLayer({
             if (element) elementsRef.current.set(label.id, element);
             else elementsRef.current.delete(label.id);
           }}
-          className={`scene-label scene-label--${label.variant}`}
+          className={`scene-label scene-label--${label.variant}${label.stale ? " scene-label--stale" : ""}`}
         >
           {label.text}
         </div>

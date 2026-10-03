@@ -3,7 +3,7 @@ import { buildEmberParticles, buildFlameInstances } from "./flameInstances.js";
 import type { FireCellMarker } from "../sceneEntities.js";
 
 function cell(index: number, burnState: FireCellMarker["burnState"], stale = false): FireCellMarker {
-  return { key: `c${index}`, gridCellIndex: index, position: { x: index, z: -index }, burnState, stale, lastObservedAt: 0 };
+  return { key: `c${index}`, gridCellIndex: index, position: { x: index, z: -index }, burnState, stale, lastObservedAt: 0, ageMs: stale ? 90_000 : 0 };
 }
 
 describe("buildFlameInstances", () => {
@@ -23,6 +23,15 @@ describe("buildFlameInstances", () => {
     expect(fresh?.intensity).toBe(1);
     expect(stale?.stale).toBe(true);
     expect(stale!.intensity).toBeLessThan(fresh!.intensity);
+  });
+
+  it("an older stale ghost is dimmer than a recently-stale one", () => {
+    const recent = { ...cell(1, "burning", true), ageMs: 40_000 };
+    const old = { ...cell(1, "burning", true), ageMs: 140_000 };
+    const [a] = buildFlameInstances([recent], 1, 22);
+    const [b] = buildFlameInstances([old], 1, 22);
+    expect(b!.intensity).toBeLessThan(a!.intensity);
+    expect(b!.intensity).toBeGreaterThan(0);
   });
 
   it("card count follows the tier and stays inside the cell", () => {

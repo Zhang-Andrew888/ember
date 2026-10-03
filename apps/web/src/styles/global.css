@@ -660,3 +660,29 @@ input {
   gap: 0.4rem;
   align-items: center;
 }
+
+/* Compact layer controls: toggles wrap in a row so the legend stays small over the map. */
+.scene-legend__controls {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  max-width: 320px;
+}
+
+.scene-legend__controls .scene-legend__forecast,
+.scene-legend__controls button,
+.scene-legend__controls details {
+  flex-basis: 100%;
+}
+
+/* Stale information: dashed, dimmed - the label text also states the age. */
+.scene-label--stale {
+  border-style: dashed;
+  opacity: 0.78;
+  font-style: italic;
+}
+
+.scene-legend__swatch--stale {
+  background: repeating-linear-gradient(135deg, #5b6a6d 0 2px, transparent 2px 4px);
+  outline: 1px dashed #5b6a6d;
+}

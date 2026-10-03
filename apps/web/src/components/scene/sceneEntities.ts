@@ -9,6 +9,7 @@ import {
   type SceneVector,
 } from "../../map/positions.js";
 import { buildForecastLayer, buildRouteLines, type ForecastLayer, type RouteLine } from "./sceneLayers.js";
+import { ageOf } from "./staleness.js";
 import { siteProtectionStatus, type SiteProtectionStatus } from "../../format/reports.js";
 
 export interface AgentMarker {
@@ -18,6 +19,8 @@ export interface AgentMarker {
   readonly state: CoordinatorAgentView["state"];
   readonly position: SceneVector;
   readonly heading: SceneHeading | null;
+  /** Sim ms since the coordinator last heard from this agent (its position is that old). */
+  readonly ageMs: number | null;
 }
 
 export interface SiteMarker {
@@ -27,6 +30,8 @@ export interface SiteMarker {
   readonly protectionStatus: SiteProtectionStatus;
   readonly damage: number | null;
   readonly stale: boolean;
+  /** Sim ms since this site was last observed; null = never. */
+  readonly ageMs: number | null;
 }
 
 export interface FireCellMarker {
@@ -37,6 +42,8 @@ export interface FireCellMarker {
   readonly stale: boolean;
   /** simTimeMs the cell was last observed at - for inspection timestamps (docs/FRONTEND.md). */
   readonly lastObservedAt: number;
+  /** Sim ms since this cell was last observed. */
+  readonly ageMs: number;
 }
 
 export interface SceneEntities {
@@ -61,6 +68,35 @@ export function listRefugeNodes(map: ScenarioMap): SceneNode[] {
  * a gap here is a map/data problem, not something to paper over visually.
  */
 export function buildSceneEntities(view: CoordinatorView, map: ScenarioMap): SceneEntities {
+  const agents = fanOutAtNodes(resolveAgents(view, map), view, map);
+
+  const sites: SiteMarker[] = [];
+  for (const site of view.sites) {
+    const position = resolveNodePosition(map, site.nodeId);
+    if (!position) continue;
+    sites.push({
+      id: site.id,
+      name: site.name,
+      position,
+      protectionStatus: siteProtectionStatus(site),
+      damage: site.observedDamage,
+      stale: site.stale,
+      ageMs: ageOf(view.simTimeMs as number, site.lastObservedAt as number | null),
+    });
+  }
+
+  const fireCells = resolveFireCells(view, map);
+
+  return {
+    agents,
+    sites,
+    fireCells,
+    routes: buildRouteLines(view, map, null),
+    forecast: buildForecastLayer(view, map),
+  };
+}
+
+function resolveAgents(view: CoordinatorView, map: ScenarioMap): AgentMarker[] {
   const agents: AgentMarker[] = [];
   for (const agent of view.agents) {
     const position = resolveAgentPosition(map, agent.position);
@@ -81,32 +117,49 @@ export function buildSceneEntities(view: CoordinatorView, map: ScenarioMap): Sce
       state: agent.state,
       position,
       heading,
+      ageMs: ageOf(view.simTimeMs as number, agent.reportedAt as number),
     });
   }
+  return agents;
+}
 
-  const sites: SiteMarker[] = [];
-  for (const site of view.sites) {
-    const position = resolveNodePosition(map, site.nodeId);
-    if (!position) continue;
-    sites.push({
-      id: site.id,
-      name: site.name,
-      position,
-      protectionStatus: siteProtectionStatus(site),
-      damage: site.observedDamage,
-      stale: site.stale,
+/** Distance from a site/refuge node's centre at which agents standing there are drawn (clears the model). */
+export const NODE_CLEARANCE = 92;
+/** Spacing used when several agents share an ordinary junction. */
+export const JUNCTION_SPREAD = 30;
+
+/**
+ * Agents standing at a node would sit exactly on top of a site/refuge model
+ * (or on each other). Fan them out south of the node (toward the viewer) so
+ * every marker stays visible; positions are display-only and never feed back
+ * into anything else.
+ */
+export function fanOutAtNodes(agents: AgentMarker[], view: CoordinatorView, map: ScenarioMap): AgentMarker[] {
+  const byNode = new Map<string, number[]>();
+  for (const agent of view.agents) {
+    if (agent.position.kind !== "node") continue;
+    const resolvedIndex = agents.findIndex((marker) => marker.id === agent.id);
+    if (resolvedIndex < 0) continue;
+    const list = byNode.get(agent.position.nodeId) ?? [];
+    list.push(resolvedIndex);
+    byNode.set(agent.position.nodeId, list);
+  }
+  const result = [...agents];
+  for (const [nodeId, indices] of byNode) {
+    const node = map.nodes.get(nodeId);
+    if (!node) continue;
+    const radius = node.kind === "junction" ? (indices.length > 1 ? JUNCTION_SPREAD : 0) : NODE_CLEARANCE;
+    if (radius === 0) continue;
+    indices.forEach((markerIndex, slot) => {
+      const angle = Math.PI / 2 + (slot - (indices.length - 1) / 2) * 0.85;
+      const marker = result[markerIndex]!;
+      result[markerIndex] = {
+        ...marker,
+        position: { x: node.x + Math.cos(angle) * radius, z: node.z + Math.sin(angle) * radius },
+      };
     });
   }
-
-  const fireCells = resolveFireCells(view, map);
-
-  return {
-    agents,
-    sites,
-    fireCells,
-    routes: buildRouteLines(view, map, null),
-    forecast: buildForecastLayer(view, map),
-  };
+  return result;
 }
 
 /**
@@ -136,6 +189,7 @@ function resolveFireCells(view: CoordinatorView, _map: ScenarioMap): FireCellMar
       burnState: cell.burnState,
       stale: cell.stale,
       lastObservedAt: cell.lastObservedAt as number,
+      ageMs: ageOf(view.simTimeMs as number, cell.lastObservedAt as number) ?? 0,
     });
   }
   return fireCells;

@@ -7,6 +7,8 @@ import { SceneLabelLayer, type LabelDescriptor } from "./SceneLabelLayer.js";
 import { SceneLegend } from "./SceneLegend.js";
 import type { CameraControlsHandle } from "./CameraControls.js";
 import { sceneTerrain } from "./terrain/sceneTerrain.js";
+import { agentLabelText } from "./models/markerCues.js";
+import { freshness } from "./staleness.js";
 import { polylineMidpoint } from "./sceneLayers.js";
 import { listRefugeNodes, type FireCellMarker, type SceneEntities } from "./sceneEntities.js";
 import { scenarioMap } from "../../map/activeScenario.js";
@@ -32,6 +34,12 @@ export interface SceneViewProps {
 interface RenderContext {
   readonly camera: Camera;
   readonly canvasElement: HTMLCanvasElement;
+}
+
+function agentStaleText(agent: SceneEntities["agents"][number]): string {
+  const base = agentLabelText(agent.callsign, agent.state);
+  const fresh = freshness(agent.ageMs);
+  return fresh.stale ? `${base} (${fresh.ageLabel})` : base;
 }
 
 /** Combines the 3D canvas, DOM label overlay, and legend into one scene region. */
@@ -73,7 +81,7 @@ export function SceneView({
     const refugeLabels = listRefugeNodes(scenarioMap).map((refuge) => ({
       id: `refuge:${refuge.id}`,
       x: refuge.x,
-      y: sceneTerrain.groundY(refuge.x, refuge.z) + 14,
+      y: sceneTerrain.groundY(refuge.x, refuge.z) + 30,
       z: refuge.z,
       text: refuge.label ?? "Refuge",
       variant: "refuge" as const,
@@ -85,22 +93,25 @@ export function SceneView({
       // out as text. Sites have no click-to-inspect (unlike agents and fire
       // cells), so the label is the only accessible path to either value.
       const damageLabel = siteDamageLabel(site.damage);
+      const fresh = freshness(site.ageMs, site.stale);
       return {
         id: `site:${site.id}`,
         x: site.position.x,
-        y: sceneTerrain.groundY(site.position.x, site.position.z) + 18,
+        y: sceneTerrain.groundY(site.position.x, site.position.z) + 40,
         z: site.position.z,
-        text: `${site.name} — ${siteProtectionStatusLabel(site.protectionStatus)}${damageLabel ? `, ${damageLabel}` : ""}${site.stale ? " (stale)" : ""}`,
+        text: `${site.name} — ${siteProtectionStatusLabel(site.protectionStatus)}${damageLabel ? `, ${damageLabel}` : ""}${fresh.stale && site.ageMs !== null ? ` (stale, ${fresh.ageLabel})` : ""}`,
         variant: "site" as const,
+        stale: fresh.stale && site.ageMs !== null,
       };
     });
     const agentLabels = entities.agents.map((agent) => ({
       id: `agent:${agent.id}`,
       x: agent.position.x,
-      y: sceneTerrain.groundY(agent.position.x, agent.position.z) + 22,
+      y: sceneTerrain.groundY(agent.position.x, agent.position.z) + 44,
       z: agent.position.z,
-      text: agent.callsign,
+      text: agentStaleText(agent),
       variant: "agent" as const,
+      stale: freshness(agent.ageMs).stale,
     }));
     const routeLabels = entities.routes.map((line) => {
       const mid = polylineMidpoint(line.points);

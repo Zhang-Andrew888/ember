@@ -29,6 +29,7 @@ import {
 } from "@ember/navigation";
 import type { AgentProjection, SimInput } from "@ember/simulation";
 import { RoadIndex, type PublicMap } from "@ember/simulation/model";
+import { capabilitiesOf, type CrewCapabilities } from "./crew-roles.js";
 import { decideContinuation, decideOrder } from "./autonomy.js";
 import { EvidenceTracker } from "./evidence.js";
 import { applyStyle, type CommStyle } from "./style.js";
@@ -116,6 +117,11 @@ export class CrewController implements AgentController {
     this.cfg = { ...DEFAULT_CONTROLLER_CONFIG, ...options.config };
     this.forecast = new ForecastService(options.agentId, options.map, this.cfg.forecast);
     this.evidence = new EvidenceTracker(options.map);
+  }
+
+  /** This role's documented speed and work rate. */
+  get capabilities(): CrewCapabilities {
+    return capabilitiesOf(this.role);
   }
 
   get state(): ControllerState {
@@ -469,7 +475,7 @@ export class CrewController implements AgentController {
   }
 
   candidateSearch(ctx: PlanningContext, allowed: ReadonlySet<string> | null): MissionSearchResult {
-    const targets = protectionTargets(this.evidence.siteKnowledge(), this.cfg.nav?.crewWorkRate ?? 1, allowed);
+    const targets = protectionTargets(this.evidence.siteKnowledge(), this.cfg.nav?.crewWorkRate ?? this.capabilities.workRate, allowed);
     return planMissions(ctx, targets);
   }
 
