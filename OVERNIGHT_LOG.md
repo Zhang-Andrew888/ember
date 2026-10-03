@@ -1487,3 +1487,19 @@ the map and the camera was cropped (zoom clamp); fixed both. Still off: fire cel
 forest (3c: flame cards, ground glow); fog still flattens the far edge.
 PR: #12 (feat/web-scene -> main) open; #8 was merged into lane/web earlier.
 Blocked: nothing. Next: 3c fire shaders + ground glow/char.
+
+### Commit 6: item 3c - fire as light (flame cards, embers, smoke, ground glow and char)
+Changed: `fire/shaders.ts` (hand-written GLSL; no library), `Fire.tsx` (instanced crossed flame cards with additive
+blending, rising ember points, faint smoke puffs), `fire/fireMap.ts` + `fireLight.ts` (64x64 observed-only light/char
+texture sampled by the terrain and tree materials), `anim/sceneClock.tsx` (one capped 66 ms clock for all decorative
+motion under frameloop="demand"), `FireCells.tsx` reduced to flat inspectable ember-bed tiles (the old pulse is gone).
+Observed fire only: flames come from observed burning cells, the glow map from observed cells, embers/smoke from fresh
+burning cells only. Stale burning = grey hatched static ghost and a quarter of the ground light. Burned = char, no
+light. Tests cover: nothing observed -> fully dark map, stale < fresh, burned lights nothing, no flames for
+burned/unburned. Fire toggle now governs flames, glow and tree char together. Reduced motion: clock stopped
+(uMotion 0), no embers/smoke, flames held steady.
+Self-critique (3x crop of the patch): first pass glowed too hot (trees washed pale yellow), pool was boxy, flames
+tiny. Switched to a smooth radial falloff over 3 cells, halved the emissive gain (0.55 -> 0.3), raised flames to
+1.9 cells tall. Now: soft warm pool, readable flame cards, grey ghosts clearly distinct. Still off: flame/glow have
+no bloom yet; far fog flattens the north edge; only 2 live cells in the mock so the effect is modest.
+PR: #14 open (3b). Blocked: nothing. Next: 3d post-processing (bloom/vignette/AA), auto quality, dev-only debug panel.

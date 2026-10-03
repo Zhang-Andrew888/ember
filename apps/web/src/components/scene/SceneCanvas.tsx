@@ -2,6 +2,8 @@ import { forwardRef, useMemo } from "react";
 import { Canvas, type RootState } from "@react-three/fiber";
 import { Terrain } from "./Terrain.js";
 import { Trees } from "./Trees.js";
+import { Fire } from "./Fire.js";
+import { SceneClock } from "./anim/sceneClock.js";
 import { QualityProvider } from "./quality/QualityContext.js";
 import { effectiveQuality } from "./quality/tiers.js";
 import { Roads } from "./Roads.js";
@@ -45,6 +47,8 @@ export const SceneCanvas = forwardRef<CameraControlsHandle, SceneCanvasProps>(fu
   controlsRef,
 ) {
   const quality = useMemo(() => effectiveQuality("high", reducedMotion), [reducedMotion]);
+  // The fire toggle governs every observed-fire effect (flames, ground light, char), not just the tiles.
+  const visibleCells = useMemo(() => (showFireCells ? entities.fireCells : []), [showFireCells, entities.fireCells]);
   const refuges = listRefugeNodes(scenarioMap);
   const routeLines = useMemo(
     () => entities.routes.map((line) => ({ ...line, selected: line.agentId === selectedAgentId })),
@@ -59,7 +63,7 @@ export const SceneCanvas = forwardRef<CameraControlsHandle, SceneCanvasProps>(fu
       onCreated={onReady}
       // The scene is static between interactions - render on demand
       // (camera move, new snapshot, pulse animation) instead of a
-      // continuous 60fps loop. See CameraControls.tsx and FireCells.tsx
+      // continuous 60fps loop. See CameraControls.tsx and anim/sceneClock.tsx
       // for the invalidate() calls that keep this correct.
       frameloop="demand"
     >
@@ -70,13 +74,15 @@ export const SceneCanvas = forwardRef<CameraControlsHandle, SceneCanvasProps>(fu
       <directionalLight position={[-420, 300, 260]} color={ATMOSPHERE.key} intensity={1.0} />
       <QualityProvider value={quality}>
       <Terrain />
-      <Trees fireCells={entities.fireCells} reducedMotion={reducedMotion} />
+      <SceneClock animated={!reducedMotion} />
+      <Trees fireCells={visibleCells} reducedMotion={reducedMotion} />
+      <Fire cells={visibleCells} reducedMotion={reducedMotion} />
       <Roads />
       {showForecast && entities.forecast ? <ForecastLayer layer={entities.forecast} /> : null}
       <RefugeMarkers refuges={refuges} />
       <SiteMarkers sites={entities.sites} />
       {showFireCells ? (
-        <FireCells cells={entities.fireCells} reducedMotion={reducedMotion} onInspectCell={onInspectCell} />
+        <FireCells cells={entities.fireCells} onInspectCell={onInspectCell} />
       ) : null}
       {showRoutes ? <RouteLayer lines={routeLines} /> : null}
       <AgentMarkers
