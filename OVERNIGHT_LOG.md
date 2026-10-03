@@ -850,3 +850,45 @@ work against its own requirements:
 instructions and re-check periodically until 10:00 ET per the active
 directive, rather than manufacturing speculative changes once legitimate,
 verifiable leads run out.
+
+## 2026-10-03 08:5x UTC (04:5x ET) - a genuinely new finding: narrow-viewport composer was unreachable
+
+Different class of check than the last two rounds: instead of re-reading
+a feature's own requirement text, noticed that this session's only two
+viewport checks all session (1440x900, and the docs/VALIDATION.md-
+specified 1024x720) both sit at or above `global.css`'s
+`@media (max-width: 1023px)` breakpoint - meaning the narrow/stacked
+layout that breakpoint exists to produce had never actually been
+rendered or measured by anyone, this whole session, despite
+docs/FRONTEND.md explicitly requiring it: "On narrower screens stack
+scene above conversation and preserve the urgent strip and composer."
+
+Checked it live at 800x700 (well inside the breakpoint) and found a real,
+confirmed bug: the composer (message input, Send, Push to talk) rendered
+entirely below the viewport - measured precisely via DOM region heights
+and `boundingBox()`, not just a screenshot glance: total document height
+796px vs a 700px viewport, composer's own box starting at y=703.8 (nothing
+visible there without scrolling down). Root cause: `.scene-view` had
+`min-width: 0` (needed for the normal row-layout's horizontal flex-shrink)
+but no `min-height: 0` - a flex item's default `min-height: auto` blocks
+shrinking below its content's natural size for a box with replaced
+content (the Canvas), which only matters once the narrow-viewport media
+query flips the container to `flex-direction: column` and height becomes
+the shrink axis instead of width.
+
+Fixed (`9932bde`) by adding `min-height: 0` to `.scene-view`, symmetric
+with its existing `min-width: 0`. Verified live: at 800x700, document
+height now exactly matches the 700px viewport (no scroll needed at all),
+scene shrinks correctly above the conversation panel, composer's box is
+now fully within the viewport. Re-verified both documented viewports
+(1440x900, 1024x720) are completely unaffected (still row layout, zero
+overflow, zero page errors) - `min-height: 0` only matters once something
+actually switches the shrink axis to height, which never happens in row
+mode. Full 8-scenario regression smoke test still clean.
+
+**Verified:** typecheck/lint/test green (120 tests, 17 files).
+
+**Status:** CI green on `9932bde` (verified via the GitHub Actions API;
+the Lint job sat queued on a runner for several minutes this time - a
+GitHub Actions capacity delay, not a failure - Test and Typecheck had
+already passed in the usual ~15s).
