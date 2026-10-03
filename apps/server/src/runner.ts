@@ -12,11 +12,10 @@ export interface MonotonicClock {
   nowMs(): number;
 }
 
-export interface TechnicalFailure {
-  readonly kind: "processing_backlog";
-  readonly atWallMs: number;
-  readonly backlogSimMs: number;
-}
+export type TechnicalFailure =
+  | { readonly kind: "processing_backlog"; readonly atWallMs: number; readonly backlogSimMs: number }
+  /** An exception escaped a pump or a client-message handler; the message is never sent to clients. */
+  | { readonly kind: "internal_error"; readonly atWallMs: number };
 
 export interface RunnerOptions {
   /** Backlog (simulated ms behind due time) above which a technical failure is recorded. */

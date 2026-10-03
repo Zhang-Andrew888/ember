@@ -32,13 +32,17 @@ function tokenFromQuery(url: string | undefined): string | undefined {
   return new URLSearchParams(q).get("token") ?? undefined;
 }
 
+function errorText(error: unknown): string {
+  return error instanceof Error ? (error.stack ?? error.message) : String(error);
+}
+
 /**
  * Fastify HTTP routes plus WebSocket upgrade for `/incidents/:id/events` and `/incidents/:id/voice`.
  * Voice uses the same validated JSON push-to-talk messages as events (provider audio is future work).
  */
-export async function startHttpApp(options: { port?: number; clock?: MonotonicClock } = {}): Promise<HttpAppHandle> {
+export async function startHttpApp(options: { port?: number; clock?: MonotonicClock; seed?: string } = {}): Promise<HttpAppHandle> {
   const clock: MonotonicClock = options.clock ?? { nowMs: () => performance.now() };
-  const registry = new IncidentRegistry();
+  const registry = new IncidentRegistry(options.seed);
   const fastify = Fastify({ logger: false });
   const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_MESSAGE_BYTES });
   const sockets = new Map<WebSocket, { clientId: ClientId; record: NonNullable<ReturnType<IncidentRegistry["get"]>> }>();
@@ -130,6 +134,18 @@ export async function startHttpApp(options: { port?: number; clock?: MonotonicCl
     for (const m of entry.record.hub.drain(entry.clientId)) ws.send(m);
   };
 
+  /** A throwing message handler must not take the process down; clients get a fixed-text notice. */
+  const reportFailure = (record: NonNullable<ReturnType<IncidentRegistry["get"]>>, where: string, error: unknown): void => {
+    process.stderr.write(`ember-server: ${where} failed: ${errorText(error)}\n`);
+    record.live.failures.push({ kind: "internal_error", atWallMs: record.live.wallElapsedMs });
+    try {
+      record.hub.notifyTechnicalFailure();
+      for (const [ws, entry] of sockets) if (entry.record === record) flushClient(ws);
+    } catch (notifyError) {
+      process.stderr.write(`ember-server: failure notice failed: ${errorText(notifyError)}\n`);
+    }
+  };
+
   fastify.server.on("upgrade", (request: IncomingMessage, socket: unknown, head: Uint8Array) => {
     const rawSocket = socket as { destroy(): void; write(data: string): void };
     const route = parseIncidentPath(request.url);
@@ -149,8 +165,12 @@ export async function startHttpApp(options: { port?: number; clock?: MonotonicCl
       const clientId = record.hub.connect();
       sockets.set(ws, { clientId, record });
       ws.on("message", (data) => {
-        record.hub.handle(clientId, data.toString(), record.live.wallElapsedMs);
-        flushClient(ws);
+        try {
+          record.hub.handle(clientId, data.toString(), record.live.wallElapsedMs);
+          flushClient(ws);
+        } catch (error) {
+          reportFailure(record, "message handler", error);
+        }
       });
       ws.on("close", () => {
         record.hub.disconnect(clientId, record.live.wallElapsedMs);
@@ -163,9 +183,15 @@ export async function startHttpApp(options: { port?: number; clock?: MonotonicCl
   const timer = setInterval(() => {
     for (const record of registry.all()) {
       if (!record.started) continue;
-      record.live.pump();
+      record.live.safePump();
     }
-    for (const ws of [...sockets.keys()]) flushClient(ws);
+    for (const ws of [...sockets.keys()]) {
+      try {
+        flushClient(ws);
+      } catch (error) {
+        process.stderr.write(`ember-server: flush failed: ${errorText(error)}\n`);
+      }
+    }
   }, FLUSH_EVERY_MS);
 
   return {

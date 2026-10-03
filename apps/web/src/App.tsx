@@ -7,11 +7,14 @@ import { createMockIncidentSocket, type MockIncidentSocket } from "./net/mockInc
 import { resolveScenario } from "./net/scenarioSelection.js";
 import {
   createIncident,
+  fetchIncidentReplay,
   resolveWebSocketUrl,
   startIncident,
+  type IncidentReplayRecording,
 } from "./net/incidentRestClient.js";
 import { newCommandId } from "./net/commandId.js";
 import { planStart, START_FAILED_MESSAGE } from "./net/startPlan.js";
+import { transportModeFromStartPlan } from "./net/transportMode.js";
 import { createProtocolWebSocket, type ProtocolWebSocket } from "./net/protocolWebSocket.js";
 import { mockWireRepliesForSay } from "./net/mockCommandSimulator.js";
 import { useCoordinatorView } from "./state/useCoordinatorView.js";
@@ -30,7 +33,7 @@ import { ConversationPanel } from "./components/ConversationPanel.js";
 import { UrgentStrip } from "./components/UrgentStrip.js";
 import { AgentRail } from "./components/AgentRail.js";
 import { EndOverlay } from "./components/EndOverlay.js";
-import { ReplayView } from "./components/ReplayView.js";
+import { ReplayView, type ReplaySource } from "./components/ReplayView.js";
 import { ConnectionBanner } from "./components/ConnectionBanner.js";
 import { DemoBanner } from "./components/DemoBanner.js";
 import { playPreparedSpeech } from "./net/grokSpeechPlayback.js";
@@ -43,6 +46,7 @@ const WS_URL = import.meta.env.VITE_INCIDENT_WS_URL as string | undefined;
 const REST_BASE_URL = import.meta.env.VITE_INCIDENT_REST_BASE_URL as string | undefined;
 const HAS_LIVE_REST = REST_BASE_URL !== undefined;
 const START_PLAN = planStart({ wsUrl: WS_URL, restBase: REST_BASE_URL });
+const TRANSPORT_MODE = transportModeFromStartPlan(START_PLAN);
 const IS_MOCK_MODE = START_PLAN.kind === "mock";
 const USE_GROK_VOICE = import.meta.env.VITE_GROK_VOICE === "1";
 const GROK_LIVE = USE_GROK_VOICE && HAS_LIVE_REST;
@@ -58,6 +62,10 @@ export function App() {
   const [startError, setStartError] = useState<string | null>(null);
   const [client, setClient] = useState<CoordinatorViewClient | null>(null);
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
+  const [replaySource, setReplaySource] = useState<ReplaySource>("illustrative");
+  const [replayRecording, setReplayRecording] = useState<IncidentReplayRecording | null>(null);
+  const [replayLoading, setReplayLoading] = useState(false);
+  const [replayError, setReplayError] = useState<string | null>(null);
   const mockSocketRef = useRef<MockIncidentSocket | null>(null);
   const protocolSocketRef = useRef<ProtocolWebSocket | null>(null);
   const liveSessionRef = useRef<{ incidentId: string; token: string } | null>(null);
@@ -171,7 +179,38 @@ export function App() {
     window.location.reload();
   }, []);
 
-  const handleReplay = useCallback(() => setPhase("replay"), []);
+  const replayOffer = IS_MOCK_MODE ? "illustrative" : HAS_LIVE_REST ? "this-run" : "none";
+
+  const handleReplay = useCallback(async () => {
+    setReplayError(null);
+    if (IS_MOCK_MODE) {
+      setReplaySource("illustrative");
+      setReplayRecording(null);
+      setPhase("replay");
+      return;
+    }
+    const incidentId = liveSessionRef.current?.incidentId ?? INCIDENT_ID;
+    const token = liveSessionRef.current?.token ?? INCIDENT_TOKEN;
+    if (!HAS_LIVE_REST || token === undefined) {
+      setReplayError("Replay is not available for this session.");
+      return;
+    }
+    setReplayLoading(true);
+    const result = await fetchIncidentReplay(REST_BASE_URL ?? "", incidentId, token);
+    setReplayLoading(false);
+    if (result.status === "ok") {
+      setReplaySource("incident");
+      setReplayRecording(result.recording);
+      setPhase("replay");
+      return;
+    }
+    setReplayError(
+      result.status === "active"
+        ? "This run is still active; replay unlocks when the incident ends."
+        : "Could not load replay for this run.",
+    );
+  }, []);
+
   const handleExitReplay = useCallback(() => setPhase("live"), []);
 
   const dispatchSay = useCallback(
@@ -245,11 +284,25 @@ export function App() {
   const composerDisabled = connectionStatus !== "open" || Boolean(view?.incidentEnd);
 
   if (phase === "briefing") {
-    return <Briefing onStart={handleStart} starting={starting} demoMode={demoMode} error={startError} />;
+    return (
+      <Briefing
+        onStart={handleStart}
+        starting={starting}
+        demoMode={demoMode}
+        transportMode={TRANSPORT_MODE}
+        error={startError}
+      />
+    );
   }
 
   if (phase === "replay") {
-    return <ReplayView onExit={handleExitReplay} />;
+    return (
+      <ReplayView
+        onExit={handleExitReplay}
+        source={replaySource}
+        {...(replayRecording === null ? {} : { recording: replayRecording })}
+      />
+    );
   }
 
   const hasEnded = Boolean(view?.incidentEnd);
@@ -260,6 +313,7 @@ export function App() {
       <ConnectionBanner status={connectionStatus} />
       <div className="app-layout__content" inert={hasEnded || undefined}>
         <TopBar
+          transportMode={TRANSPORT_MODE}
           simTimeMs={view ? (view.simTimeMs as number) : null}
           wallElapsedMs={view ? (view.wallElapsedMs as number) : null}
           connectionStatus={connectionStatus}
@@ -299,7 +353,16 @@ export function App() {
         />
       </div>
       {view?.incidentEnd ? (
-        <EndOverlay incidentEnd={view.incidentEnd} onStartAgain={handleStartAgain} onReplay={handleReplay} />
+        <EndOverlay
+          incidentEnd={view.incidentEnd}
+          onStartAgain={handleStartAgain}
+          onReplay={() => {
+            void handleReplay();
+          }}
+          replayOffer={replayOffer}
+          replayLoading={replayLoading}
+          replayError={replayError}
+        />
       ) : null}
     </div>
   );

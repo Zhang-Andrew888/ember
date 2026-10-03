@@ -66,7 +66,7 @@ export class ScriptedInterpreter implements Interpreter {
     }
 
     const site = req.directory.sites.find((s) => tokensOverlap(lower, s.name));
-    if (/\b(status|where are you|what are you doing|how long|when will)\b/.test(lower) && !/\bprotect\b/.test(lower)) {
+    if (/\b(status|where are you|what are you doing|how long|when will|explain|your plan|what'?s your plan|why are you)\b/.test(lower) && !/\bprotect\b/.test(lower)) {
       envelope.kind = "status";
     } else if (/\b(protect|save|defend|work on|go to)\b/.test(lower)) {
       envelope.objective = { kind: "protect", ...(site === undefined ? targetGuess(lower) : { targetName: site.name }) };

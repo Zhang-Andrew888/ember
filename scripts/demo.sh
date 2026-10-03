@@ -16,6 +16,8 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
+# shellcheck source=lib/demo-ports.sh
+source "$ROOT/scripts/lib/demo-ports.sh"
 
 MODE="live"
 SMOKE=0
@@ -82,6 +84,7 @@ if [ "$MODE" = "live" ]; then
   if curl -fsS "http://127.0.0.1:$PORT/health" >/dev/null 2>&1; then
     log "a server is already listening on :$PORT; reusing it"
   else
+    require_port_free "$PORT" "server"
     log "starting server on :$PORT (log: $LOG_DIR/server.log)"
     PORT="$PORT" pnpm --filter ember-server exec tsx src/main.ts >"$LOG_DIR/server.log" 2>&1 &
     PIDS+=("$!")
@@ -91,6 +94,7 @@ if [ "$MODE" = "live" ]; then
 fi
 
 if [ "$START_WEB" = "1" ]; then
+  require_port_free "$WEB_PORT" "web"
   log "starting web on :$WEB_PORT in $MODE mode (log: $LOG_DIR/web.log)"
   # Bind IPv4 explicitly: vite's default "localhost" may resolve to ::1 only, which breaks 127.0.0.1 probes.
   if [ "$MODE" = "live" ]; then
@@ -101,7 +105,7 @@ if [ "$START_WEB" = "1" ]; then
   fi
   PIDS+=("$!")
   wait_for_http "http://127.0.0.1:$WEB_PORT/" "web" || { cat "$LOG_DIR/web.log"; exit 1; }
-  log "web ready: http://localhost:$WEB_PORT/"
+  log "web ready: http://127.0.0.1:$WEB_PORT/ (use this URL — localhost may hit a stale [::1] listener)"
 fi
 
 if [ "$SMOKE" = "1" ]; then

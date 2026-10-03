@@ -1,9 +1,11 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import {
   createIncident,
+  fetchIncidentReplay,
   resolveWebSocketUrl,
   startIncident,
 } from "./incidentRestClient.js";
+import { mockRecording } from "../replay/mockRecording.js";
 
 describe("net/incidentRestClient - startIncident", () => {
   afterEach(() => {
@@ -87,6 +89,49 @@ describe("net/incidentRestClient - createIncident", () => {
   it("returns null on failed response", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false }));
     expect(await createIncident("http://localhost:3000")).toBeNull();
+  });
+});
+
+describe("net/incidentRestClient - fetchIncidentReplay", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("parses coordinator log and truth frames on success", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          coordinatorLog: mockRecording.coordinatorLog,
+          truthFrames: mockRecording.truthFrames,
+          end: { tick: 1, displayReason: "time", matchingReasons: ["time"] },
+        }),
+      }),
+    );
+
+    const result = await fetchIncidentReplay("http://localhost:3000", "inc-1", "tok");
+    expect(result.status).toBe("ok");
+    if (result.status === "ok") {
+      expect(result.recording.coordinatorLog.length).toBe(mockRecording.coordinatorLog.length);
+    }
+    expect(vi.mocked(fetch)).toHaveBeenCalledWith("http://localhost:3000/incidents/inc-1/replay", {
+      headers: { "x-incident-token": "tok" },
+    });
+  });
+
+  it("returns active when the server responds 409", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 409 }));
+    expect(await fetchIncidentReplay("http://localhost:3000", "x", "t")).toEqual({ status: "active" });
+  });
+
+  it("returns error on invalid payload", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ coordinatorLog: [], truthFrames: [] }) }),
+    );
+    expect(await fetchIncidentReplay("http://localhost:3000", "x", "t")).toEqual({ status: "error" });
   });
 });
 
