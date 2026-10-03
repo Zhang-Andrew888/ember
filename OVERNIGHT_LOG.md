@@ -892,3 +892,46 @@ mode. Full 8-scenario regression smoke test still clean.
 the Lint job sat queued on a runner for several minutes this time - a
 GitHub Actions capacity delay, not a failure - Test and Typecheck had
 already passed in the usual ~15s).
+
+## 2026-10-03 08:5x-09:0x UTC (04:5x-05:0x ET) - another real finding: site damage was color-only, with no inspection path at all
+
+Continued the same methodology that found the narrow-viewport bug: re-read
+`docs/FRONTEND.md` in full, end to end, checking each specific claim
+against what actually ships, rather than trusting memory of having
+"covered accessibility already."
+
+Found: "Site protection and site damage have separate indicators. '60%
+protected' is not '60% health'" and the existing "do not convey ... by
+color alone" rule. `SiteMarkers.tsx` already drew a damage ring (red,
+sized by `site.damage`) when `observedDamage > 0` - but nothing anywhere
+converts that ratio to text. This is a worse case of the exact bug fixed
+earlier this session for site *protection* status (`7dd95ee`): sites have
+no click-to-inspect at all (unlike agents via AgentRail, and fire cells
+via the legend's `<details>` disclosure added for backlog item 2), so the
+damage ring was the *only* way to learn a site was damaged, and the exact
+percentage was never recoverable as text by any means.
+
+Never caught earlier because no fixture, authored mock snapshot, or
+scenario anywhere in the codebase had ever set `observedDamage` above 0 -
+confirmed by grepping every `observedDamage` usage site. The ring has
+literally never been rendered this entire session.
+
+Added (`08d4c2e`):
+- `net/scenarios.ts`'s `siteDamageScenario` (0.4 damage on an in-progress
+  site), reachable via `?scenario=site-damage`, following the exact
+  pattern `stale-contradiction` etc. already established - needed to
+  verify this live rather than only reasoning about it from the code.
+- `format/reports.ts`'s `siteDamageLabel()` (rounds to a percentage, null
+  when there's nothing to report).
+- Wired into `SceneView.tsx`'s site label text, alongside the existing
+  protection-status text.
+
+**Verified live** at `?scenario=site-damage`: the label now reads "Ridge
+Cabins — protection underway, 40% damaged" - the two facts genuinely read
+as separate, not conflated. Full 9-scenario regression smoke test (8
+existing + this new one) clean, zero page errors.
+
+**Verified:** typecheck/lint/test all green (127 tests, 17 files - up
+from 120; 5 new `siteDamageLabel` tests, 2 new scenario tests).
+
+**Status:** CI green on `08d4c2e` (verified via the GitHub Actions API).
