@@ -31,4 +31,11 @@ describe("replay truth reveal", () => {
     expect(counts[counts.length - 1]).toBeGreaterThan(counts[0] ?? 0);
     expect(Number.isFinite(reveal.ignitedAtMs[record.scenario.map.initialFireCells[0]!])).toBe(true);
   });
+
+  it("always ends on a frame at the recorded final time, whatever the frame interval", () => {
+    const reveal = revealFire(record, 70_000);
+    expect(reveal.frames[reveal.frames.length - 1]?.timeMs).toBe(record.finalTimeMs);
+    const times = reveal.frames.map((f) => f.timeMs);
+    expect(new Set(times).size).toBe(times.length);
+  });
 });

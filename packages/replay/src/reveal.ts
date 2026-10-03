@@ -40,6 +40,7 @@ export function revealFire(rawRecord: RunRecord, frameEveryMs = 10_000): FireRev
     incident.advanceTo(next);
     if (incident.simTimeMs % frameEveryMs === 0) capture();
   }
+  if (frames[frames.length - 1]?.timeMs !== incident.simTimeMs) capture();
   return {
     frames,
     ignitedAtMs: incident.truth().cellIgnitedAtMs,
