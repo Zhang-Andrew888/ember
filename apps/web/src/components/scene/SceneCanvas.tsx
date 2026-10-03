@@ -36,6 +36,11 @@ export const SceneCanvas = forwardRef<CameraControlsHandle, SceneCanvasProps>(fu
       camera={{ position: INITIAL_CAMERA_POSITION, zoom: INITIAL_ZOOM, near: 1, far: 4000 }}
       dpr={[1, 1.5]}
       onCreated={onReady}
+      // The scene is static between interactions - render on demand
+      // (camera move, new snapshot, pulse animation) instead of a
+      // continuous 60fps loop. See CameraControls.tsx and FireCells.tsx
+      // for the invalidate() calls that keep this correct.
+      frameloop="demand"
     >
       <ambientLight intensity={0.65} />
       <directionalLight position={[300, 500, 200]} intensity={0.9} />

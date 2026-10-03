@@ -38,7 +38,7 @@ export const CameraControls = forwardRef<CameraControlsHandle, CameraControlsPro
   { reducedMotion },
   ref,
 ) {
-  const { camera, gl } = useThree();
+  const { camera, gl, invalidate } = useThree();
   const animationRef = useRef<FocusAnimation | null>(null);
 
   const controls = useMemo(() => {
@@ -61,6 +61,15 @@ export const CameraControls = forwardRef<CameraControlsHandle, CameraControlsPro
   }, [controls, reducedMotion]);
 
   useEffect(() => controls.dispose, [controls]);
+
+  // Canvas uses frameloop="demand" (SceneCanvas.tsx) - nothing renders
+  // unless something actually changed. Pointer-driven orbiting already
+  // invalidates through this; damping settling after a drag needs it too.
+  useEffect(() => {
+    const handleChange = () => invalidate();
+    controls.addEventListener("change", handleChange);
+    return () => controls.removeEventListener("change", handleChange);
+  }, [controls, invalidate]);
 
   useImperativeHandle(
     ref,
@@ -93,6 +102,7 @@ export const CameraControls = forwardRef<CameraControlsHandle, CameraControlsPro
           toPosition,
           start: performance.now(),
         };
+        invalidate(); // kick off the first frame of the tween under frameloop="demand"
       },
     }),
     [controls, camera, reducedMotion],
@@ -105,7 +115,11 @@ export const CameraControls = forwardRef<CameraControlsHandle, CameraControlsPro
       const eased = easeOutCubic(t);
       controls.target.lerpVectors(animation.fromTarget, animation.toTarget, eased);
       camera.position.lerpVectors(animation.fromPosition, animation.toPosition, eased);
-      if (t >= 1) animationRef.current = null;
+      if (t >= 1) {
+        animationRef.current = null;
+      } else {
+        invalidate(); // keep the tween running under frameloop="demand"
+      }
     }
     controls.update();
   });
