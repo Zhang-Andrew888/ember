@@ -779,3 +779,40 @@ the area - 8.91:1, well clear of the 4.5:1 normal-text minimum.
 **Next:** keep looking for this same class of cross-cutting gap (does a
 later backlog item's new UI hold up against an earlier item's own
 checklist) before considering the session's work exhausted.
+
+## 2026-10-03 08:4x UTC (04:4x ET) - cross-checking backlog item 4's own requirement text
+
+Same approach as the previous entry: re-read `docs/FRONTEND.md`'s literal
+push-to-talk requirement against what backlog item 4 actually shipped,
+rather than trusting the earlier commit's own summary of itself. The doc
+says: "release/cancel/lost-focus always ends capture safely." The pointer
+modality gets all three for free (`onPointerUp`/`onPointerCancel`/
+`onBlur`); the keyboard modality only had release (`keyup` -> commit) and
+lost-focus (`blur` -> cancel) - a keyboard-only user had no way to abort
+an in-progress hold without either committing it or tabbing focus away
+entirely, which is not the same thing as a safe, deliberate cancel.
+
+Added (`41df397`) an `Escape` handler to `ConversationPanel.tsx`'s
+`handleKeyDown`, scoped to only act while actually `recording` so it's a
+no-op in every other state. Verified live: holding Space past the
+adapter's minimum-hold guard then pressing Escape drops `aria-pressed`
+back to `false` and the label back to "Push to talk" immediately, with
+no transcript entry added; a real hold-then-release right after still
+commits normally. Full 8-scenario regression smoke test still clean.
+
+(Also investigated, but deliberately did not change: whether
+`SceneView`'s fire-cell inspection panel could show stale data if a
+cell's state changes while the panel is open - architecturally possible
+since `inspectedCell` holds a snapshot object reference rather than a
+live lookup by key, but no existing authored data path - live mock
+snapshots or the replay log - actually changes `observedCells` for any
+already-recorded cell at all, so this can't currently be reproduced live
+with real data. Not fixing something I can't verify with an actual
+reproduction, consistent with this whole session's practice of only
+shipping changes caught by a real test/screenshot/measurement, not by
+code-reading speculation. Leaving this as a known, documented, currently-
+unreachable architectural note rather than a silent gap.)
+
+**Verified:** typecheck/lint/test green (120 tests, 17 files).
+
+**Status:** CI green on `41df397` (verified via the GitHub Actions API).
