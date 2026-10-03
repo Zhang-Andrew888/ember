@@ -81,7 +81,7 @@ describe("net/mockIncidentSocket - createMockIncidentSocket", () => {
     expect(socket.readyState).toBe(3);
   });
 
-  it("failToOpen fires onerror then onclose, never onopen", () => {
+  it("failToOpen fires onerror, then onclose on a later tick (never the same one), never onopen", () => {
     const socket = createMockIncidentSocket({ failToOpen: true });
     const onopen = vi.fn();
     const onerror = vi.fn();
@@ -94,6 +94,12 @@ describe("net/mockIncidentSocket - createMockIncidentSocket", () => {
 
     expect(onopen).not.toHaveBeenCalled();
     expect(onerror).toHaveBeenCalledTimes(1);
+    // onclose must not fire in the same tick as onerror - otherwise a
+    // React host batches both state updates and "error" is never painted.
+    expect(onclose).not.toHaveBeenCalled();
+    expect(socket.readyState).toBe(0);
+
+    vi.advanceTimersByTime(100);
     expect(onclose).toHaveBeenCalledTimes(1);
     expect(socket.readyState).toBe(3);
   });

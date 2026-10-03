@@ -174,9 +174,18 @@ export function createMockIncidentSocket(options: MockIncidentSocketOptions = {}
   if (options.failToOpen) {
     timers.push(
       setTimeout(() => {
-        readyState = CLOSED;
+        // onerror and onclose are two separate ticks, not one: a real
+        // WebSocket failure (DNS, refused connection) has a gap between
+        // them, and firing both in the same synchronous callback meant
+        // React batched the two setState calls into one commit - the
+        // "error" status was computed but never actually painted.
         socket.onerror?.();
-        socket.onclose?.();
+        timers.push(
+          setTimeout(() => {
+            readyState = CLOSED;
+            socket.onclose?.();
+          }, 50),
+        );
       }, 0),
     );
     return socket;

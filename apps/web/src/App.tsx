@@ -5,6 +5,7 @@ import {
   type WebSocketLike,
 } from "./net/CoordinatorViewClient.js";
 import { createMockIncidentSocket, type MockIncidentSocket } from "./net/mockIncidentSocket.js";
+import { resolveScenario } from "./net/scenarioSelection.js";
 import { startIncident } from "./net/incidentRestClient.js";
 import { useCoordinatorView } from "./state/useCoordinatorView.js";
 import { useReducedMotion } from "./state/useReducedMotion.js";
@@ -40,7 +41,11 @@ export function App() {
 
   const openSocket = useCallback(() => {
     if (IS_MOCK_MODE) {
-      const socket = createMockIncidentSocket();
+      // Dev/test-only state scenarios (backlog item 1), opted into via
+      // ?scenario=<name> - never reachable without that query param, so
+      // the default demo is unaffected. See net/scenarioSelection.ts.
+      const scenarioOptions = resolveScenario(window.location.search);
+      const socket = createMockIncidentSocket(scenarioOptions ?? undefined);
       mockSocketRef.current = socket;
       return socket;
     }
