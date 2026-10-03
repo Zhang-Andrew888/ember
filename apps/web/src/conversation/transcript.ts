@@ -74,11 +74,16 @@ const WIRE_SPEAKER: Record<WireTranscript["kind"], string> = {
   system: "System",
 };
 
-function wireTranscriptLine(message: WireTranscript, view: CoordinatorView | null): TranscriptLine {
+/** Append-only sideband index. Padded so localeCompare preserves arrival order. */
+function wireTranscriptId(sequence: number): string {
+  return `wire-t:${sequence.toString().padStart(6, "0")}`;
+}
+
+function wireTranscriptLine(message: WireTranscript, view: CoordinatorView | null, sequence: number): TranscriptLine {
   const callsign =
     message.kind === "agent" ? view?.agents.find((agent) => message.text.startsWith(agent.callsign))?.callsign : undefined;
   return {
-    id: `wire-t:${message.simTimeMs}:${message.text.slice(0, 24)}`,
+    id: wireTranscriptId(sequence),
     kind: message.kind === "agent" ? "agent_report" : transcriptKind(message.kind),
     simTimeMs: message.simTimeMs,
     speaker: callsign ?? WIRE_SPEAKER[message.kind],
@@ -115,12 +120,14 @@ export function buildConversationTranscript(
   const fallbackSimTimeMs = view ? (view.simTimeMs as number) : 0;
   const receiptLines = sideband.receipts.map((receipt, index) => receiptLine(receipt, index, fallbackSimTimeMs));
   const receiptTexts = new Set(receiptLines.map((line) => line.text));
-  for (const message of sideband.transcripts) {
+  for (const [sequence, message] of sideband.transcripts.entries()) {
     // Routine agent lines repeat the agent's report (the view already carries it), and a control
     // line repeats the matching receipt reply; keep the one that carries the richer state.
+    // The sequence is the append-only sideband index, so keys stay unique and stable when the
+    // view is replaced and when two lines share a sim time or text prefix.
     if (message.kind === "agent" && !message.urgent) continue;
     if (message.kind === "control" && receiptTexts.has(message.text)) continue;
-    lines.push(wireTranscriptLine(message, view));
+    lines.push(wireTranscriptLine(message, view, sequence));
   }
   lines.push(...receiptLines);
 
