@@ -54,11 +54,13 @@ describe("OSM Montclair planning budget (issue #72)", () => {
     });
 
     const planningTicks: number[] = [];
+    const refreshTicks: number[] = [];
     let firstTick = Infinity;
     let first = true;
     while (!inc.ended && inc.simTimeMs < RUN_MS) {
       for (const c of controllers) {
         const searches = planning.length;
+        const version = c.currentEnsemble?.version ?? 0;
         const t0 = performance.now();
         const out = c.tick(inc.projectAgent(c.agentId));
         const wall = performance.now() - t0;
@@ -67,18 +69,23 @@ describe("OSM Montclair planning budget (issue #72)", () => {
         first = false;
         // A tick that planned also paid for any forecast refresh it triggered: the target's "scoped forecast + replan".
         if (planning.length > searches) planningTicks.push(wall);
+        // A tick that published a new forecast ensemble (refresh, evidence update or rebuild).
+        if ((c.currentEnsemble?.version ?? 0) !== version) refreshTicks.push(wall);
       }
       inc.advanceTo(inc.simTimeMs + 1000);
     }
 
     expect(inc.simTimeMs, "the run must complete, not stall").toBeGreaterThanOrEqual(RUN_MS);
     expect(planning.length, "enough replans to be meaningful").toBeGreaterThan(20);
+    expect(refreshTicks.length, "enough forecast refreshes to be meaningful").toBeGreaterThan(50);
     const summary =
       `planning ms: p50 ${percentile(planning, 0.5).toFixed(1)}, p95 ${percentile(planning, 0.95).toFixed(1)}, max ${Math.max(...planning).toFixed(0)}; ` +
-      `planning-tick ms: p95 ${percentile(planningTicks, 0.95).toFixed(1)}, max ${Math.max(...planningTicks).toFixed(0)}; first tick ${firstTick.toFixed(0)}`;
+      `planning-tick ms: p95 ${percentile(planningTicks, 0.95).toFixed(1)}, max ${Math.max(...planningTicks).toFixed(0)}; forecast-refresh tick ms: p95 ${percentile(refreshTicks, 0.95).toFixed(1)}, max ${Math.max(...refreshTicks).toFixed(0)}; first tick ${firstTick.toFixed(0)}`;
     expect(percentile(planning, 0.95), summary).toBeLessThan(REPLAN_TARGET_MS);
     expect(Math.max(...planning), summary).toBeLessThan(REPLAN_CAP_MS);
     expect(percentile(planningTicks, 0.95), summary).toBeLessThan(REPLAN_TARGET_MS);
+    expect(percentile(refreshTicks, 0.95), summary).toBeLessThan(REPLAN_TARGET_MS);
+    expect(Math.max(...refreshTicks), summary).toBeLessThan(REPLAN_CAP_MS);
     expect(firstTick, summary).toBeLessThan(COLD_TICK_CAP_MS);
   });
 });
