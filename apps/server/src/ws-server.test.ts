@@ -42,4 +42,16 @@ describe("websocket server", () => {
     socket.close();
     await server.close();
   });
+
+  it("closes a connection that sends an oversized message and keeps serving others", async () => {
+    const server = await startServer({ scenario: buildSyntheticScenario(), seed: "WS-LIMIT", uncontrolled: ["crew-1", "crew-2", "crew-3", "scout"] });
+    const big = await connect(server.port);
+    const closed = new Promise<number>((resolve) => big.socket.on("close", (code: number) => resolve(code)));
+    big.socket.send("x".repeat(256 * 1024));
+    expect(await closed).toBe(1009);
+    const other = await connect(server.port);
+    await until(() => other.received.length > 0);
+    other.socket.close();
+    await server.close();
+  });
 });

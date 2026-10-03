@@ -15,12 +15,12 @@ declare module "ws" {
     send(data: string): void;
     close(): void;
     on(event: "message", cb: (data: { toString(): string }) => void): void;
-    on(event: "close", cb: () => void): void;
+    on(event: "close", cb: (code: number) => void): void;
     on(event: "open", cb: () => void): void;
     on(event: "error", cb: (e: unknown) => void): void;
   }
   export class WebSocketServer {
-    constructor(options: { port: number; host?: string });
+    constructor(options: { port: number; host?: string; maxPayload?: number });
     on(event: "connection", cb: (socket: WebSocket) => void): void;
     on(event: "listening", cb: () => void): void;
     close(cb?: () => void): void;

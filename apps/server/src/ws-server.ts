@@ -12,6 +12,8 @@ export interface ServerHandle {
 }
 
 const FLUSH_EVERY_MS = 200;
+/** Coordinator commands are short text; anything larger is refused by closing the socket (1009). */
+const MAX_MESSAGE_BYTES = 64 * 1024;
 
 /**
  * Bind the hub to a WebSocket server on the loopback interface. The simulation advances on the
@@ -23,13 +25,16 @@ export async function startServer(options: SessionOptions & { port?: number }): 
   const bridge = new ConversationBridge(session);
   const hub = new SessionHub(session, bridge);
   const live = new LiveRun(session, bridge, hub, { nowMs: () => performance.now() });
-  const wss = new WebSocketServer({ port: options.port ?? 0, host: "127.0.0.1" });
+  const wss = new WebSocketServer({ port: options.port ?? 0, host: "127.0.0.1", maxPayload: MAX_MESSAGE_BYTES });
   await new Promise<void>((resolve) => wss.on("listening", resolve));
   const sockets = new Map<ClientId, { send(data: string): void }>();
   wss.on("connection", (socket) => {
     const id = hub.connect();
     sockets.set(id, socket);
     socket.on("message", (data) => hub.handle(id, data.toString(), live.wallElapsedMs));
+    socket.on("error", () => {
+      // A protocol error (such as an oversized frame) closes the socket; "close" does the cleanup.
+    });
     socket.on("close", () => {
       hub.disconnect(id);
       sockets.delete(id);
