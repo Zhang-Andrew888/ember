@@ -64,6 +64,33 @@ export function spreadRate(
   return Math.max(lo, Math.min(hi, raw));
 }
 
+const staticCache = new WeakMap<Terrain, Float64Array>();
+
+/**
+ * The part of the spread rate that never changes in a run: target fuel times the uphill slope
+ * term, per cell and direction. Splitting it out turns the per-step work into multiplications.
+ */
+function staticFactors(terrain: Terrain): Float64Array {
+  const hit = staticCache.get(terrain);
+  if (hit !== undefined) return hit;
+  const out = new Float64Array(SIZE * SIZE * 8);
+  for (let cell = 0; cell < SIZE * SIZE; cell++) {
+    const gx = cell % SIZE;
+    const gy = (cell - gx) / SIZE;
+    for (let d = 0; d < 8; d++) {
+      const nb = NEIGHBORS[d]!;
+      const nx = gx + nb.dx;
+      const ny = gy + nb.dy;
+      if (nx < 0 || ny < 0 || nx >= SIZE || ny >= SIZE) continue;
+      const target = ny * SIZE + nx;
+      const slope = Math.max(-SIM_DEFAULTS.slopeClamp, Math.min(SIM_DEFAULTS.slopeClamp, (terrain.height[target]! - terrain.height[cell]!) / nb.dist));
+      out[cell * 8 + d] = terrain.fuel[target]! * Math.exp(SIM_DEFAULTS.slopeCoefficient * slope);
+    }
+  }
+  staticCache.set(terrain, out);
+  return out;
+}
+
 /**
  * Grid fire state advanced one fixed step at a time. The authoritative simulator and the
  * forecast ensembles both use this class so they share one spread mechanism.
@@ -123,6 +150,14 @@ export class FireField {
 
     const wind = windDirectionAt(params, toMs);
     const dtSec = dtMs / 1000;
+    const stat = staticFactors(this.terrain);
+    const baseRate = SIM_DEFAULTS.baseSpreadRate * params.spreadMultiplier;
+    const [rateLo, rateHi] = SIM_DEFAULTS.spreadRateClamp;
+    const windFactor = new Float64Array(8);
+    for (let d = 0; d < 8; d++) {
+      const nb = NEIGHBORS[d]!;
+      windFactor[d] = Math.exp(SIM_DEFAULTS.windCoefficient * (Math.cos(wind) * nb.ux + Math.sin(wind) * nb.uy));
+    }
     const reached: number[] = [];
     const seen = new Set<number>();
     for (const cell of this.burning) {
@@ -135,9 +170,9 @@ export class FireField {
         if (nx < 0 || ny < 0 || nx >= SIZE || ny >= SIZE) continue;
         const target = ny * SIZE + nx;
         if (this.state[target] !== CELL_UNBURNED) continue;
-        const rise = this.terrain.height[target]! - this.terrain.height[cell]!;
-        const rate = spreadRate(params, wind, nb, this.terrain.fuel[target]!, rise);
         const slot = cell * 8 + d;
+        const raw = baseRate * stat[slot]! * windFactor[d]!;
+        const rate = raw < rateLo ? rateLo : raw > rateHi ? rateHi : raw;
         const next = this.progress[slot]! + rate * dtSec;
         this.progress[slot] = next;
         if (next >= nb.dist && !seen.has(target)) {

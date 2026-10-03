@@ -1,13 +1,12 @@
 import { SimTimeMs, type AgentId } from "@ember/domain";
 import { GRID_EDGE, hashValue, type AgentKnowledgeSnapshot } from "@ember/knowledge";
-import { streamRng, type PublicMap } from "@ember/simulation/model";
+import { FireField, streamRng, type PublicMap } from "@ember/simulation/model";
 import { DEFAULT_FORECAST_CONFIG, widenRanges, type ForecastConfig } from "./config.js";
 import { FitAccumulator, fitMember, type FitObservation } from "./fit.js";
 import {
   boundaryCandidates,
   buildMember,
   extremeIds,
-  probeMember,
   noShiftCandidates,
   perturb,
   priorCandidates,
@@ -206,15 +205,14 @@ export class ForecastService {
   ): { members: ForecastMember[]; firstFailure: string | null } {
     const members: ForecastMember[] = [];
     let firstFailure: string | null = null;
-    const lastObsMs = fitObs.reduce((m, o) => Math.max(m, o.timeMs), 0);
     for (const c of candidates) {
       let member: ForecastMember;
       if ("ignitionMs" in c) {
         member = c;
       } else {
-        // Screen with a short rollout; only supported candidates pay for the full horizon.
-        const probe = probeMember(this.ctx, this.config, c, lastObsMs);
-        const screen = fitMember(probe, fitObs, this.config.disagreementTolerance);
+        // Screen incrementally in time order, stopping at the first observation it cannot explain;
+        // only supported candidates pay for the full horizon.
+        const screen = this.screen(c, fitObs);
         if (!screen.pass) {
           if (firstFailure === null) firstFailure = screen.failedObservationId;
           continue;
@@ -233,6 +231,39 @@ export class ForecastService {
       } else if (firstFailure === null) firstFailure = fit.failedObservationId;
     }
     return { members, firstFailure };
+  }
+
+  /**
+   * Roll a candidate forward only as far as each observation needs, checking observations in time
+   * order and stopping at the first it cannot explain. Equivalent to fitting a full rollout.
+   */
+  private screen(c: Candidate, fitObs: readonly FitObservation[]): { pass: boolean; failedObservationId: string | null } {
+    const step = this.config.rolloutStepMs;
+    const field = new FireField(this.ctx.terrain, this.ctx.nonburnable);
+    field.ignite(this.ctx.initialCells, 0, c.params.initialProgress ?? 0);
+    const ordered = [...fitObs].sort((a, b) => a.timeMs - b.timeMs);
+    let t = 0;
+    let i = 0;
+    while (i < ordered.length) {
+      const time = ordered[i]!.timeMs;
+      const group: FitObservation[] = [];
+      while (i < ordered.length && ordered[i]!.timeMs === time) group.push(ordered[i++]!);
+      // Include the step after `time`: its cells are recorded as igniting at the start of that step.
+      while (t < time + step) {
+        t += step;
+        field.step(t, step, c.params);
+      }
+      // Same convention as full rollouts: ignition is recorded at the start of its step.
+      const ign = new Float64Array(field.ignitedAtMs.length);
+      for (let k = 0; k < ign.length; k++) {
+        const v = field.ignitedAtMs[k]!;
+        ign[k] = v === 0 || !Number.isFinite(v) ? v : Math.max(0, v - step);
+      }
+      const partial = { id: c.id, kind: c.kind, params: c.params, ignitionMs: ign, rolloutEndMs: t };
+      const fit = fitMember(partial, group, this.config.disagreementTolerance);
+      if (!fit.pass) return fit;
+    }
+    return { pass: true, failedObservationId: null };
   }
 
   private capKeepingExtremes(members: ForecastMember[]): ForecastMember[] {
@@ -265,8 +296,7 @@ export class ForecastService {
       const base = supported[attempts % supported.length]!;
       const cand = perturb(base.params, rng, bounds, `${base.id}~${attempts}`);
       attempts += 1;
-      const lastObsMs = fitObs.reduce((m, o) => Math.max(m, o.timeMs), 0);
-      if (!fitMember(probeMember(this.ctx, this.config, cand, lastObsMs), fitObs, this.config.disagreementTolerance).pass) continue;
+      if (!this.screen(cand, fitObs).pass) continue;
       const member = buildMember(this.ctx, this.config, cand.id, cand.kind, cand.params, horizonEndMs);
       this.verified.set(member, { generation: this.accum.generation, upTo: fitObs.length });
       members.push(member);

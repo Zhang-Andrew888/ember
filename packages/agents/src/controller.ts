@@ -192,7 +192,10 @@ export class CrewController implements AgentController {
 
   protected refreshForecast(proj: AgentProjection, now: number): ForecastEnsemble {
     const cur = this.forecast.current;
-    const due = cur === null || this.fireDirty || now - cur.builtAtMs >= (this.cfg.forecast?.refreshMs ?? 25_000);
+    const refreshMs = this.cfg.forecast?.refreshMs ?? 25_000;
+    // While unreliable the prior is re-fitted only on the normal refresh; a rebuild is already pending.
+    const settling = cur !== null && cur.reliability === "unreliable" && now - cur.builtAtMs < refreshMs;
+    const due = cur === null || (this.fireDirty && !settling) || now - cur.builtAtMs >= refreshMs;
     let ensemble = cur;
     if (due || ensemble === null) {
       ensemble = this.forecast.update(proj.knowledge, now);
