@@ -1,11 +1,28 @@
-import { RoadIndex, SIM_DEFAULTS, cellCenter, cellsWithin, refugeCells } from "./model/index.js";
+import { RoadIndex, SIM_DEFAULTS, cellCenter, cellIndexOf, cellsWithin, refugeCells } from "./model/index.js";
 import type { SimScenario } from "./scenario.js";
+
+function coordinateError(label: string, x: number, y: number): string | null {
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return `${label} has non-finite coordinates`;
+  if (cellIndexOf(x, y) === null) return `${label} is off the grid`;
+  return null;
+}
+
+function polylineLength(points: readonly { x: number; y: number }[]): number {
+  let total = 0;
+  for (let i = 1; i < points.length; i++) {
+    const a = points[i - 1]!;
+    const b = points[i]!;
+    total += Math.hypot(b.x - a.x, b.y - a.y);
+  }
+  return total;
+}
 
 /** Referential and structural checks a scenario file must pass before it can start an incident. */
 export function validateScenario(scenario: SimScenario): string[] {
   const errors: string[] = [];
   const m = scenario.map;
   const nodeIds = new Set<string>(m.nodes.map((n) => n.id));
+  const nodesById = new Map(m.nodes.map((n) => [n.id, n]));
   const dup = (label: string, ids: readonly string[]): void => {
     if (new Set(ids).size !== ids.length) errors.push(`duplicate ${label} ids`);
   };
@@ -25,6 +42,23 @@ export function validateScenario(scenario: SimScenario): string[] {
   if (m.initialFireCells.length === 0) errors.push("no initial fire");
   for (const c of m.initialFireCells) {
     if (c < 0 || c >= SIM_DEFAULTS.gridSize ** 2) errors.push(`initial fire cell ${c} is off the grid`);
+  }
+  for (const n of m.nodes) {
+    const problem = coordinateError(`node ${n.id}`, n.x, n.y);
+    if (problem !== null) errors.push(problem);
+  }
+  for (const e of m.edges) {
+    for (let i = 0; i < e.via.length; i++) {
+      const p = e.via[i]!;
+      const problem = coordinateError(`edge ${e.id} via point ${i}`, p.x, p.y);
+      if (problem !== null) errors.push(problem);
+    }
+    const a = nodesById.get(e.from);
+    const b = nodesById.get(e.to);
+    if (a === undefined || b === undefined) continue;
+    const points = [{ x: a.x, y: a.y }, ...e.via, { x: b.x, y: b.y }];
+    if (!points.every((p) => Number.isFinite(p.x) && Number.isFinite(p.y))) continue;
+    if (!(polylineLength(points) > 0)) errors.push(`edge ${e.id} has invalid geometry`);
   }
   if (errors.length > 0) return errors;
 
