@@ -141,6 +141,23 @@ describe("knowledge/KnowledgeStore", () => {
     expect(a.siteBelief(site)?.completedWork).toBe(b.siteBelief(site)?.completedWork);
   });
 
+  it("reports the same cell belief for equal-time sightings in any arrival order", () => {
+    const sightings = [
+      obs("o1", crew, 4000, [[9, "burning"]]),
+      obs("o2", scout, 4000, [[9, "burning"]]),
+      obs("o3", scout, 4000, [[9, "burned"]]),
+    ];
+    const orders = [[0, 1, 2], [2, 1, 0], [1, 0, 2], [1, 2, 0]];
+    const beliefs = orders.map((order) => {
+      const store = new KnowledgeStore(crew);
+      for (const i of order) store.ingest(sightings[i]!);
+      return store.cellBelief(9);
+    });
+    for (const b of beliefs) expect(b).toEqual(beliefs[0]);
+    expect(beliefs[0]?.state).toBe("burning");
+    expect(beliefs[0]?.conflict).toBe(true);
+  });
+
   it("ignores non-grid cell fields but retains them in history", () => {
     const store = new KnowledgeStore(crew);
     const o = obs("o1", crew, 1000, []);

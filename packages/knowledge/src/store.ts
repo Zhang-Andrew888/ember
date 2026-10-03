@@ -121,9 +121,14 @@ export class KnowledgeStore {
     };
     if (prev === undefined || observation.observedAt > prev.observedAt) {
       this.cells.set(cell, next);
-    } else if (observation.observedAt === prev.observedAt && field.burnState !== prev.state) {
-      const worst = SEVERITY[field.burnState] > SEVERITY[prev.state] ? next : prev;
-      this.cells.set(cell, { ...worst, conflict: true });
+    } else if (observation.observedAt === prev.observedAt) {
+      if (field.burnState !== prev.state) {
+        const worst = SEVERITY[field.burnState] > SEVERITY[prev.state] ? next : prev;
+        this.cells.set(cell, { ...worst, conflict: true });
+      } else if (observation.id < prev.observationId) {
+        // Same state at the same time: keep the lower observation id so arrival order does not matter.
+        this.cells.set(cell, { ...next, conflict: prev.conflict });
+      }
     }
   }
 
