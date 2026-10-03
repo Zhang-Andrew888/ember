@@ -116,7 +116,10 @@ export function App() {
     lastAudioCueCount.current = sideband.audioCues.length;
     for (const cue of cues) {
       if (cue.event !== "started") continue;
-      void playPreparedSpeech(REST_BASE_URL ?? "", session.incidentId, session.token, cue.itemId);
+      const itemId = cue.itemId;
+      void playPreparedSpeech(REST_BASE_URL ?? "", session.incidentId, session.token, itemId).finally(() => {
+        protocolSocketRef.current?.sendCommand({ type: "audio_finished", itemId });
+      });
     }
   }, [sideband.audioCues]);
 
