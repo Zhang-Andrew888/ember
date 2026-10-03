@@ -34,7 +34,10 @@ export type OutboundClientMessage =
   | { type: "ptt_release"; transcript: string }
   | { type: "ptt_lost_focus"; transcript: string }
   | { type: "inspect"; agentId: string }
-  | { type: "audio_finished"; itemId: string };
+  | { type: "speech_playback"; itemId: string; outcome: SpeechPlaybackOutcome };
+
+/** Browser report after a prepared clip finishes or fails (Grok voice). */
+export type SpeechPlaybackOutcome = "ended" | "failed";
 
 export function encodeClient(message: OutboundClientMessage): string {
   return JSON.stringify({ protocolVersion: WIRE_PROTOCOL_VERSION, message });

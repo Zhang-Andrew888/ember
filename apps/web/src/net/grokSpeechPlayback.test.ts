@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { handleGrokAudioCue, PreparedSpeechPlayback, type PreparedSpeechAudio } from "./grokSpeechPlayback.js";
+import {
+  handleGrokAudioCue,
+  preparedOutcomeToSpeechPlayback,
+  PreparedSpeechPlayback,
+  type PreparedSpeechAudio,
+} from "./grokSpeechPlayback.js";
 
 function deferred<T>(): { promise: Promise<T>; resolve: (v: T) => void; reject: (e: Error) => void } {
   let resolve!: (v: T) => void;
@@ -10,6 +15,14 @@ function deferred<T>(): { promise: Promise<T>; resolve: (v: T) => void; reject: 
   });
   return { promise, resolve, reject };
 }
+
+describe("preparedOutcomeToSpeechPlayback", () => {
+  it("maps completed to ended and aborted to no wire ack", () => {
+    expect(preparedOutcomeToSpeechPlayback("completed")).toBe("ended");
+    expect(preparedOutcomeToSpeechPlayback("failed")).toBe("failed");
+    expect(preparedOutcomeToSpeechPlayback("aborted")).toBeNull();
+  });
+});
 
 describe("PreparedSpeechPlayback", () => {
   it("aborts an in-flight fetch and pauses audio when stop is called (PTT interrupt path)", async () => {
@@ -51,7 +64,7 @@ describe("handleGrokAudioCue", () => {
     apiBase: "http://127.0.0.1:3000",
     incidentId: "inc-1",
     token: "secret",
-    notifyFinished: vi.fn(),
+    notifyPlayback: vi.fn(),
   };
 
   it("stops routine playback when the server sends interrupted (push-to-talk)", async () => {
@@ -81,11 +94,11 @@ describe("handleGrokAudioCue", () => {
     handleGrokAudioCue({ event: "interrupted", itemId: "routine" }, playback, ctx);
     expect(paused).toBe(true);
     expect(playback.hasActive("routine")).toBe(false);
-    expect(ctx.notifyFinished).not.toHaveBeenCalled();
+    expect(ctx.notifyPlayback).not.toHaveBeenCalled();
   });
 
-  it("plays urgent speech after routine is interrupted without sending audio_finished for the aborted line", async () => {
-    ctx.notifyFinished.mockClear();
+  it("sends speech_playback ended for urgent after routine interrupt, not for aborted routine", async () => {
+    ctx.notifyPlayback.mockClear();
 
     const playback = new PreparedSpeechPlayback({
       fetch: vi.fn(async (input: RequestInfo | URL) => {
@@ -117,7 +130,7 @@ describe("handleGrokAudioCue", () => {
     expect(playback.hasActive("routine")).toBe(false);
 
     handleGrokAudioCue({ event: "started", itemId: "urgent" }, playback, ctx);
-    await vi.waitFor(() => expect(ctx.notifyFinished).toHaveBeenCalledWith("urgent"));
-    expect(ctx.notifyFinished).not.toHaveBeenCalledWith("routine");
+    await vi.waitFor(() => expect(ctx.notifyPlayback).toHaveBeenCalledWith("urgent", "ended"));
+    expect(ctx.notifyPlayback).not.toHaveBeenCalledWith("routine", expect.anything());
   });
 });

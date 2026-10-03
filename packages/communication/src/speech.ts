@@ -49,6 +49,23 @@ export interface SchedulerOptions {
   /** Identical text from the same agent within this window is spoken once (still shown). */
   readonly coalesceMs?: number;
   readonly onEvent?: (e: SchedulerEvent) => void;
+  /**
+   * Wall-clock cap for one clip when no listener acknowledges it.
+   * Defaults to {@link playbackAckBudgetMs}. This is not simulated time.
+   */
+  readonly ackBudgetMs?: (text: string) => number;
+}
+
+const MIN_PLAYBACK_ACK_MS = 30_000;
+const MAX_PLAYBACK_ACK_MS = 90_000;
+const ACK_MS_PER_CHAR = 120;
+
+/**
+ * How long a clip may occupy the playing slot with no browser acknowledgement.
+ * The clock is wall time. Normal playback ends sooner, when the browser reports it.
+ */
+export function playbackAckBudgetMs(text: string): number {
+  return Math.min(MAX_PLAYBACK_ACK_MS, Math.max(MIN_PLAYBACK_ACK_MS, text.length * ACK_MS_PER_CHAR));
 }
 
 const URGENT_MAX_TIER = 2;
@@ -57,7 +74,8 @@ const URGENT_MAX_TIER = 2;
  * Audio scheduler. Urgent items interrupt routine speech; recording suspends playback and urgent
  * audio gets first priority on release; an unready higher-priority item blocks lower ones rather
  * than letting routine speech jump ahead; clearing the browser buffer is separate from any
- * provider cancellation.
+ * provider cancellation. A clip leaves the playing slot when the listener acknowledges it,
+ * when playback fails, or when its wall-clock acknowledgement budget expires.
  */
 export class AudioScheduler {
   private queue: SpeechItem[] = [];
@@ -65,6 +83,13 @@ export class AudioScheduler {
   private playing: SpeechItem | null = null;
   private recording = false;
   private ended = false;
+  /** While held, ready clips stay queued instead of occupying the playing slot with nobody listening. */
+  private playbackHeld = false;
+  /** Bumps every time a clip begins so a replay of the same id starts a new acknowledgement budget. */
+  private playingToken = 0;
+  private trackedToken = 0;
+  /** Wall time when the current token was first observed. Never a simTimeMs value. */
+  private playingSinceMs: number | null = null;
   private readonly recent = new Map<string, number>();
   private readonly emit: (e: SchedulerEvent) => void;
 
@@ -122,6 +147,56 @@ export class AudioScheduler {
     this.pump();
   }
 
+  /**
+   * The listener could not play this clip. The transcript already has the text; later clips continue.
+   * A stale id (already interrupted or finished) is ignored.
+   */
+  playbackFailed(itemId: string): void {
+    if (this.playing?.id !== itemId) return;
+    this.playing = null;
+    this.emit({ kind: "audio_unavailable", itemId });
+    try {
+      this.opts.sink.stop();
+    } catch {
+      // A failed device must not block the next clip.
+    }
+    this.pump();
+  }
+
+  /** Leave ready clips queued until {@link resumePlayback}. A clip already playing is left to the caller. */
+  suspendPlayback(): void {
+    this.playbackHeld = true;
+  }
+
+  /** Allow the next ready clip to start. */
+  resumePlayback(): void {
+    this.playbackHeld = false;
+    this.pump();
+  }
+
+  /**
+   * Release the playing clip if the browser has not acknowledged it within the wall-clock budget.
+   * `wallMs` is elapsed wall time, never `simTimeMs`. The first call for a clip only starts the budget.
+   */
+  pollPlayback(wallMs: number): void {
+    if (this.playbackHeld) return;
+    const playing = this.playing;
+    if (playing === null) {
+      this.playingSinceMs = null;
+      return;
+    }
+    if (this.trackedToken !== this.playingToken || this.playingSinceMs === null) {
+      this.trackedToken = this.playingToken;
+      this.playingSinceMs = wallMs;
+      return;
+    }
+    const budget = (this.opts.ackBudgetMs ?? playbackAckBudgetMs)(playing.text);
+    if (wallMs - this.playingSinceMs >= budget) {
+      this.playingSinceMs = null;
+      this.finished(playing.id);
+    }
+  }
+
   startRecording(): void {
     this.recording = true;
     if (this.playing !== null) {
@@ -165,7 +240,7 @@ export class AudioScheduler {
   }
 
   private pump(): void {
-    if (this.playing !== null || this.recording) return;
+    if (this.playing !== null || this.recording || this.playbackHeld) return;
     // Obsolete routine items are skipped before playback.
     this.queue = this.queue.filter((item) => {
       if (item.tier >= 3 && item.planRevision < this.opts.currentPlanRevision(item.agentId)) {
@@ -184,6 +259,7 @@ export class AudioScheduler {
     }
     this.queue = this.queue.filter((q) => q.id !== head.id);
     this.playing = head;
+    this.playingToken += 1;
     this.emit({ kind: "started", itemId: head.id });
     try {
       this.opts.sink.play(head);

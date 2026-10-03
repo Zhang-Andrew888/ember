@@ -10,8 +10,12 @@ export const ClientMessage = z.discriminatedUnion("type", [
   z.object({ type: z.literal("resend") }),
   /** Looking at an agent on the map. It never changes who messages are addressed to. */
   z.object({ type: z.literal("inspect"), agentId: z.string().min(1).max(40) }),
-  /** Browser finished playing a prepared TTS clip (Grok voice); unblocks the server speech queue. */
-  z.object({ type: z.literal("audio_finished"), itemId: z.string().min(1).max(80) }),
+  /** Browser playback of a prepared clip ended or failed. Either result lets the next clip start. */
+  z.object({
+    type: z.literal("speech_playback"),
+    itemId: z.string().min(1).max(120),
+    outcome: z.enum(["ended", "failed"]),
+  }),
 ]);
 export type ClientMessage = z.infer<typeof ClientMessage>;
 

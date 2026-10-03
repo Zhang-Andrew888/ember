@@ -73,8 +73,8 @@ export function App() {
   const mockSocketRef = useRef<MockIncidentSocket | null>(null);
   const protocolSocketRef = useRef<ProtocolWebSocket | null>(null);
   const liveSessionRef = useRef<{ incidentId: string; token: string } | null>(null);
-  const grokPlaybackRef = useRef(new PreparedSpeechPlayback());
   const liveWsUrlRef = useRef<string | null>(null);
+  const grokPlaybackRef = useRef(new PreparedSpeechPlayback());
   const reducedMotion = useReducedMotion();
 
   const { status: connectionStatus, view, sideband } = useCoordinatorView(client);
@@ -120,8 +120,8 @@ export function App() {
         apiBase: REST_BASE_URL ?? "",
         incidentId: session.incidentId,
         token: session.token,
-        notifyFinished: (itemId) => {
-          protocolSocketRef.current?.sendCommand({ type: "audio_finished", itemId });
+        notifyPlayback: (itemId, outcome) => {
+          protocolSocketRef.current?.sendCommand({ type: "speech_playback", itemId, outcome });
         },
       });
     }

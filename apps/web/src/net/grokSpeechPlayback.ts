@@ -1,3 +1,5 @@
+import type { SpeechPlaybackOutcome } from "./wireProtocol.js";
+
 export type PreparedSpeechOutcome = "completed" | "aborted" | "failed";
 
 export interface PreparedSpeechPlayParams {
@@ -33,7 +35,7 @@ interface ActivePlayback {
 
 /**
  * Tracks in-flight TTS fetch/play by item id so `interrupted` / `dropped` cues and incident end
- * can stop browser audio (issue #75). Pair with server `audio_finished` on natural completion (#69).
+ * can stop browser audio (#75). Acknowledgements use `speech_playback` on the events socket (#85).
  */
 export class PreparedSpeechPlayback {
   private readonly active = new Map<string, ActivePlayback>();
@@ -116,6 +118,13 @@ export class PreparedSpeechPlayback {
   }
 }
 
+/** Maps browser playback result to the server wire outcome; `aborted` sends nothing. */
+export function preparedOutcomeToSpeechPlayback(outcome: PreparedSpeechOutcome): SpeechPlaybackOutcome | null {
+  if (outcome === "completed") return "ended";
+  if (outcome === "failed") return "failed";
+  return null;
+}
+
 /** Fetch server-prepared xAI TTS (MP3) and play in the browser. */
 export async function playPreparedSpeech(
   apiBase: string,
@@ -133,10 +142,10 @@ export interface GrokAudioCueContext {
   readonly apiBase: string;
   readonly incidentId: string;
   readonly token: string;
-  readonly notifyFinished: (itemId: string) => void;
+  readonly notifyPlayback: (itemId: string, outcome: SpeechPlaybackOutcome) => void;
 }
 
-/** Maps server audio wire cues to browser playback (issue #75). */
+/** Maps server audio wire cues to browser playback (#75) and `speech_playback` acks (#85). */
 export function handleGrokAudioCue(
   cue: { readonly event: string; readonly itemId: string },
   playback: PreparedSpeechPlayback,
@@ -147,7 +156,8 @@ export function handleGrokAudioCue(
       void playback
         .play({ apiBase: ctx.apiBase, incidentId: ctx.incidentId, token: ctx.token, itemId: cue.itemId })
         .then((outcome: PreparedSpeechOutcome) => {
-          if (outcome === "completed" || outcome === "failed") ctx.notifyFinished(cue.itemId);
+          const wire = preparedOutcomeToSpeechPlayback(outcome);
+          if (wire !== null) ctx.notifyPlayback(cue.itemId, wire);
         });
       return;
     case "interrupted":
