@@ -58,6 +58,27 @@ describe("conversation/transcript", () => {
     expect(lines.find((line) => line.text.startsWith("The incident"))?.speaker).toBe("System");
   });
 
+  it("gives distinct stable ids to identical coordinator messages in the same millisecond", () => {
+    let sideband = appendSideband(EMPTY_SIDEBAND, wire("coordinator", "Hold", 5000));
+    sideband = appendSideband(sideband, wire("coordinator", "Hold", 5000));
+    const idsFor = (view: typeof fixtureCoordinatorView | null) =>
+      buildConversationTranscript(view, sideband)
+        .filter((line) => line.text === "Hold")
+        .map((line) => line.id);
+    const withView = idsFor(fixtureCoordinatorView);
+    expect(withView).toHaveLength(2);
+    expect(new Set(withView).size).toBe(2);
+    expect(idsFor(null)).toEqual(withView);
+  });
+
+  it("gives distinct ids when same-tick messages share a 24-character prefix", () => {
+    let sideband = appendSideband(EMPTY_SIDEBAND, wire("coordinator", "Crew 1, protect the lodge now", 5000));
+    sideband = appendSideband(sideband, wire("coordinator", "Crew 1, protect the lodge later", 5000));
+    const lines = buildConversationTranscript(fixtureCoordinatorView, sideband).filter((line) => line.kind === "coordinator");
+    expect(lines.map((line) => line.text)).toEqual(["Crew 1, protect the lodge now", "Crew 1, protect the lodge later"]);
+    expect(new Set(lines.map((line) => line.id)).size).toBe(2);
+  });
+
   it("shows the player's message before the reply to it, and one copy of the reply", () => {
     const reply = "Sent to Crew 2: protect Waterworks.";
     let sideband = appendSideband(EMPTY_SIDEBAND, wire("control", reply, 5000));
