@@ -558,3 +558,51 @@ just "doesn't crash."
 **Next:** backlog item 4, conversation UI against a mock adapter
 (push-to-talk release-to-commit, typed input, transcript, urgent strip,
 exact-text speech playback stub).
+
+## 2026-10-03 08:1x-08:2x UTC (04:1x-04:2x ET) - backlog item 4: conversation UI against a mock adapter
+
+Two commits. First the pure logic (`cb5597b`): `net/mockVoiceAdapter.ts`
+(press/release-to-commit capture state machine - never touches
+getUserMedia, real voice is Slice 5/out of scope and unreachable from
+this sandbox anyway; commit() yields a canned transcript, enough to
+exercise the real hold/release/cancel interaction pattern without
+fabricating real speech-to-text) and `state/speechPlaybackStub.ts`
+(pending -> playing -> idle lifecycle for "exact-text speech," sized by
+word count; urgent speak() always interrupts, routine speak() while busy
+is dropped not queued - stated as a simplification in the file's own
+comment). 18 unit tests between them.
+
+Then the UI wiring (`00701a9`): push-to-talk in `ConversationPanel.tsx`
+is now a real control instead of permanently disabled - pointer hold
+(`setPointerCapture` so release always lands on the element even if the
+cursor drifts) and keyboard hold (Space, scoped to the button's own
+`onKeyDown`/`onKeyUp` so it can never intercept Space in the text
+composer); `onBlur` always cancels mid-hold. `App.tsx` owns one shared
+speech-stub instance: a new urgent report's sequence triggers
+`speak(text, {urgent:true})` exactly once, and every sent message
+(typed or voice) triggers `speak("Received: " + text)` - "Received," not
+"accepted," since this stub never claims a command was actually acted
+on. `UrgentStrip`'s `audioState` prop (declared since the very first
+Slice 1 commit, always hardcoded `"idle"`) finally reflects something
+real.
+
+**Verified live, not just unit tested** (a test-harness quirk surfaced
+here worth recording: Playwright's locator `.textContent()`/
+`.boundingBox()` can hang indefinitely while a pointer is actively
+captured via `setPointerCapture` and held via `page.mouse.down()` -
+`page.evaluate()` reads the DOM instantly and correctly throughout; used
+that instead once found, not a real app issue): pointer hold shows
+"Recording… release to send," release produces the acknowledgement and
+it clears ~2.5s later matching the stub's own timing; a 20ms tap (under
+the 150ms minimum hold) correctly produces nothing; the identical
+sequence works via keyboard with typing spaces in the composer
+completely unaffected; the urgent strip's audio text genuinely cycles
+"(none)" -> "audio next" -> "playing" -> "(none)" as a real urgent report
+arrives from the mock snapshot stream. Full 8-scenario smoke re-run still
+shows zero page errors.
+
+**Status:** CI green on both commits (verified via the GitHub Actions
+API). 109 web-lane tests as of `00701a9`.
+
+**Next:** backlog item 5, replay/debrief view driven by recorded mock
+event logs (no sim imports).
