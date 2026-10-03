@@ -6,12 +6,12 @@ This document keeps the original ordered backlog and acceptance gates. **Impleme
 
 | Slice | Summary | Status |
 |---|---|---|
-| 0 | Provider spike, real map extract, mic/TTS proof | **Open** — no xAI keys or OSM crop in repo; synthetic scenario + `ScriptedInterpreter` stand in |
+| 0 | Provider spike, real map extract, mic/TTS proof | **Partial** — optional xAI REST TTS/STT + chat intent on server (`dev-http`, no Realtime S2S); OSM crop still open; mock/scripted stand-ins when keys off |
 | 1 | Seeded incident, clock, debrief, event log | **Done (sim)** — `packages/simulation`, `packages/replay`; **web** — briefing, end overlay, mock/live hooks |
 | 2 | Knowledge, forecasts, filtered views | **Done (sim)** — `packages/knowledge`, `packages/forecast`, coordinator projections tested |
-| 3 | Mission search, autonomy, retreat | **Done (sim)** — `packages/navigation`, `packages/agents` |
+| 3 | Mission search, autonomy, retreat | **Done (sim)** — `packages/navigation`, `packages/agents`; multi-route approach enumeration; exploratory `nav-calibration-cli` + `evaluation-results/nav-calibration-exploratory.json` (dev seeds, not held-out tuned) |
 | 4 | Full team, reservations, scout | **Done (sim)** — session wiring in `apps/server`; synthetic graph includes second approach road |
-| 5 | Full Grok conversation | **Partial** — `packages/communication` + server bridge with **no-provider** adapter; validation cases 1–15 covered in tests except real mic/provider |
+| 5 | Full Grok conversation | **Partial** — gateway + optional Grok intent/voice on server; web live transport and mock demo; validation cases 1–15 in tests; Realtime S2S and release mic smoke still open |
 | 6 | Three.js experience | **Mostly done (web)** — scene, a11y, PTT stub, replay view, dev `?scenario=` presets; **blocked:** route emphasis and forecast layer need domain fields (contract issues #1, #2) |
 | 7 | Replay, evaluation, demo | **Partial** — bundle replay, metrics, three-variant harness, failure injection, JSON reports; **open:** two-minute rehearsed demo assets, real provider sessions |
 
