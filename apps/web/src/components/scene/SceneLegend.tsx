@@ -30,7 +30,7 @@ export const SceneLegend = forwardRef<HTMLDivElement, SceneLegendProps>(function
   ref,
 ) {
   // The key is collapsed on narrower viewports so it never hides routes or forecast.
-  const [keyOpen, setKeyOpen] = useState(() => typeof window !== "undefined" && window.innerWidth >= 1280);
+  const [keyOpen, setKeyOpen] = useState(() => typeof window !== "undefined" && window.innerWidth >= 1700);
   return (
     <div ref={ref} className="scene-legend" role="group" aria-label="Map layers and camera">
       <details
@@ -45,8 +45,8 @@ export const SceneLegend = forwardRef<HTMLDivElement, SceneLegendProps>(function
           Observed fire
         </li>
         <li>
-          <span className="scene-legend__swatch" style={{ background: colors.staleOutline }} />
-          Stale observation
+          <span className="scene-legend__swatch scene-legend__swatch--stale" />
+          Stale: faded, hatched, age shown
         </li>
         <li>
           <span className="scene-legend__swatch scene-legend__swatch--hatch" />

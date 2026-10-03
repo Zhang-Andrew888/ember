@@ -515,3 +515,12 @@ describe("older relayed clear versus fresh local fire", () => {
     expect(tracker.closed.has(cell)).toBe(true);
   });
 });
+
+describe("controller capabilities", () => {
+  it("expose the role's documented speed and work rate, and a crew plans from its own work rate", () => {
+    const scenario = scenarioWith({ fire: far });
+    const c = crew(scenario);
+    expect(c.capabilities).toEqual({ speedMps: 4, workRate: 1 });
+    expect(new CrewController({ agentId: crew1, callsign: "Scout", role: "scout", map: scenario.map }).capabilities.workRate).toBe(0);
+  });
+});

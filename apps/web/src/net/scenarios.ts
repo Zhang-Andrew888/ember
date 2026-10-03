@@ -126,3 +126,71 @@ export const runEndedScenarios: Record<EndReason, CoordinatorView> = {
     ),
   }),
 };
+
+/**
+ * Every agent state and every site protection status on screen at once, for
+ * checking that each has its own shape cue (dev preset `?scenario=model-states`).
+ * Authored directly on the real scenario ids (the id adapter leaves them alone).
+ */
+export const modelStatesScenario: CoordinatorView = {
+  ...fixtureCoordinatorView,
+  sequence: 700 as CoordinatorView["sequence"],
+  agentPlans: [],
+  coordinatorForecast: null,
+  agents: [
+    edgeAgent("crew-1", "Crew 1", "protection_crew", "approaching", "e-rw-j1", 120),
+    edgeAgent("crew-2", "Crew 2", "protection_crew", "withdrawing", "e-j1-s", 150),
+    // Crew 3 last reported 60 sim-seconds ago: its marker must fade and hatch.
+    edgeAgent("crew-3", "Crew 3", "protection_crew", "retreating", "e-rs-s", 160, 30_000),
+    edgeAgent("scout", "Scout", "scout", "working", "e-n-h", 200),
+    edgeAgent("crew-4", "Crew 4", "protection_crew", "lost", "e-j1-n", 150),
+    nodeAgent("crew-5", "Crew 5", "protection_crew", "working", "n-sa"),
+  ],
+  sites: [
+    { ...fixtureCoordinatorView.sites[0]!, nodeId: "n-sa" as never, observedCompletedWork: 40 as never, observedDamage: 0.3 as never, observedDestroyed: false, lastObservedAt: 85_000 as never, stale: false },
+    { ...fixtureCoordinatorView.sites[1]!, nodeId: "n-sb" as never, observedCompletedWork: null, observedDamage: null, observedDestroyed: null, lastObservedAt: null, stale: false },
+    { ...fixtureCoordinatorView.sites[2]!, nodeId: "n-sc" as never, observedCompletedWork: 0 as never, observedDamage: 1 as never, observedDestroyed: true, lastObservedAt: 60_000 as never, stale: true },
+  ],
+};
+
+function edgeAgent(
+  id: string,
+  callsign: string,
+  role: CoordinatorView["agents"][number]["role"],
+  state: CoordinatorView["agents"][number]["state"],
+  edgeId: string,
+  distance: number,
+  reportedAt = 90_000,
+): CoordinatorView["agents"][number] {
+  return {
+    id: id as never,
+    role,
+    callsign,
+    state,
+    position: {
+      kind: "edge",
+      edgeId: edgeId as never,
+      distanceAlongPolyline: distance as never,
+      direction: "forward",
+      turnaroundTimeRemaining: 0 as never,
+    },
+    reportedAt: reportedAt as never,
+  };
+}
+
+function nodeAgent(
+  id: string,
+  callsign: string,
+  role: CoordinatorView["agents"][number]["role"],
+  state: CoordinatorView["agents"][number]["state"],
+  nodeId: string,
+): CoordinatorView["agents"][number] {
+  return {
+    id: id as never,
+    role,
+    callsign,
+    state,
+    position: { kind: "node", nodeId: nodeId as never },
+    reportedAt: 90_000 as never,
+  };
+}
