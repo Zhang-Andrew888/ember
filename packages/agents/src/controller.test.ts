@@ -516,6 +516,23 @@ describe("older relayed clear versus fresh local fire", () => {
   });
 });
 
+describe("per-crew communication style", () => {
+  it("a radio-style crew reports callsign-first and a plain one does not", () => {
+    const scenario = scenarioWith({ fire: far, work: 60 });
+    const run = (style: "plain" | "radio") => {
+      const inc = new Incident({ scenario, seed: "st1", overrides: calm });
+      const c = new CrewController({ agentId: crew1, callsign: "Crew 1", role: "protection_crew", map: scenario.map, style });
+      runControllers(inc, [c], 120_000);
+      return { text: inc.projectCoordinator().recentReports.map((r) => r.text), last: c.status(inc.projectAgent(crew1)).lastReport };
+    };
+    const plain = run("plain");
+    const radio = run("radio");
+    expect(plain.text.some((t) => /^Crew 1 is heading to Ridge Cabins/.test(t))).toBe(true);
+    expect(radio.text.some((t) => /^Crew 1, heading to Ridge Cabins/.test(t))).toBe(true);
+    expect(radio.last).toMatch(/^Crew 1,/);
+  });
+});
+
 describe("controller capabilities", () => {
   it("expose the role's documented speed and work rate, and a crew plans from its own work rate", () => {
     const scenario = scenarioWith({ fire: far });
