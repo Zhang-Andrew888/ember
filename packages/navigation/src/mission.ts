@@ -62,15 +62,18 @@ export function planWithHazard(ctx: PlanningContext, hm: HazardModel, targets: r
   const out: Built[] = [];
   const revision = SequenceNumber.parse(ctx.ensemble.knowledgeRevision);
 
-  const search = (from: readonly SearchStart[], ban: ReadonlySet<EdgeId> | undefined): Reach =>
-    timeExpandedSearch({ hm, nowMs: ctx.nowMs, starts: from, oracle, ban, config });
+  const search = (from: readonly SearchStart[], ban: ReadonlySet<EdgeId> | undefined, stopAt: ReadonlySet<NodeId>): Reach =>
+    timeExpandedSearch({ hm, nowMs: ctx.nowMs, starts: from, oracle, ban, config, stopAt });
 
   const avoid = new Set<EdgeId>(ctx.avoidEdges ?? []);
-  const table = new ReturnTable(hm, ctx.nowMs, oracle, avoid, config);
+  // Built on first use: when no target has an approach there is nothing to return from.
+  let built: ReturnTable | null = null;
+  const returns = (): ReturnTable => (built ??= new ReturnTable(hm, ctx.nowMs, oracle, avoid, config));
   for (const target of targets) {
     const approaches = enumerateApproachRoutes((ban) => {
-      const reach = search(starts, ban);
-      const hit = reach.earliest(new Set([target.nodeId]));
+      const goal = new Set([target.nodeId]);
+      const reach = search(starts, ban, goal);
+      const hit = reach.earliest(goal);
       if (hit === null) return null;
       return { legs: reach.legsTo(hit.nodeId, hit.k), k: hit.k };
     }, avoid);
@@ -81,6 +84,7 @@ export function planWithHazard(ctx: PlanningContext, hm: HazardModel, targets: r
         const arriveMs = ctx.nowMs + approach.k * config.bucketMs;
         const endMs = ctx.nowMs + workEndK * config.bucketMs;
         if (!(endMs < nodeSafeLimit) || !(endMs + config.bufferMs < hm.horizonEndMs)) break;
+        const table = returns();
         const arrivalK = table.arrival(target.nodeId, workEndK);
         if (arrivalK < 0) continue;
         const ret = table.returnFrom(target.nodeId, workEndK);
