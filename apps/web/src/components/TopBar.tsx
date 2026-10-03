@@ -1,10 +1,12 @@
 import type { ConnectionStatus } from "../net/CoordinatorViewClient.js";
+import type { SpeechPlaybackSnapshot } from "../state/speechPlaybackStub.js";
 import { formatIncidentClock, formatRemainingWallTime } from "../format/time.js";
 
 export interface TopBarProps {
   readonly simTimeMs: number | null;
   readonly wallElapsedMs: number | null;
   readonly connectionStatus: ConnectionStatus;
+  readonly speechSnapshot: SpeechPlaybackSnapshot;
 }
 
 const CONNECTION_LABEL: Record<ConnectionStatus, string> = {
@@ -14,7 +16,18 @@ const CONNECTION_LABEL: Record<ConnectionStatus, string> = {
   error: "Connection error — reconnecting",
 };
 
-export function TopBar({ simTimeMs, wallElapsedMs, connectionStatus }: TopBarProps) {
+function audioStatusLabel(snapshot: SpeechPlaybackSnapshot): string {
+  if (snapshot.state === "idle" && !snapshot.queuedUrgent && snapshot.queuedRoutineCount === 0) {
+    return "Audio idle";
+  }
+  if (snapshot.queuedUrgent && snapshot.state === "idle") return "Urgent audio queued";
+  if (snapshot.state === "pending") return "Audio preparing";
+  if (snapshot.state === "playing") return snapshot.urgent ? "Urgent audio playing" : "Routine audio playing";
+  if (snapshot.queuedRoutineCount > 0) return "Routine audio queued";
+  return "Audio active";
+}
+
+export function TopBar({ simTimeMs, wallElapsedMs, connectionStatus, speechSnapshot }: TopBarProps) {
   return (
     <header className="top-bar">
       <span className="top-bar__title">EMBER LINE</span>
@@ -26,6 +39,9 @@ export function TopBar({ simTimeMs, wallElapsedMs, connectionStatus }: TopBarPro
       </span>
       <span className={`top-bar__status top-bar__status--${connectionStatus}`} role="status">
         {CONNECTION_LABEL[connectionStatus]}
+      </span>
+      <span className="top-bar__audio" role="status">
+        {audioStatusLabel(speechSnapshot)}
       </span>
     </header>
   );
