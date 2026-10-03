@@ -326,3 +326,29 @@ describe("coordinator objectives", () => {
     expect(log.decisions.filter((d) => d.event.type === "mission_start")).toHaveLength(1);
   });
 });
+
+describe("end-to-end survival against a surprise", () => {
+  it("leaves the site on its own when observed fire contradicts the plan, and survives", () => {
+    // The briefing says fire east of the site spreads east. In truth the wind turns west early.
+    const scenario = scenarioWith({ fire: patch(1550, 1050), sites: ["site-a"], work: 300 });
+    const inc = new Incident({
+      scenario,
+      seed: "surprise",
+      overrides: { spreadMultiplier: 1.2, windShiftMs: 250_000, postShiftWindRad: Math.PI, initialWindRad: 0 },
+    });
+    const c = crew(scenario);
+    const log = runControllers(inc, [c], 900_000);
+    const start = log.decisions.find((d) => d.event.type === "mission_start");
+    expect(start).toBeDefined();
+    const leave = log.decisions.find((d) => d.event.type === "withdrawal_triggered" || d.event.type === "retreat_triggered");
+    expect(leave).toBeDefined();
+    const workEnd = inc.inputLog.find((i) => i.input.kind === "commit_plan")?.input;
+    const plannedWorkEnd = workEnd?.kind === "commit_plan" ? workEnd.plan.workInterval.endMs : 0;
+    // It departed before the planned work interval ended, with no coordinator approval or input.
+    expect(leave!.tick).toBeLessThan(plannedWorkEnd);
+    expect(inc.inputLog.every((i) => i.input.kind !== "relay" && i.input.kind !== "set_active_recipient")).toBe(true);
+    expect(inc.projectAgent(crew1).state).not.toBe("lost");
+    expect(inc.notices.some((n) => n.kind === "agent_lost")).toBe(false);
+    expect(log.forecastEvents.some((e) => e.kind === "contradiction" || e.kind === "rebuild_complete")).toBe(true);
+  });
+});
