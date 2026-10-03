@@ -58,7 +58,7 @@ export const SceneCanvas = forwardRef<CameraControlsHandle, SceneCanvasProps>(fu
       orthographic
       shadows="soft"
       camera={{ position: INITIAL_CAMERA_POSITION, zoom: INITIAL_ZOOM, near: 1, far: 4000 }}
-      dpr={[1, quality.dprMax]}
+      dpr={[...quality.dpr]}
       onCreated={onReady}
       // The scene is static between interactions - render on demand
       // (camera move, new snapshot, pulse animation) instead of a

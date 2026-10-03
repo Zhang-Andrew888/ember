@@ -1,4 +1,4 @@
-import { DataTexture, LinearFilter, RGBAFormat, UnsignedByteType, type IUniform, type MeshStandardMaterial } from "three";
+import { DataTexture, LinearFilter, RGBAFormat, UnsignedByteType, type IUniform, type MeshLambertMaterial, type MeshStandardMaterial } from "three";
 import { SCENE_SIZE } from "../../../map/worldScale.js";
 import { sceneClock } from "../anim/sceneClock.js";
 
@@ -30,7 +30,7 @@ const CHAR_COLOR = "vec3(0.05, 0.04, 0.035)";
  * (emissive warm pool) and chars it. `instanced` reads the world position
  * through instanceMatrix. Chains any onBeforeCompile already set (tree sway).
  */
-export function applyFireLight(material: MeshStandardMaterial, instanced: boolean, charGround: boolean): void {
+export function applyFireLight(material: MeshStandardMaterial | MeshLambertMaterial, instanced: boolean, charGround: boolean): void {
   const previous = material.onBeforeCompile;
   const previousKey = material.customProgramCacheKey?.bind(material) ?? (() => "");
   material.onBeforeCompile = (shader, renderer) => {

@@ -1564,3 +1564,36 @@ Self-critique: the old selection behaviour recentred once and then lost the crew
 Reset previously snapped, ignoring the 250 ms rule; now eased. Still off: no keyboard shortcut for reset (the button
 is a real DOM button and tabbable); follow does not zoom to fit the agent's route.
 Blocked: nothing. Next: item 7 frame-rate script.
+
+### Commit 11: item 7 - repeatable frame-rate script, and the decoration cuts it forced
+Script: `pnpm --filter ember-web perf -- [--viewport 1440x900,1024x720] [--tiers low,medium,high] [--seconds 6]
+[--machine "<name>"] [--headed] [--real-gpu]` (`apps/web/scripts/perf.mjs`; stats/labelling in the tested
+`frameStats.mjs`). It starts the Vite DEV server, opens Chromium at the viewport, starts the incident, forces
+continuous rendering with the dev-only `?perfContinuous` flag (impossible in a production build; tested), selects each
+tier through the debug panel, records requestAnimationFrame intervals (= sustainable frame time under continuous
+rendering) and writes `apps/web/perf-results/perf-<time>.json`. The label is automatic: a software WebGL renderer is
+ALWAYS "cloud VM, headless Chromium, software rendering, not representative"; a real GPU run without `--machine` is
+flagged UNNAMED and exits 2. Playwright is not a repo dependency (resolved locally, else from the global npm root).
+
+RESULTS - cloud VM, headless Chromium, software rendering, not representative
+(ANGLE / SwiftShader, 6 s per tier, target = 30 fps = 33.3 ms; files in perf-results/):
+  BEFORE the cuts (perf-2026-10-03T18-00-17):  low 5.2 fps (191 ms) | medium 1.5 fps (675 ms) | high 0.95 fps (1047 ms)  @1440x900
+                                                low 7.4 fps (136 ms) | medium 2.4 fps | high 1.3 fps                    @1024x720
+  AFTER  the cuts (perf-2026-10-03T18-05-24):  low 12.5 fps (80 ms; p95 117) | medium 1.6 fps (630 ms) | high 1.1 fps (945 ms)  @1440x900
+                                                low 20.3 fps (49 ms; p95 83) | medium 2.8 fps | high 1.3 fps                  @1024x720
+TARGET MISSED at every tier on this VM. That says almost nothing about real hardware: the VM has no GPU.
+ANDREW MUST RUN THE SAME SCRIPT ON HIS OWN NAMED MACHINE, e.g.
+  pnpm --filter ember-web perf -- --machine "<model, GPU, OS>" --real-gpu --headed
+and quote only that result. Until then no frame-rate claim holds for real hardware.
+
+Decoration dropped first (profile on the low tier, mean frame ms, removing one layer at a time, 1440x900):
+  everything 212 | no trees 81 | no terrain 145 | no roads 186 | no fire 186 | none of the four 32.
+  -> low tier now: tree density 0.3 -> 0.12 with a single-cone tree, Lambert instead of PBR for ground and trees,
+     render scale 0.75 (labels are DOM so stay crisp). Re-profile: all 79 | no trees 58 | no terrain 48 | no roads 75 |
+     no fire 76 | none 30 (the ~30 ms floor is canvas + markers + DOM in software GL).
+  -> medium: tree density 0.65 -> 0.45, Lambert. Bloom/MSAA/shadows are the software killers on medium/high; they stay
+     because a real GPU should afford them - the auto tier steps down if it cannot.
+Product-critical layers (routes, forecast, crews, sites, observed fire, labels) are identical on every tier (checked by
+screenshot of the low tier: all readable, forest simply sparser).
+Caveat carried from 3d: the in-app timer (RenderPipeline) under-reads in software GL; this script is the number to use.
+Next: item 8 replay (truth only there).

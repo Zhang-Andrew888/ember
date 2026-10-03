@@ -17,14 +17,19 @@ export interface QualityConfig {
   readonly vignette: boolean;
   readonly antialias: boolean;
   readonly shadows: boolean;
-  readonly dprMax: number;
+  /** Pixel-ratio clamp [min, max] handed to the Canvas. Low renders below native resolution (labels stay crisp: they are DOM). */
+  readonly dpr: readonly [number, number];
+  /** Cheaper tree geometry (one cone) on the low tier. */
+  readonly simpleTrees: boolean;
+  /** Lambert shading instead of PBR for ground and trees (much cheaper per pixel). */
+  readonly cheapLighting: boolean;
   /** Flame cards per burning cell. */
   readonly flameCards: number;
 }
 
 export const QUALITY: Record<QualityTier, QualityConfig> = {
   low: {
-    treeDensity: 0.3,
+    treeDensity: 0.12,
     sway: false,
     embers: false,
     smoke: false,
@@ -32,11 +37,13 @@ export const QUALITY: Record<QualityTier, QualityConfig> = {
     vignette: false,
     antialias: false,
     shadows: false,
-    dprMax: 1,
+    dpr: [0.75, 0.75],
+    simpleTrees: true,
+    cheapLighting: true,
     flameCards: 1,
   },
   medium: {
-    treeDensity: 0.65,
+    treeDensity: 0.45,
     sway: true,
     embers: true,
     smoke: false,
@@ -44,7 +51,9 @@ export const QUALITY: Record<QualityTier, QualityConfig> = {
     vignette: true,
     antialias: true,
     shadows: false,
-    dprMax: 1.25,
+    dpr: [1, 1.25],
+    simpleTrees: false,
+    cheapLighting: true,
     flameCards: 2,
   },
   high: {
@@ -56,7 +65,9 @@ export const QUALITY: Record<QualityTier, QualityConfig> = {
     vignette: true,
     antialias: true,
     shadows: true,
-    dprMax: 1.5,
+    dpr: [1, 1.5],
+    simpleTrees: false,
+    cheapLighting: false,
     flameCards: 3,
   },
 };

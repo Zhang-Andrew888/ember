@@ -8,15 +8,18 @@ describe("quality tiers", () => {
       const higher = QUALITY[QUALITY_TIERS[i]!];
       expect(higher.treeDensity).toBeGreaterThanOrEqual(lower.treeDensity);
       expect(higher.flameCards).toBeGreaterThanOrEqual(lower.flameCards);
-      expect(higher.dprMax).toBeGreaterThanOrEqual(lower.dprMax);
+      expect(higher.dpr[1]).toBeGreaterThanOrEqual(lower.dpr[1]);
       for (const key of ["sway", "embers", "smoke", "bloom", "vignette", "antialias", "shadows"] as const) {
         expect(Number(higher[key]), key).toBeGreaterThanOrEqual(Number(lower[key]));
       }
+      // Cost-saving switches run the other way: a higher tier never uses the cheaper variant more.
+      expect(Number(higher.simpleTrees)).toBeLessThanOrEqual(Number(lower.simpleTrees));
+      expect(Number(higher.cheapLighting)).toBeLessThanOrEqual(Number(lower.cheapLighting));
     }
   });
 
   it("caps pixel ratio at 1.5 (docs/FRONTEND.md)", () => {
-    for (const tier of QUALITY_TIERS) expect(QUALITY[tier].dprMax).toBeLessThanOrEqual(1.5);
+    for (const tier of QUALITY_TIERS) expect(QUALITY[tier].dpr[1]).toBeLessThanOrEqual(1.5);
   });
 
   it("reduced motion turns off every self-animating or glowing effect on every tier", () => {

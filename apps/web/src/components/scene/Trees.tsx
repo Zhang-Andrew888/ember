@@ -1,10 +1,10 @@
 import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { useThree } from "@react-three/fiber";
-import { Color, MeshStandardMaterial, Object3D, type BufferGeometry, type InstancedMesh } from "three";
+import { Color, MeshLambertMaterial, MeshStandardMaterial, Object3D, type BufferGeometry, type InstancedMesh } from "three";
 import { sceneTerrain, waterCells, roadSamplePoints } from "./terrain/sceneTerrain.js";
 import { createProximityTest } from "./trees/roadMask.js";
 import { burnByCell, placeTrees, treeBrightness, type CellBurn, type TreeInstance } from "./trees/treePlacement.js";
-import { applySway, createPineGeometry, createSpruceGeometry, type SwayUniforms } from "./trees/treeGeometry.js";
+import { applySway, createPineGeometry, createSimpleTreeGeometry, createSpruceGeometry, type SwayUniforms } from "./trees/treeGeometry.js";
 import { applyFireLight } from "./fire/fireLight.js";
 import { sceneClock } from "./anim/sceneClock.js";
 import { useQuality } from "./quality/QualityContext.js";
@@ -44,8 +44,8 @@ export function Trees({ fireCells, reducedMotion }: { readonly fireCells: readon
 
   return (
     <>
-      <TreeSpecies trees={bySpecies[0]} burns={burns} geometryFactory={createSpruceGeometry} uniforms={uniforms} />
-      <TreeSpecies trees={bySpecies[1]} burns={burns} geometryFactory={createPineGeometry} uniforms={uniforms} />
+      <TreeSpecies trees={bySpecies[0]} burns={burns} geometryFactory={quality.simpleTrees ? createSimpleTreeGeometry : createSpruceGeometry} uniforms={uniforms} cheap={quality.cheapLighting} />
+      <TreeSpecies trees={bySpecies[1]} burns={burns} geometryFactory={quality.simpleTrees ? createSimpleTreeGeometry : createPineGeometry} uniforms={uniforms} cheap={quality.cheapLighting} />
     </>
   );
 }
@@ -55,21 +55,26 @@ function TreeSpecies({
   burns,
   geometryFactory,
   uniforms,
+  cheap,
 }: {
   readonly trees: readonly TreeInstance[];
   readonly burns: ReadonlyMap<number, CellBurn>;
   readonly geometryFactory: () => BufferGeometry;
   readonly uniforms: SwayUniforms;
+  readonly cheap: boolean;
 }) {
   const meshRef = useRef<InstancedMesh>(null);
   const invalidate = useThree((state) => state.invalidate);
   const geometry = useMemo(geometryFactory, [geometryFactory]);
   const material = useMemo(() => {
-    const m = new MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.95 });
+    // Lambert on cheaper tiers: far less per-pixel work for the same flat-shaded look.
+    const m = cheap
+      ? new MeshLambertMaterial({ vertexColors: true, flatShading: true })
+      : new MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.95 });
     applySway(m, uniforms);
     applyFireLight(m, true, false);
     return m;
-  }, [uniforms]);
+  }, [uniforms, cheap]);
   useEffect(
     () => () => {
       geometry.dispose();
