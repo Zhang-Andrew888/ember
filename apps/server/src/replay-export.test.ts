@@ -71,7 +71,6 @@ describe("buildReplayExport", () => {
     const ended = registry.create(
       {
         scenario: { ...base, map: { ...base.map, initialFireCells: patch(1500, 100) } },
-        seed: "replay-export-cache",
       },
       endedClock,
     );
@@ -81,7 +80,7 @@ describe("buildReplayExport", () => {
     expect(ended.session.incident.ended).toBe(true);
 
     const liveClock = { t: 1_000, nowMs(): number { return this.t; } };
-    const live = registry.create({ seed: "replay-export-live" }, liveClock);
+    const live = registry.create({}, liveClock);
     live.live.start();
     const simBefore = live.session.incident.simTimeMs;
     const passesBefore = replayRevealPasses();
