@@ -103,6 +103,7 @@ describe("wire protocol and information boundary", () => {
     hub.handle(id, JSON.stringify({ type: "ptt_release", transcript: "Crew 2, hold position" }), 3000);
     expect(bridge.scheduler.isRecording).toBe(false);
     hub.handle(id, JSON.stringify({ type: "ptt_release", transcript: "again" }), 3100);
+    expect(bridge.scheduler.isRecording).toBe(false);
     clock.t += 1000;
     live.pump();
     const msgs = hub.drain(id).map(wire);
@@ -129,6 +130,37 @@ describe("wire protocol and information boundary", () => {
     hub.handle(id, JSON.stringify({ type: "say", text: "resume your own judgment", idempotencyKey: "b" }), 400);
     const follow = hub.drain(id).map(wire);
     expect(follow.find((m) => m.type === "receipt")?.receipt?.recipientId).toBe("crew-2");
+  });
+
+  it("keeps playback suspended until the last concurrent capture ends", () => {
+    const { hub, bridge } = setup();
+    const a = hub.connect();
+    const b = hub.connect();
+    hub.handle(a, JSON.stringify({ type: "ptt_begin" }), 1000);
+    expect(bridge.scheduler.isRecording).toBe(true);
+    // A client that never began must not clear the shared flag.
+    hub.handle(b, JSON.stringify({ type: "ptt_release", transcript: "noise" }), 1100);
+    hub.handle(b, JSON.stringify({ type: "ptt_lost_focus", transcript: "noise" }), 1200);
+    expect(bridge.scheduler.isRecording).toBe(true);
+    hub.handle(b, JSON.stringify({ type: "ptt_begin" }), 1300);
+    expect(bridge.scheduler.isRecording).toBe(true);
+    // The first client to release leaves the other capture holding playback.
+    hub.handle(b, JSON.stringify({ type: "ptt_release", transcript: "Crew 2, hold position" }), 2000);
+    expect(bridge.scheduler.isRecording).toBe(true);
+    hub.handle(a, JSON.stringify({ type: "ptt_lost_focus", transcript: "Crew 3, withdraw" }), 2500);
+    expect(bridge.scheduler.isRecording).toBe(false);
+  });
+
+  it("drops only the disconnected client's capture from the shared recording flag", () => {
+    const { hub, bridge } = setup();
+    const a = hub.connect();
+    const b = hub.connect();
+    hub.handle(a, JSON.stringify({ type: "ptt_begin" }), 1000);
+    hub.handle(b, JSON.stringify({ type: "ptt_begin" }), 1100);
+    hub.disconnect(b, 1500, "partial");
+    expect(bridge.scheduler.isRecording).toBe(true);
+    hub.handle(a, JSON.stringify({ type: "ptt_release", transcript: "Crew 2, hold position" }), 2000);
+    expect(bridge.scheduler.isRecording).toBe(false);
   });
 
   it("retains a half-submitted utterance as unsent and only sends it on explicit resend", () => {

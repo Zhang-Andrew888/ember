@@ -19,6 +19,8 @@ export class SessionHub {
   /** Clients dropped because their outbound queue overflowed (backpressure). */
   readonly backpressureClosed = new Set<ClientId>();
   private readonly ptt = new Map<ClientId, PushToTalk>();
+  /** Clients with an open capture. Playback stays suspended until the last one ends. */
+  private readonly recordingClients = new Set<ClientId>();
   private nextClient = 1;
   private transcriptPointer = 0;
   private decisionPointer = 0;
@@ -42,7 +44,10 @@ export class SessionHub {
 
   /** A closed socket mid-capture keeps its transcript as unsent for explicit resend. */
   disconnect(id: ClientId, wallMs: number, partialTranscript = ""): void {
-    this.ptt.get(id)?.disconnect(wallMs, partialTranscript);
+    const capture = this.ptt.get(id);
+    const wasRecording = capture?.state === "recording";
+    capture?.disconnect(wallMs, partialTranscript);
+    if (wasRecording) this.noteCaptureEnded(id);
     this.outboxes.delete(id);
   }
 
@@ -84,6 +89,17 @@ export class SessionHub {
     for (const id of [...this.outboxes.keys()]) this.send(id, message);
   }
 
+  private noteCaptureBegan(id: ClientId): void {
+    const first = this.recordingClients.size === 0;
+    this.recordingClients.add(id);
+    if (first) this.bridge.scheduler.startRecording();
+  }
+
+  private noteCaptureEnded(id: ClientId): void {
+    if (!this.recordingClients.delete(id)) return;
+    if (this.recordingClients.size === 0) this.bridge.scheduler.stopRecording();
+  }
+
   handle(id: ClientId, raw: string, wallMs: number): void {
     const msg = decode(raw);
     if (msg === null) {
@@ -99,14 +115,15 @@ export class SessionHub {
         submit(msg.text, msg.idempotencyKey);
         return;
       case "ptt_begin":
-        ptt?.begin(wallMs, this.bridge.gateway.activeRecipientId);
-        this.bridge.scheduler.startRecording();
+        if (ptt?.begin(wallMs, this.bridge.gateway.activeRecipientId) === true) this.noteCaptureBegan(id);
         return;
       case "ptt_release":
       case "ptt_lost_focus": {
         const utterance = msg.type === "ptt_release" ? ptt?.release(wallMs, msg.transcript) : ptt?.lostFocus(wallMs, msg.transcript);
-        this.bridge.scheduler.stopRecording();
-        if (utterance !== null && utterance !== undefined && utterance.text.trim() !== "") submit(utterance.text, `ptt-${id}-${utterance.releasedMs}`);
+        // A release with no matching begin is not a capture; it must not resume anyone else's audio.
+        if (utterance === null || utterance === undefined) return;
+        this.noteCaptureEnded(id);
+        if (utterance.text.trim() !== "") submit(utterance.text, `ptt-${id}-${utterance.releasedMs}`);
         return;
       }
       case "inspect": {
