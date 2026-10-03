@@ -161,3 +161,20 @@ export function polylineMidpoint(points: readonly SceneVector[]): SceneVector {
   const b = points[points.length - 1] ?? a;
   return { x: (a.x + b.x) / 2, z: (a.z + b.z) / 2 };
 }
+
+/** At most this many forecast bands get a text label; the rest stay as hatching (the real server sends one per road). */
+export const MAX_FORECAST_LABELS = 3;
+
+/**
+ * The bands worth a label: those where fire could arrive soonest (nulls last), up to the cap.
+ * A map with ten overlapping window labels is unreadable, and the nearest threats matter most.
+ */
+export function labelledBands(bands: readonly ForecastBand[], max = MAX_FORECAST_LABELS): ForecastBand[] {
+  const key = (band: ForecastBand) => band.earliestMs ?? band.latestMs ?? Number.POSITIVE_INFINITY;
+  return [...bands].sort((a, b) => key(a) - key(b)).slice(0, max);
+}
+
+/** "work_interval_limited_by_forecast" -> "work interval limited by forecast". */
+export function humanizeReason(reason: string): string {
+  return reason.replace(/[_-]+/g, " ").trim();
+}

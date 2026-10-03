@@ -8,6 +8,8 @@ import { DemoBanner } from "./DemoBanner.js";
 export interface BriefingProps {
   readonly onStart: () => void;
   readonly starting: boolean;
+  /** Why the last Start attempt failed, if it did; shown so Start never fails silently. */
+  readonly error?: string | null;
   readonly demoMode: boolean;
 }
 
@@ -18,7 +20,7 @@ export interface BriefingProps {
  * pressed - App.tsx only begins snapshot playback / calls the start
  * endpoint from onStart.
  */
-export function Briefing({ onStart, starting, demoMode }: BriefingProps) {
+export function Briefing({ onStart, starting, demoMode, error = null }: BriefingProps) {
   const probeMic = useCallback(() => createVoiceCapture({ preferMicrophone: true }).probeMicrophone(), []);
 
   return (
@@ -71,6 +73,11 @@ export function Briefing({ onStart, starting, demoMode }: BriefingProps) {
         <MicCheck onProbe={probeMic} />
       </section>
 
+      {error ? (
+        <p role="alert" className="briefing__error">
+          {error}
+        </p>
+      ) : null}
       <button type="button" className="briefing__start" onClick={onStart} disabled={starting}>
         {starting ? "Starting…" : "Start incident"}
       </button>
