@@ -1548,3 +1548,19 @@ thinner hatch (2.2/7 discarded). Now a stale marker is clearly an older, ghosted
 Not done / by design: stale information is never hidden - only restyled. The route and forecast layers have no age
 of their own in the contract (plans carry no timestamp), so they are not faded.
 Blocked: nothing. Next: item 6 camera follow + reset + reduced motion.
+
+### Commit 10: item 6 - camera follow, animated reset, reduced-motion variant
+Changed: `cameraMath.ts` (frame-rate independent follow easing tau 80 ms ~ 250 ms settle, snap flag, tween helpers,
+pan-gesture test; 11 unit tests), `CameraControls.tsx` rewritten (follow target, animated reset to the fitted pose,
+removed the old one-shot focus tween), `SceneView` (selecting an agent starts follow; a pan gesture or the toggle
+stops it; Reset also stops follow), legend gets a "Follow selected" checkbox (disabled with a hint when nothing is
+selected). Orbit and zoom do NOT stop follow, only pan does. Reduced motion: no damping, follow snaps, reset is
+instant. No command controls added: follow/reset only move the camera.
+Measured with Playwright (1440x900, model-states preset, label distance from canvas centre, px):
+  normal:  before select 264 -> after select 58 (follow on) -> after right-drag pan follow OFF (122) -> after Reset 270
+  reduced: before select 264 -> after select 58 (settled in 300 ms) -> pan follow OFF (130) -> after Reset 264
+  (~58 px = label sits above the model it is centred on; Reset returns to the fitted framing within label jitter.)
+Self-critique: the old selection behaviour recentred once and then lost the crew as it moved; following fixes that.
+Reset previously snapped, ignoring the 250 ms rule; now eased. Still off: no keyboard shortcut for reset (the button
+is a real DOM button and tabbable); follow does not zoom to fit the agent's route.
+Blocked: nothing. Next: item 7 frame-rate script.

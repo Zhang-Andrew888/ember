@@ -1,15 +1,24 @@
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
-import { Vector3 } from "three";
+import type { Vector3 } from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import {
+  easeOutCubic,
+  followStep,
+  isPanGesture,
+  lerp,
+  RESET_DURATION_MS,
+  tweenProgress,
+  type Point2,
+} from "./cameraMath.js";
 
-const FOCUS_TRANSITION_MS = 250;
-
-interface FocusAnimation {
+interface ResetTween {
   readonly fromTarget: Vector3;
   readonly toTarget: Vector3;
   readonly fromPosition: Vector3;
   readonly toPosition: Vector3;
+  readonly fromZoom: number;
+  readonly toZoom: number;
   readonly start: number;
 }
 
@@ -21,33 +30,37 @@ export function fitZoom(widthPx: number, heightPx: number): number {
   return Math.min(widthPx / SCENE_FIT_WIDTH, heightPx / SCENE_FIT_HEIGHT);
 }
 
-function easeOutCubic(t: number): number {
-  return 1 - Math.pow(1 - t, 3);
-}
-
 export interface CameraControlsHandle {
+  /** Returns to the fitted pose: a 250 ms ease, or instant in reduced motion. */
   reset(): void;
-  /** Re-centers the orbit target on a ground point, preserving current zoom/tilt. */
-  focusOn(x: number, z: number): void;
 }
 
 export interface CameraControlsProps {
   readonly reducedMotion: boolean;
+  /** Ground point to keep centred; null = not following. */
+  readonly followTarget: Point2 | null;
+  /** The user started panning: follow should pause so the camera never fights them. */
+  readonly onUserPan: () => void;
 }
 
 /**
  * Bounded orbit/pan/zoom for inspecting the scene (docs/FRONTEND.md:
  * "Allow modest orbit for inspection but constrain tilt so labels remain
- * legible"). Built on three's own OrbitControls (shipped inside the
- * "three" package) rather than adding @react-three/drei as a new
- * dependency for a single helper.
+ * legible"), built on three's own OrbitControls rather than adding
+ * @react-three/drei as a dependency for one helper. Adds:
+ * - follow: ease the orbit target toward `followTarget` (snap in reduced motion);
+ * - an animated reset to the fitted pose (instant in reduced motion).
  */
 export const CameraControls = forwardRef<CameraControlsHandle, CameraControlsProps>(function CameraControls(
-  { reducedMotion },
+  { reducedMotion, followTarget, onUserPan },
   ref,
 ) {
   const { camera, gl, invalidate } = useThree();
-  const animationRef = useRef<FocusAnimation | null>(null);
+  const resetRef = useRef<ResetTween | null>(null);
+  const followRef = useRef<Point2 | null>(followTarget);
+  followRef.current = followTarget;
+  const onUserPanRef = useRef(onUserPan);
+  onUserPanRef.current = onUserPan;
 
   const controls = useMemo(() => {
     const instance = new OrbitControls(camera, gl.domElement);
@@ -69,6 +82,7 @@ export const CameraControls = forwardRef<CameraControlsHandle, CameraControlsPro
   const width = useThree((state) => state.size.width);
   const height = useThree((state) => state.size.height);
   const fitted = useRef(false);
+  const fittedPose = useRef<{ target: Vector3; position: Vector3; zoom: number } | null>(null);
   useEffect(() => {
     if (fitted.current || width === 0 || height === 0) return;
     fitted.current = true;
@@ -79,6 +93,11 @@ export const CameraControls = forwardRef<CameraControlsHandle, CameraControlsPro
       controls.minZoom = zoom * 0.85;
       camera.updateProjectionMatrix();
     }
+    fittedPose.current = {
+      target: controls.target.clone(),
+      position: camera.position.clone(),
+      zoom: "zoom" in camera ? (camera.zoom as number) : 1,
+    };
     controls.saveState();
     invalidate();
   }, [camera, controls, invalidate, width, height]);
@@ -90,70 +109,93 @@ export const CameraControls = forwardRef<CameraControlsHandle, CameraControlsPro
   useEffect(() => {
     // Not `() => controls.dispose` - that returns the method unbound, so
     // React later calls it as a bare function with `this` undefined and
-    // OrbitControls.dispose() (`this.disconnect()`) throws. Only
-    // surfaced now that a component actually unmounts a <CameraControls>
-    // (ReplayView <-> live), which never happened before this session.
+    // OrbitControls.dispose() (`this.disconnect()`) throws.
     return () => controls.dispose();
   }, [controls]);
 
-  // Canvas uses frameloop="demand" (SceneCanvas.tsx) - nothing renders
-  // unless something actually changed. Pointer-driven orbiting already
-  // invalidates through this; damping settling after a drag needs it too.
+  // Canvas uses frameloop="demand" - nothing renders unless something
+  // changed. Pointer-driven orbiting already invalidates through this;
+  // damping settling after a drag needs it too.
   useEffect(() => {
     const handleChange = () => invalidate();
     controls.addEventListener("change", handleChange);
     return () => controls.removeEventListener("change", handleChange);
   }, [controls, invalidate]);
 
+  // A pan gesture hands the camera back to the user.
+  useEffect(() => {
+    const element = gl.domElement;
+    const handlePointerDown = (event: PointerEvent) => {
+      if (isPanGesture(event)) onUserPanRef.current();
+    };
+    element.addEventListener("pointerdown", handlePointerDown);
+    return () => element.removeEventListener("pointerdown", handlePointerDown);
+  }, [gl]);
+
+  // Start (or stop) following: kick the first frame under frameloop="demand".
+  useEffect(() => {
+    if (followTarget) invalidate();
+  }, [followTarget, invalidate]);
+
   useImperativeHandle(
     ref,
     () => ({
       reset: () => {
-        // Full-fidelity instant restore (position/target/zoom together);
-        // not tweened - see focusOn for the animated-transition case.
-        animationRef.current = null;
-        controls.reset();
-      },
-      focusOn: (x, z) => {
-        const deltaX = x - controls.target.x;
-        const deltaZ = z - controls.target.z;
-        const toTarget = new Vector3(x, 0, z);
-        const toPosition = new Vector3(camera.position.x + deltaX, camera.position.y, camera.position.z + deltaZ);
-
-        if (reducedMotion) {
-          animationRef.current = null;
-          controls.target.copy(toTarget);
-          camera.position.copy(toPosition);
-          controls.update();
+        const pose = fittedPose.current;
+        if (!pose) {
+          controls.reset();
           return;
         }
-
-        // Animate transitions over 250ms (docs/FRONTEND.md).
-        animationRef.current = {
+        const zoom = "zoom" in camera ? (camera.zoom as number) : 1;
+        if (reducedMotion) {
+          resetRef.current = null;
+          controls.target.copy(pose.target);
+          camera.position.copy(pose.position);
+          if ("zoom" in camera) {
+            camera.zoom = pose.zoom;
+            camera.updateProjectionMatrix();
+          }
+          controls.update();
+          invalidate();
+          return;
+        }
+        resetRef.current = {
           fromTarget: controls.target.clone(),
-          toTarget,
+          toTarget: pose.target.clone(),
           fromPosition: camera.position.clone(),
-          toPosition,
+          toPosition: pose.position.clone(),
+          fromZoom: zoom,
+          toZoom: pose.zoom,
           start: performance.now(),
         };
-        invalidate(); // kick off the first frame of the tween under frameloop="demand"
+        invalidate(); // kick off the first frame of the tween
       },
     }),
-    [controls, camera, reducedMotion],
+    [controls, camera, reducedMotion, invalidate],
   );
 
-  useFrame(() => {
-    const animation = animationRef.current;
-    if (animation) {
-      const t = Math.min(1, (performance.now() - animation.start) / FOCUS_TRANSITION_MS);
-      const eased = easeOutCubic(t);
-      controls.target.lerpVectors(animation.fromTarget, animation.toTarget, eased);
-      camera.position.lerpVectors(animation.fromPosition, animation.toPosition, eased);
-      if (t >= 1) {
-        animationRef.current = null;
-      } else {
-        invalidate(); // keep the tween running under frameloop="demand"
+  useFrame((_, delta) => {
+    const tween = resetRef.current;
+    if (tween) {
+      const t = easeOutCubic(tweenProgress(tween.start, performance.now(), RESET_DURATION_MS));
+      controls.target.lerpVectors(tween.fromTarget, tween.toTarget, t);
+      camera.position.lerpVectors(tween.fromPosition, tween.toPosition, t);
+      if ("zoom" in camera) {
+        camera.zoom = lerp(tween.fromZoom, tween.toZoom, t);
+        camera.updateProjectionMatrix();
       }
+      if (tweenProgress(tween.start, performance.now(), RESET_DURATION_MS) >= 1) resetRef.current = null;
+      else invalidate();
+    } else if (followRef.current) {
+      const { next, arrived } = followStep({ x: controls.target.x, z: controls.target.z }, followRef.current, delta, reducedMotion);
+      const dx = next.x - controls.target.x;
+      const dz = next.z - controls.target.z;
+      controls.target.x += dx;
+      controls.target.z += dz;
+      camera.position.x += dx;
+      camera.position.z += dz;
+      // Keep rendering until we arrive; once there, a moving target re-invalidates via the clock/new snapshots.
+      if (!arrived) invalidate();
     }
     controls.update();
   });

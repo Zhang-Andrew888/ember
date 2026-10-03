@@ -13,6 +13,9 @@ export interface SceneLegendProps {
   readonly showForecast: boolean;
   readonly onToggleForecast: () => void;
   readonly forecast: ForecastLayer | null;
+  readonly canFollow: boolean;
+  readonly follow: boolean;
+  readonly onToggleFollow: () => void;
   readonly onResetCamera: () => void;
   readonly fireCells: FireCellMarker[];
   readonly onInspectCell: (cell: FireCellMarker) => void;
@@ -26,7 +29,7 @@ export interface SceneLegendProps {
  * scene labels from rendering underneath it.
  */
 export const SceneLegend = forwardRef<HTMLDivElement, SceneLegendProps>(function SceneLegend(
-  { showFireCells, onToggleFireCells, showRoutes, onToggleRoutes, showForecast, onToggleForecast, forecast, onResetCamera, fireCells, onInspectCell },
+  { showFireCells, onToggleFireCells, showRoutes, onToggleRoutes, showForecast, onToggleForecast, forecast, canFollow, follow, onToggleFollow, onResetCamera, fireCells, onInspectCell },
   ref,
 ) {
   // The key is collapsed on narrower viewports so it never hides routes or forecast.
@@ -83,6 +86,10 @@ export const SceneLegend = forwardRef<HTMLDivElement, SceneLegendProps>(function
           {forecast ? forecast.headline : "Forecast: not yet built"}
           {forecast?.explanation ? ` — ${forecast.explanation}` : ""}
         </p>
+        <label className="scene-legend__toggle" title={canFollow ? undefined : "Select a crew to follow it"}>
+          <input type="checkbox" checked={canFollow && follow} disabled={!canFollow} onChange={onToggleFollow} />
+          Follow selected
+        </label>
         <button type="button" onClick={onResetCamera}>
           Reset camera
         </button>
