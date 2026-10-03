@@ -80,6 +80,14 @@ export function SceneView({
     return agent ? { x: agent.position.x, z: agent.position.z } : null;
   }, [follow, selectedAgentId, entities.agents]);
   const handleUserPan = useCallback(() => setFollow(false), []);
+  // Clicking an agent on the map also resumes following, even if it was already selected.
+  const handleInspectAgent = useCallback(
+    (agentId: string) => {
+      setFollow(true);
+      onInspectAgent(agentId);
+    },
+    [onInspectAgent],
+  );
 
   const labels = useMemo<LabelDescriptor[]>(() => {
     const refugeLabels = listRefugeNodes(scenarioMap).map((refuge) => ({
@@ -139,8 +147,14 @@ export function SceneView({
         variant: "forecast" as const,
       };
     });
-    return [...refugeLabels, ...siteLabels, ...agentLabels, ...routeLabels, ...forecastLabels];
-  }, [entities]);
+    return [
+      ...refugeLabels,
+      ...siteLabels,
+      ...agentLabels,
+      ...(showRoutes ? routeLabels : []),
+      ...(showForecast ? forecastLabels : []),
+    ];
+  }, [entities, showRoutes, showForecast]);
 
   return (
     <div className="scene-view">
@@ -153,7 +167,7 @@ export function SceneView({
         selectedAgentId={selectedAgentId}
         followTarget={followTarget}
         onUserPan={handleUserPan}
-        onInspectAgent={onInspectAgent}
+        onInspectAgent={handleInspectAgent}
         onInspectCell={setInspectedCell}
         onReady={handleReady}
         reducedMotion={reducedMotion}
@@ -173,6 +187,7 @@ export function SceneView({
         showForecast={showForecast}
         onToggleForecast={() => setShowForecast((value) => !value)}
         forecast={entities.forecast}
+        showUnseenKey={entities.fireCells.some((cell) => cell.unseen === true)}
         onResetCamera={() => {
           setFollow(false);
           controlsRef.current?.reset();
@@ -229,12 +244,22 @@ function CellInspectionPanel({
         </dd>
         <dt>State</dt>
         <dd>{cell.burnState}</dd>
-        <dt>Last observed</dt>
-        <dd>
-          {formatIncidentClock(cell.lastObservedAt)}
-          {ageMs !== null ? ` (${Math.round(ageMs / 1000)}s ago)` : ""}
-          {cell.stale ? " — stale" : ""}
-        </dd>
+        {cell.unseen ? (
+          <>
+            <dt>Observation</dt>
+            <dd>This state was not observed by the coordinator (full simulated fire, replay only)</dd>
+          </>
+        ) : null}
+        {cell.unseen ? null : (
+          <>
+            <dt>Last observed</dt>
+            <dd>
+              {formatIncidentClock(cell.lastObservedAt)}
+              {ageMs !== null ? ` (${Math.round(ageMs / 1000)}s ago)` : ""}
+              {cell.stale ? " — stale" : ""}
+            </dd>
+          </>
+        )}
       </dl>
     </div>
   );

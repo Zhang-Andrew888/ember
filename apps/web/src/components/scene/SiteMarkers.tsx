@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from "react";
 import { DoubleSide, MeshStandardMaterial, type BufferGeometry } from "three";
-import { applyStaleHatch, type StaleHatchUniform } from "./staleHatch.js";
+import { useStaleMaterial } from "./useStaleMaterial.js";
 import { freshness } from "./staleness.js";
 import type { SiteMarker } from "./sceneEntities.js";
 import type { SceneNode } from "../../map/scenarioMap.js";
@@ -55,18 +55,13 @@ function SiteModel({ site, index }: { readonly site: SiteMarker; readonly index:
   const y = sceneTerrain.groundY(site.position.x, site.position.z) + SITE_LIFT;
   const tint = PROTECTION_TINT[site.protectionStatus];
   const fresh = freshness(site.ageMs, site.stale);
-  const hatch = useMemo<StaleHatchUniform>(() => ({ uStaleHatch: { value: 0 } }), []);
   // Unobserved sites are already outline-only ghosts; stale observed sites fade and hatch.
-  hatch.uStaleHatch.value = fresh.stale && !cue.ghost ? 1 : 0;
-  const material = useMemo(() => {
-    const m = new MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.85, fog: false });
-    applyStaleHatch(m, hatch);
-    return m;
-  }, [hatch]);
-  material.color.set(tint);
-  material.transparent = fresh.stale;
-  material.opacity = fresh.opacity;
-  useEffect(() => () => material.dispose(), [material]);
+  const material = useStaleMaterial(
+    () => new MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.85, fog: false }),
+    tint,
+    fresh,
+    fresh.stale && !cue.ghost,
+  );
 
   return (
     <group position={[site.position.x, y, site.position.z]} scale={SITE_SCALE}>

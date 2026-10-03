@@ -1,0 +1,151 @@
+{
+  "kind": "ember-nav-calibration-exploratory-v1",
+  "variant": "ember_line",
+  "seeds": [
+    "dev-1",
+    "dev-2",
+    "dev-3",
+    "dev-4",
+    "dev-5"
+  ],
+  "caveat": "Dev seeds only. Do not pick a preset by maximizing work delivered; use for sensitivity and documentation.",
+  "presets": {
+    "default": {
+      "nav": {},
+      "switchMargin": 1.2,
+      "switchCooldownMs": 30000,
+      "summary": {
+        "runs": 5,
+        "meanWorkDelivered": 648.4,
+        "meanSitesProtectedAndStanding": 1,
+        "meanSitesDestroyed": 0.4,
+        "meanCrewsLost": 0,
+        "totalMissionsStarted": 18,
+        "totalReturnsCompleted": 18,
+        "totalInterrupted": 0,
+        "totalSuperseded": 17,
+        "totalLostBeforeReturn": 0,
+        "meanSimSeconds": 1447,
+        "endingCounts": {
+          "time_expired": 4,
+          "all_sites_resolved": 1
+        }
+      }
+    },
+    "buffer-tight": {
+      "nav": {
+        "bufferMs": 25000
+      },
+      "switchMargin": 1.2,
+      "switchCooldownMs": 30000,
+      "summary": {
+        "runs": 5,
+        "meanWorkDelivered": 648.4,
+        "meanSitesProtectedAndStanding": 1,
+        "meanSitesDestroyed": 0.4,
+        "meanCrewsLost": 0,
+        "totalMissionsStarted": 17,
+        "totalReturnsCompleted": 17,
+        "totalInterrupted": 0,
+        "totalSuperseded": 16,
+        "totalLostBeforeReturn": 0,
+        "meanSimSeconds": 1447,
+        "endingCounts": {
+          "time_expired": 4,
+          "all_sites_resolved": 1
+        }
+      }
+    },
+    "buffer-loose": {
+      "nav": {
+        "bufferMs": 35000
+      },
+      "switchMargin": 1.2,
+      "switchCooldownMs": 30000,
+      "summary": {
+        "runs": 5,
+        "meanWorkDelivered": 642.4,
+        "meanSitesProtectedAndStanding": 1,
+        "meanSitesDestroyed": 0.4,
+        "meanCrewsLost": 0,
+        "totalMissionsStarted": 18,
+        "totalReturnsCompleted": 18,
+        "totalInterrupted": 0,
+        "totalSuperseded": 17,
+        "totalLostBeforeReturn": 0,
+        "meanSimSeconds": 1447,
+        "endingCounts": {
+          "time_expired": 4,
+          "all_sites_resolved": 1
+        }
+      }
+    },
+    "work-finer": {
+      "nav": {
+        "minWorkMs": 15000,
+        "workStepMs": 15000
+      },
+      "switchMargin": 1.2,
+      "switchCooldownMs": 30000,
+      "summary": {
+        "runs": 5,
+        "meanWorkDelivered": 648.4,
+        "meanSitesProtectedAndStanding": 1,
+        "meanSitesDestroyed": 0.4,
+        "meanCrewsLost": 0,
+        "totalMissionsStarted": 18,
+        "totalReturnsCompleted": 18,
+        "totalInterrupted": 0,
+        "totalSuperseded": 17,
+        "totalLostBeforeReturn": 0,
+        "meanSimSeconds": 1447,
+        "endingCounts": {
+          "time_expired": 4,
+          "all_sites_resolved": 1
+        }
+      }
+    },
+    "switch-eager": {
+      "switchMargin": 1.15,
+      "switchCooldownMs": 25000,
+      "summary": {
+        "runs": 5,
+        "meanWorkDelivered": 648.4,
+        "meanSitesProtectedAndStanding": 1,
+        "meanSitesDestroyed": 0.4,
+        "meanCrewsLost": 0,
+        "totalMissionsStarted": 18,
+        "totalReturnsCompleted": 18,
+        "totalInterrupted": 0,
+        "totalSuperseded": 17,
+        "totalLostBeforeReturn": 0,
+        "meanSimSeconds": 1447,
+        "endingCounts": {
+          "time_expired": 4,
+          "all_sites_resolved": 1
+        }
+      }
+    },
+    "switch-cautious": {
+      "switchMargin": 1.25,
+      "switchCooldownMs": 35000,
+      "summary": {
+        "runs": 5,
+        "meanWorkDelivered": 648.4,
+        "meanSitesProtectedAndStanding": 1,
+        "meanSitesDestroyed": 0.4,
+        "meanCrewsLost": 0,
+        "totalMissionsStarted": 18,
+        "totalReturnsCompleted": 18,
+        "totalInterrupted": 0,
+        "totalSuperseded": 17,
+        "totalLostBeforeReturn": 0,
+        "meanSimSeconds": 1447,
+        "endingCounts": {
+          "time_expired": 4,
+          "all_sites_resolved": 1
+        }
+      }
+    }
+  }
+}

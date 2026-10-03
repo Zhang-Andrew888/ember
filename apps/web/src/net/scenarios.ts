@@ -194,3 +194,15 @@ function nodeAgent(
     reportedAt: 90_000 as never,
   };
 }
+
+/**
+ * Same agents, 70 sim-seconds later with no new reports: every marker goes from fresh to stale
+ * between the two snapshots (dev preset `?scenario=stale-transition`). Used to check that a
+ * stale marker repaints even when no animation clock is running (reduced motion).
+ */
+export const staleLaterScenario: CoordinatorView = {
+  ...fixtureCoordinatorView,
+  sequence: 800 as CoordinatorView["sequence"],
+  simTimeMs: 160_000 as CoordinatorView["simTimeMs"],
+  wallElapsedMs: 32_000 as CoordinatorView["wallElapsedMs"],
+};

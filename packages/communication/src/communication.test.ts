@@ -8,6 +8,8 @@ import {
   PushToTalk,
   RecordingSink,
   ScriptedInterpreter,
+  createGrokInterpreter,
+  parseModelIntentJson,
   lossNarration,
   matchName,
   replyForDecision,
@@ -491,6 +493,60 @@ describe("replies from committed outcomes", () => {
 
   it("narrates a loss as control, never as an utterance by the lost crew", () => {
     expect(lossNarration("Crew 3")).toEqual({ text: "Control: Crew 3 has been lost.", tier: 1 });
+  });
+});
+
+describe("Grok interpreter adapter", () => {
+  const req = {
+    commandId: "cmd-9",
+    inputSequence: 3,
+    text: "Crew 2, hold",
+    directory,
+    activeRecipientCallsign: null,
+  };
+
+  it("parseModelIntentJson merges authoritative ids from the request", () => {
+    const raw = '{"kind":"objective","objective":{"kind":"hold"},"evidenceQueries":[],"unsupportedClaims":[]}';
+    const env = parseModelIntentJson(raw, req);
+    expect(env).toMatchObject({ commandId: "cmd-9", inputSequence: 3, objective: { kind: "hold" } });
+  });
+
+  it("createGrokInterpreter delivers async answers through the gateway hook", async () => {
+    const delivered: IntentEnvelope[] = [];
+    const interpreter = createGrokInterpreter(
+      async () =>
+        '{"kind":"objective","explicitRecipient":"Crew 1","objective":{"kind":"hold"},"evidenceQueries":[],"unsupportedClaims":[]}',
+      (_seq, env) => delivered.push(env),
+    );
+    expect(interpreter.interpret(req)).toBeNull();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(delivered[0]).toMatchObject({ inputSequence: 3, explicitRecipient: "Crew 1" });
+  });
+
+  it("integrates with CommandGateway when the async answer arrives", async () => {
+    const hook: { deliver?: (seq: number, env: IntentEnvelope) => void } = {};
+    const gw = new CommandGateway({
+      directory,
+      interpreter: createGrokInterpreter(
+        async () =>
+          '{"kind":"objective","explicitRecipient":"Crew 1","objective":{"kind":"hold"},"evidenceQueries":[],"unsupportedClaims":[]}',
+        (seq, env) => hook.deliver?.(seq, env),
+      ),
+      picture: () => [],
+      status: () => null,
+      nowSimMs: () => 100_000,
+      incidentEnded: () => false,
+    });
+    hook.deliver = (seq, env) => {
+      gw.deliver(seq, env);
+    };
+    const ticket = gw.submit({ commandId: "cmd-1", text: "Crew 1, hold", idempotencyKey: "k1", wallMs: 0 });
+    expect(ticket.outcomes).toHaveLength(0);
+    await Promise.resolve();
+    await Promise.resolve();
+    const replay = gw.submit({ commandId: "cmd-1", text: "Crew 1, hold", idempotencyKey: "k1", wallMs: 0 });
+    expect(replay.outcomes.some((o) => o.actions.some((a) => a.kind === "objective"))).toBe(true);
   });
 });
 

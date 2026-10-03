@@ -1,7 +1,11 @@
 import { useSyncExternalStore } from "react";
 import type { CoordinatorViewClient, CoordinatorViewClientState } from "../net/CoordinatorViewClient.js";
 
-const INITIAL_STATE: CoordinatorViewClientState = { status: "connecting", view: null };
+const INITIAL_STATE: CoordinatorViewClientState = {
+  status: "connecting",
+  view: null,
+  sideband: { transcripts: [], receipts: [], audioCues: [] },
+};
 
 /**
  * Subscribes a component tree to a CoordinatorViewClient without putting

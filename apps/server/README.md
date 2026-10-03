@@ -26,7 +26,21 @@ no-provider test adapter (`ScriptedInterpreter`, `RecordingSink`).
 3. `POST /incidents/:id/start` with header `x-incident-token` — starts the simulation clock.
 4. All WebSocket frames are `{ protocolVersion: 1, message: … }` (see `protocol.ts`).
 
-Voice uses the same JSON push-to-talk client messages as events; provider audio is not wired yet.
+Voice uses the same JSON push-to-talk client messages as events.
+
+### Grok Voice (optional)
+
+Set **`XAI_API_KEY`** on the server. Outgoing lines are synthesized via xAI TTS (`GET /incidents/:id/speech/:itemId`); incoming PTT can use xAI STT (`POST /incidents/:id/stt` with JSON `{ audioBase64, mimeType }`).
+
+For **Grok intent** (chat completions instead of `ScriptedInterpreter`), also set **`XAI_INTENT=1`**. Optional **`XAI_CHAT_MODEL`** (default `grok-4-1-fast-non-reasoning`). `GET /health` reports `grokVoice` and `grokIntent`.
+
+```sh
+export XAI_API_KEY=...
+export XAI_INTENT=1   # optional; without it, commands use ScriptedInterpreter
+pnpm --filter ember-server exec tsx src/dev-http.ts
+```
+
+Web: `VITE_INCIDENT_REST_BASE_URL=` and `VITE_GROK_VOICE=1` in `apps/web/.env.local`, then `pnpm --filter ember-web dev`.
 
 ## Commands
 
@@ -35,6 +49,7 @@ pnpm --filter ember-server exec tsx src/evaluate-cli.ts heldout out.json   # 20 
 pnpm --filter ember-server exec tsx src/evaluate-cli.ts dev out.json       # 5 development seeds
 pnpm --filter ember-server exec tsx src/evaluate-cli.ts showcase out.json  # the rehearsed seed
 pnpm --filter ember-server exec tsx src/sensitivity-cli.ts out.json        # exploratory prior-width study
+pnpm --filter ember-server exec tsx src/nav-calibration-cli.ts out.json   # nav + switch-margin dev-seed sweep (not RL)
 ```
 
 A full held-out run takes about 16 minutes on four cores. Recorded results live in `evaluation-results/`; read the

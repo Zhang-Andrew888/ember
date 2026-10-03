@@ -1,6 +1,7 @@
-import { MissionPlan, MissionPlanId, NodeId, SequenceNumber, SimTimeMs, type EdgeId, type TimedLeg } from "@ember/domain";
+import { MissionPlan, MissionPlanId, NodeId, SequenceNumber, SimTimeMs, type EdgeId } from "@ember/domain";
 import { admitsProtection } from "@ember/forecast";
 import { hashValue } from "@ember/knowledge";
+import { enumerateApproachRoutes, routeIdOf } from "./approach-routes.js";
 import { HazardModel } from "./hazard.js";
 import { ReturnTable, timeExpandedSearch, startsFromPosition, type Reach, type SearchStart } from "./search.js";
 import {
@@ -52,14 +53,6 @@ interface Built {
   readonly mission: RankedMission;
 }
 
-function routeIdOf(legs: readonly TimedLeg[]): string {
-  return legs.map((l) => `${l.edgeId}${l.direction === "forward" ? "+" : "-"}`).join(">");
-}
-
-function edgeKeys(legs: readonly TimedLeg[]): EdgeId[] {
-  return [...new Set(legs.map((l) => l.edgeId))];
-}
-
 /** Plan against an explicit hazard model (also used for single-member and horizon-only checks). */
 export function planWithHazard(ctx: PlanningContext, hm: HazardModel, targets: readonly MissionTarget[]): RankedMission[] {
   const config = ctx.config ?? DEFAULT_NAV_CONFIG;
@@ -75,21 +68,13 @@ export function planWithHazard(ctx: PlanningContext, hm: HazardModel, targets: r
   const avoid = new Set<EdgeId>(ctx.avoidEdges ?? []);
   const table = new ReturnTable(hm, ctx.nowMs, oracle, avoid, config);
   for (const target of targets) {
-    const bases = new Map<string, { legs: TimedLeg[]; k: number }>();
-    const attempt = (ban: Set<EdgeId>): void => {
+    const approaches = enumerateApproachRoutes((ban) => {
       const reach = search(starts, ban);
       const hit = reach.earliest(new Set([target.nodeId]));
-      if (hit === null) return;
-      const legs = reach.legsTo(hit.nodeId, hit.k);
-      const id = routeIdOf(legs);
-      if (!bases.has(id)) bases.set(id, { legs, k: hit.k });
-    };
-    attempt(avoid);
-    const first = [...bases.values()][0];
-    if (first !== undefined) {
-      for (const e of edgeKeys(first.legs)) attempt(new Set([...avoid, e]));
-    }
-    for (const approach of bases.values()) {
+      if (hit === null) return null;
+      return { legs: reach.legsTo(hit.nodeId, hit.k), k: hit.k };
+    }, avoid);
+    for (const approach of approaches) {
       const nodeSafeLimit = hm.nodeSafeUntilMs(target.nodeId);
       for (const w of target.workOptionsMs) {
         const workEndK = approach.k + Math.ceil(w / config.bucketMs);

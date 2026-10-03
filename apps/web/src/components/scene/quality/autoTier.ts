@@ -12,6 +12,9 @@ export const DOWN_MS = 36;
 export const UP_MS = 14;
 export const WINDOW = 24;
 export const COOLDOWN_MS = 6_000;
+/** Fast path: this many consecutive frames above FAST_DOWN_MS step down without waiting for a full window. */
+export const FAST_SAMPLES = 4;
+export const FAST_DOWN_MS = DOWN_MS * 2;
 export const BAN_MS = 60_000;
 
 export interface AutoTierState {
@@ -34,11 +37,15 @@ export function percentile75(values: readonly number[]): number {
 
 export function recordFrame(state: AutoTierState, frameMs: number, nowMs: number): AutoTierState {
   const samples = [...state.samples, frameMs].slice(-WINDOW);
-  if (samples.length < WINDOW) return { ...state, samples };
-  const p75 = percentile75(samples);
   const index = QUALITY_TIERS.indexOf(state.tier);
+  // A machine this slow would take minutes to fill the window (a frame every second), so a short
+  // run of clearly-over-budget frames is enough to step down.
+  const recent = samples.slice(-FAST_SAMPLES);
+  const fastDown = recent.length === FAST_SAMPLES && recent.every((ms) => ms > FAST_DOWN_MS);
+  if (samples.length < WINDOW && !fastDown) return { ...state, samples };
+  const p75 = percentile75(samples);
 
-  if (p75 > DOWN_MS && index > 0) {
+  if ((fastDown || p75 > DOWN_MS) && index > 0) {
     return {
       tier: QUALITY_TIERS[index - 1]!,
       samples: [],

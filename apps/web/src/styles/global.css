@@ -72,6 +72,30 @@ input {
   font-variant-numeric: tabular-nums;
 }
 
+.connection-banner,
+.demo-banner {
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.connection-banner {
+  background: #2a2220;
+}
+
+.connection-banner--connecting {
+  background: #252a2e;
+}
+
+.demo-banner {
+  background: #1f2a33;
+}
+
+.top-bar__audio {
+  font-size: 0.85rem;
+  color: #c5d0c8;
+}
+
 .top-bar__status {
   margin-left: auto;
   padding: 0.2rem 0.6rem;
@@ -316,6 +340,28 @@ input {
 
 .conversation-panel__report-agent {
   font-weight: 600;
+}
+
+.conversation-panel__line {
+  font-size: 0.9rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.conversation-panel__line--clarification {
+  border-left: 3px solid #e8b84a;
+  padding-left: 0.5rem;
+}
+
+.conversation-panel__line--rejection {
+  border-left: 3px solid var(--color-rejected);
+  padding-left: 0.5rem;
+}
+
+.conversation-panel__tag {
+  font-size: 0.75rem;
+  font-weight: 600;
+  opacity: 0.85;
 }
 
 .conversation-panel__composer {
@@ -685,4 +731,17 @@ input {
 .scene-legend__swatch--stale {
   background: repeating-linear-gradient(135deg, #5b6a6d 0 2px, transparent 2px 4px);
   outline: 1px dashed #5b6a6d;
+}
+
+.scene-legend__swatch--unseen {
+  background: transparent;
+  outline: 2px dashed #b79cff;
+}
+
+.replay-banner__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-left: auto;
+  margin-right: 0.75rem;
 }

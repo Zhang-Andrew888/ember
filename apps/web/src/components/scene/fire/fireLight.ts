@@ -51,7 +51,7 @@ export function applyFireLight(material: MeshStandardMaterial | MeshLambertMater
         "#include <color_fragment>",
         `#include <color_fragment>
         vec4 fireTexel = texture2D(uFireMap, (vFirePos + ${(SCENE_SIZE / 2).toFixed(1)}) / ${SCENE_SIZE.toFixed(1)});
-        ${charGround ? `diffuseColor.rgb = mix(diffuseColor.rgb, ${CHAR_COLOR}, fireTexel.g * 0.85);` : `diffuseColor.rgb *= 1.0 - fireTexel.g * 0.0;`}`,
+        ${charGround ? `diffuseColor.rgb = mix(diffuseColor.rgb, ${CHAR_COLOR}, fireTexel.g * 0.85);` : ""}`,
       )
       .replace(
         "#include <emissivemap_fragment>",

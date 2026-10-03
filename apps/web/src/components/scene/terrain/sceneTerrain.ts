@@ -2,7 +2,7 @@ import { scenarioMap } from "../../../map/activeScenario.js";
 import { createHeightField, type HeightField } from "./heightField.js";
 
 /** The active scenario's terrain, shared by every scene layer so everything sits on the same ground. */
-export const sceneTerrain: HeightField = createHeightField(scenarioMap.terrain, scenarioMap.worldMeters);
+export const sceneTerrain: HeightField = createHeightField(scenarioMap.terrain);
 
 /**
  * Water fills the lowest ground. The level is chosen from the field (a low

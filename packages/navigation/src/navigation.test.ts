@@ -207,6 +207,14 @@ describe("complete mission search", () => {
     expect(result.plan!.timedLegs.map((l) => l.edgeId)).toContain("e-n-h");
   });
 
+  it("admits multiple distinct approach routes when both corridors are free", () => {
+    const result = planMissions(ctxWith({ ensemble: makeEnsemble(map, [{ id: "a" }]) }), protectionTargets(siteA));
+    const routeIds = new Set(result.candidates.map((c) => c.routeId));
+    expect(routeIds.size).toBeGreaterThan(1);
+    expect([...routeIds].some((id) => id.includes("e-s-h"))).toBe(true);
+    expect([...routeIds].some((id) => id.includes("e-n-h"))).toBe(true);
+  });
+
   it("ranks admitted missions by value-weighted benefit per total time, deterministically", () => {
     const targets = protectionTargets([siteKnowledge("site-a"), siteKnowledge("site-b"), siteKnowledge("site-c")]);
     const ensemble = makeEnsemble(map, [{ id: "a" }]);

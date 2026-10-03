@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { replayLog } from "../net/replayLog.js";
+import { mockRecording } from "../replay/mockRecording.js";
+import { mergeTruthCells, truthFrameAt } from "../replay/recording.js";
+import { truthForDisplay } from "../replay/truthGate.js";
 import { buildSceneEntities } from "./scene/sceneEntities.js";
 import { scenarioMap } from "../map/activeScenario.js";
 import { SceneView } from "./scene/SceneView.js";
@@ -18,16 +20,16 @@ export interface ReplayViewProps {
  * timeline ... commands disabled"), driven by a recorded mock event log
  * (net/replayLog.ts) - no packages/replay import, no sim-lane dependency.
  *
- * docs/FRONTEND.md also specifies an explicit "replay: full simulated
- * fire" toggle - that would show the actual, complete truth alongside the
- * coordinator's filtered knowledge. There is no truth channel anywhere in
- * this schema or any mock data yet (live or recorded); this view says so
- * rather than fabricating one. What's shown below is the coordinator's
- * own recorded projection only, exactly as it would have looked live.
+ * Replay is the ONLY place the full simulated fire may be shown
+ * (docs/FRONTEND.md "replay: full simulated fire" toggle). It is off by
+ * default; truthForDisplay() releases the truth frame only here, only with
+ * the toggle on. The truth comes from the recording's separate truthFrames
+ * channel (replay/recording.ts), never from the coordinator log itself.
  */
 export function ReplayView({ onExit }: ReplayViewProps) {
   const [index, setIndex] = useState(0);
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
+  const [showFullFire, setShowFullFire] = useState(false);
   const reducedMotion = useReducedMotion();
   const bannerLabelRef = useRef<HTMLSpanElement>(null);
 
@@ -40,8 +42,18 @@ export function ReplayView({ onExit }: ReplayViewProps) {
     bannerLabelRef.current?.focus();
   }, []);
 
+  const replayLog = mockRecording.coordinatorLog;
   const view = replayLog[index]!;
-  const entities = useMemo(() => buildSceneEntities(view, scenarioMap), [view]);
+  const baseEntities = useMemo(() => buildSceneEntities(view, scenarioMap), [view]);
+  const truth = truthForDisplay({
+    phase: "replay",
+    showFullFire,
+    frame: truthFrameAt(mockRecording.truthFrames, view.simTimeMs as number),
+  });
+  const entities = useMemo(
+    () => (truth ? { ...baseEntities, fireCells: mergeTruthCells(baseEntities.fireCells, truth, scenarioMap) } : baseEntities),
+    [baseEntities, truth],
+  );
 
   return (
     <div className="app-layout replay-view">
@@ -49,7 +61,16 @@ export function ReplayView({ onExit }: ReplayViewProps) {
         <span className="replay-banner__label" ref={bannerLabelRef} tabIndex={-1}>
           REPLAY
         </span>
-        <span>Commands disabled. Showing the coordinator&rsquo;s own recorded knowledge only.</span>
+        <span>
+          Commands disabled.{" "}
+          {showFullFire
+            ? "Showing the full simulated fire, including fire the coordinator has not observed (dashed frames)."
+            : "Showing the coordinator\u2019s own recorded knowledge only."}
+        </span>
+        <label className="replay-banner__toggle">
+          <input type="checkbox" checked={showFullFire} onChange={(event) => setShowFullFire(event.target.checked)} />
+          Replay: full simulated fire
+        </label>
         <button type="button" onClick={onExit}>
           Exit replay
         </button>
@@ -65,7 +86,12 @@ export function ReplayView({ onExit }: ReplayViewProps) {
         />
       </div>
 
-      <UrgentStrip report={latestUrgentReport(view)} audioState="idle" />
+      <UrgentStrip
+        report={latestUrgentReport(view)}
+        callsign={null}
+        audioState="idle"
+        queuedUrgent={false}
+      />
       <AgentRail agents={view.agents} selectedAgentId={selectedAgentId} onSelectAgent={setSelectedAgentId} />
 
       <div className="replay-controls">
