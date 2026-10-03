@@ -60,7 +60,14 @@ export const CameraControls = forwardRef<CameraControlsHandle, CameraControlsPro
     controls.enableDamping = !reducedMotion;
   }, [controls, reducedMotion]);
 
-  useEffect(() => controls.dispose, [controls]);
+  useEffect(() => {
+    // Not `() => controls.dispose` - that returns the method unbound, so
+    // React later calls it as a bare function with `this` undefined and
+    // OrbitControls.dispose() (`this.disconnect()`) throws. Only
+    // surfaced now that a component actually unmounts a <CameraControls>
+    // (ReplayView <-> live), which never happened before this session.
+    return () => controls.dispose();
+  }, [controls]);
 
   // Canvas uses frameloop="demand" (SceneCanvas.tsx) - nothing renders
   // unless something actually changed. Pointer-driven orbiting already

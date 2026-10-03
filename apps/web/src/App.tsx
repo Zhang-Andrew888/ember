@@ -21,6 +21,7 @@ import { ConversationPanel } from "./components/ConversationPanel.js";
 import { UrgentStrip } from "./components/UrgentStrip.js";
 import { AgentRail } from "./components/AgentRail.js";
 import { EndOverlay } from "./components/EndOverlay.js";
+import { ReplayView } from "./components/ReplayView.js";
 
 const INCIDENT_ID = import.meta.env.VITE_INCIDENT_ID ?? "demo";
 const WS_URL = import.meta.env.VITE_INCIDENT_WS_URL;
@@ -29,7 +30,7 @@ const IS_MOCK_MODE = !WS_URL;
 
 const EMPTY_ENTITIES = { agents: [], sites: [], fireCells: [] };
 
-type Phase = "briefing" | "live";
+type Phase = "briefing" | "live" | "replay";
 
 export function App() {
   const [phase, setPhase] = useState<Phase>("briefing");
@@ -92,6 +93,9 @@ export function App() {
     window.location.reload();
   }, []);
 
+  const handleReplay = useCallback(() => setPhase("replay"), []);
+  const handleExitReplay = useCallback(() => setPhase("live"), []);
+
   const handleSendMessage = useCallback((text: string) => {
     // "Received: ..." (not "accepted"/applied) deliberately mirrors
     // CommandReceipt's own "received" status - this stub only ever claims
@@ -121,6 +125,10 @@ export function App() {
 
   if (phase === "briefing") {
     return <Briefing onStart={handleStart} starting={starting} />;
+  }
+
+  if (phase === "replay") {
+    return <ReplayView onExit={handleExitReplay} />;
   }
 
   const hasEnded = Boolean(view?.incidentEnd);
@@ -166,7 +174,9 @@ export function App() {
           onSelectAgent={setSelectedAgentId}
         />
       </div>
-      {view?.incidentEnd ? <EndOverlay incidentEnd={view.incidentEnd} onStartAgain={handleStartAgain} /> : null}
+      {view?.incidentEnd ? (
+        <EndOverlay incidentEnd={view.incidentEnd} onStartAgain={handleStartAgain} onReplay={handleReplay} />
+      ) : null}
     </div>
   );
 }
