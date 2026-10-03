@@ -402,3 +402,77 @@ assumed). 108 web-lane tests as of `3c4b4c8`.
 **Next:** backlog item 2, accessibility (keyboard nav, focus order,
 visible focus, ARIA labels, reduced-motion - already partly covered
 earlier but not yet systematically audited - and non-color cues).
+
+## 2026-10-03 07:5x-08:0x UTC (03:5x-04:0x ET) - backlog item 2: accessibility audit
+
+Methodology: live Playwright checks against the running dev server, not
+visual inspection - a real keyboard Tab-walk recording each stop's
+tag/text/role, the real computed accessibility tree
+(`page.accessibility.snapshot()`, which resolves label associations etc.,
+not just raw `aria-label` attributes), and a standalone WCAG relative-
+luminance script for contrast ratios. Three real gaps found and fixed,
+each its own commit:
+
+1. **`2bee69e`** - fire-cell inspection (burn state + observation
+   timestamp) had zero keyboard/screen-reader path. It's only reachable
+   today via clicking an `instancedMesh` cell inside the `<canvas>`,
+   which has no accessible children at all - unlike agents (AgentRail
+   already covers them) and sites (always-visible labels), fire cells had
+   no DOM equivalent whatsoever. Added a `<details>/<summary>` disclosure
+   to SceneLegend listing every current cell as a button with the same
+   text the mouse panel shows; activating one opens the identical panel.
+2. **`d810d03`** - a real focus-trap violation, found by Tab-walking the
+   `ended-time-expired` scenario: focus reached the fire-observations
+   checkbox, the new cell disclosure, the message composer input, and
+   every agent-rail card - all visually hidden behind the end-overlay
+   modal (the overlay blocks pointer events, so none of this was
+   reachable by mouse, but all of it was still reachable by keyboard and
+   exposed to screen readers). Fixed with the native `inert` attribute on
+   a wrapper around the background content while `incidentEnd` is set
+   (removes it from the tab order and accessibility tree, blocks pointer
+   events, no hand-rolled focus-trap logic needed) plus moving focus to
+   the dialog's own heading on mount. `aria-modal="true"` is now accurate
+   since the background really is inert.
+3. **`6c1615d`** - `--color-border` (used for input/card/panel boundaries)
+   measured 1.51:1 against `--color-background` with a standalone WCAG
+   contrast script - well under the 3:1 WCAG 1.4.11 minimum for a border
+   that's the only way to perceive a control's boundary. Replaced with
+   `#647b83` (3.99:1 against background, 3.43:1 against panel), still a
+   muted tone consistent with the documented charcoal/panel palette.
+
+**Also checked, no changes needed:** every other text/background pair in
+the measured palette passes AA (text-on-background 16.0:1, text-on-panel
+13.8:1, refuge swatch 10.4:1, observed-fire swatch 6.3:1, stale-outline
+swatch 3.16:1 - passes the 3:1 UI-component threshold that applies to a
+non-text swatch, correctly doesn't need the 4.5:1 text threshold). Visible
+focus: every interactive element keeps the browser's default `outline:
+auto` - nothing in this codebase ever sets `outline: none`, confirmed by
+grep, not by only checking the elements I happened to tab through.
+Accessible names: the real accessibility tree snapshot confirms every
+control already had a correct computed name before this round (checkbox
+via its wrapping `<label>`, composer input via its `sr-only`-but-present
+`<label for>`, push-to-talk's disabled state carries its explanatory text
+as an accessible `description`, agent-rail buttons combine callsign/role/
+state into one name with `aria-pressed` reflecting selection) - this
+backlog item's audit found real markup, not aria-label attributes, so
+nothing needed adding there. Live regions (`role="alert"` on the active
+urgent strip, `role="status"` on its empty state and the cell-inspection
+panel and the connection-status chip, `aria-live="polite"` on the
+transcript's routine-update region) were already in place from earlier
+work; grepped the source to confirm all five are still present, not
+re-verified by re-deriving them from scratch. Reduced motion was already
+verified live in an earlier session segment (camera focus tween skipped,
+fire-cell pulse skipped, zero errors) - not re-tested this round since
+nothing touched that code path.
+
+**Status:** CI green on every commit in this batch (verified via the
+GitHub Actions API). Full test suite and an 8-scenario Playwright smoke
+re-run both still pass with zero page errors after each fix.
+
+**Next:** backlog item 3, rendering performance - measure frame time at
+the target viewport, record numbers here, fix hot spots (decoration
+first). Flagging now, before measuring: this sandbox's headless Chromium
+runs software WebGL (no GPU), so any FPS number captured here describes
+this sandbox, not the target hardware docs/VALIDATION.md asks for
+("documented test machine") - will say so plainly rather than present a
+software-rendering number as a real-hardware performance claim.
