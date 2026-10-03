@@ -27,3 +27,8 @@ Running log for the crew increments. Newest last.
 - Survival reasons (route closed, certify failure, forecast unreliable) outrank member condition.
 - Rising fatigue tightens certification first, so in practice the forecast reason fires slightly before the member withdraw limit; the member branch is covered by the pure tests.
 - Added optional `memberState` to ControllerOptions (validated) so a crew can start already worn.
+
+## Review round (17:2x UTC)
+- #10 and #11 rejected by review. #10: process (waived later) plus not in plan; dependency note added. #11: cites SIMULATION.md line 90 "No injury meter". My reading: that is world state; crew-internal planning margin never enters it. Replied on #11; flagged for Andrew. If he disagrees, #11/#13 get closed, not reworked.
+- Trimmed lockfile to the zod entry (newer pnpm had added unrelated `libc:` lines).
+- Increments 4-7 branch from main, independent of #10/#11/#13.
