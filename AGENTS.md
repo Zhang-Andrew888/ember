@@ -86,3 +86,9 @@ Each merged increment should:
 - Add or update Vitest tests for new behavior.
 - Leave the fixture in `tests/fixtures/coordinator-view.fixture.ts` valid (web lane depends on it).
 - Not expose private world state through any API or WebSocket message.
+
+## Cursor Cloud specific instructions
+
+- Node 22 or newer and pnpm 10 are enough. No provider secrets: the live stack uses the no-provider adapters.
+- After checkout, run `pnpm install --frozen-lockfile` and `pnpm build:libs`. Package entry points resolve to `dist`, so the server cannot start until libraries are built. CI checks are `pnpm typecheck`, `pnpm lint`, and `pnpm test`.
+- The HTTP API is `startHttpApp` on `127.0.0.1:3000` (`GET /health`). `pnpm --filter ember-server dev` does not listen. Vite runs at `http://127.0.0.1:5173` and proxies `/incidents` and `/health` to port 3000. Set `VITE_INCIDENT_REST_BASE_URL` to an empty string so the UI creates a real incident through that proxy. A non-empty value is also a base URL; leaving the variable unset uses the mock incident.
