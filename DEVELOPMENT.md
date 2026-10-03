@@ -1,6 +1,6 @@
 # Development setup and running
 
-Quick path for local work on Ember Line. CI and evaluation CLIs are unchanged; see [apps/server/README.md](apps/server/README.md) for offline harness commands.
+Quick path for local work on Ember Line. See also [apps/server/README.md](apps/server/README.md) for evaluation harness details.
 
 ## Prerequisites
 
@@ -91,6 +91,26 @@ With `VITE_GROK_VOICE=1` and a server key:
 With `XAI_INTENT=1` on the server, typed and STT-transcribed commands are interpreted via xAI chat completions (async gateway), not the keyword parser.
 
 **Mic / browser:** allow microphone when prompted; use HTTPS or localhost. If Grok is off, the UI falls back to mock/stub playback where implemented.
+
+## Offline evaluation and navigation calibration
+
+No server or API keys. Scripted coordinator policy only. Read caveats in [docs/SERVER_AND_EVALUATION.md](docs/SERVER_AND_EVALUATION.md) before citing metrics.
+
+| CLI | Purpose |
+|-----|---------|
+| `evaluate-cli.ts heldout out.json` | 20 held-out seeds × 3 variants (~16 min) |
+| `evaluate-cli.ts dev out.json` | 5 development seeds |
+| `evaluate-cli.ts showcase out.json` | Rehearsed demo seed |
+| `sensitivity-cli.ts out.json` | Forecast prior-width sensitivity (exploratory) |
+| `nav-calibration-cli.ts out.json` | Nav + switch-margin presets on dev seeds (`ember_line`) |
+
+```sh
+pnpm --filter ember-server exec tsx src/evaluate-cli.ts dev evaluation-results/dev.json
+pnpm --filter ember-server exec tsx src/sensitivity-cli.ts evaluation-results/prior-sensitivity.json
+pnpm --filter ember-server exec tsx src/nav-calibration-cli.ts evaluation-results/nav-calibration.json
+```
+
+Presets: `packages/navigation/src/calibration-grid.ts` ([packages/navigation/README.md](packages/navigation/README.md)). Offline calibration only — not reinforcement learning; do not tune against held-out win rates.
 
 ## Troubleshooting
 

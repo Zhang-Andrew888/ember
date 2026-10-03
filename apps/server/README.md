@@ -49,6 +49,7 @@ pnpm --filter ember-server exec tsx src/evaluate-cli.ts heldout out.json   # 20 
 pnpm --filter ember-server exec tsx src/evaluate-cli.ts dev out.json       # 5 development seeds
 pnpm --filter ember-server exec tsx src/evaluate-cli.ts showcase out.json  # the rehearsed seed
 pnpm --filter ember-server exec tsx src/sensitivity-cli.ts out.json        # exploratory prior-width study
+pnpm --filter ember-server exec tsx src/nav-calibration-cli.ts out.json   # nav + switch-margin dev-seed sweep (not RL)
 ```
 
 A full held-out run takes about 16 minutes on four cores. Recorded results live in `evaluation-results/`; read the
