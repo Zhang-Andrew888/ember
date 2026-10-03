@@ -3,12 +3,9 @@ import { EdgePosition, Meters, SimTimeMs } from "@ember/domain";
 import {
   CELL_BURNED,
   CELL_BURNING,
-  CELL_NONBURNABLE,
-  CELL_UNBURNED,
   FireField,
   RoadIndex,
   SIM_DEFAULTS,
-  cellCenter,
   cellIndexOf,
   cellsWithin,
   createTerrain,
@@ -474,20 +471,5 @@ export class World {
     if (s === CELL_BURNING) return "burning";
     if (s === CELL_BURNED) return "burned";
     return "unburned";
-  }
-
-  /** Nonburnable cells report as unburned to any observer. */
-  isNonburnable(cell: number): boolean {
-    return this.fire.state[cell] === CELL_NONBURNABLE;
-  }
-
-  cellPoint(cell: number): { x: number; y: number } {
-    return cellCenter(cell);
-  }
-
-  unburnedCount(): number {
-    let n = 0;
-    for (let i = 0; i < this.fire.state.length; i++) if (this.fire.state[i] === CELL_UNBURNED) n += 1;
-    return n;
   }
 }

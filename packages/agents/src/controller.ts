@@ -93,13 +93,11 @@ export class CrewController implements AgentController {
   private eventPointer = 0;
   private seenObjectives = new Set<string>();
   private lastIdleReason: string | null = null;
-  private autonomousForced = false;
   private lastRejectionText: string | null = null;
   private lastReportText: string | null = null;
   private lastProj: AgentProjection | null = null;
   private lastEnv: ControllerEnvironment = {};
   private pendingRevision: MissionPlanT | null = null;
-  private yieldCandidate: MissionPlanT | null = null;
 
   constructor(options: ControllerOptions) {
     this.agentId = options.agentId;
@@ -134,7 +132,6 @@ export class CrewController implements AgentController {
     this.objective = null;
     this.pendingObjective = null;
     this.holding = false;
-    this.autonomousForced = true;
     this.evalDirty = true;
   }
 
@@ -333,7 +330,7 @@ export class CrewController implements AgentController {
     this.returnNow("reservation_conflict", proj, ctx, out);
   }
 
-  proposeYield(nowMs: number): MissionPlanT | null {
+  proposeYield(_nowMs: number): MissionPlanT | null {
     const proj = this.lastProj;
     const a = this.active;
     const ens = this.forecast.current;
@@ -341,14 +338,12 @@ export class CrewController implements AgentController {
     if (a.mode === "retreating" || a.kind === "halt") return null;
     // Planned against the oracle, which already holds the requester's tentative slot.
     const ctx = this.context({ ...proj, simTimeMs: Math.max(proj.simTimeMs, 0) }, ens, this.lastEnv, this.classOfActive());
-    void nowMs;
     let plan: MissionPlanT | null = null;
     if (a.kind === "mission" && a.targetId !== null) {
       plan = this.candidateSearch(ctx, new Set([a.targetId])).best?.plan ?? null;
     } else {
       plan = planReturn(ctx)?.plan ?? null;
     }
-    this.yieldCandidate = plan;
     return plan;
   }
 
@@ -533,7 +528,6 @@ export class CrewController implements AgentController {
       this.decide(out, proj, "objective_rejected", reason, `objective ${obj.id} rejected; current plan kept`);
       this.report(out, explain(this.callsign, { type: "objective_rejected", reasonCode: reason, actualAction: "" }, `(${reason})`), true);
     };
-    this.autonomousForced = false;
     switch (obj.kind) {
       case "protect_site": {
         if (obj.targetId === null) return reject("missing_target");

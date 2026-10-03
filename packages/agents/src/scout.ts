@@ -1,5 +1,4 @@
 import type { NodeId } from "@ember/domain";
-import { earliestIgnitionMs } from "@ember/forecast";
 import { planMissions, type MissionSearchResult, type MissionTarget, type PlanningContext } from "@ember/navigation";
 import { cellsWithin, type RoadIndex } from "@ember/simulation/model";
 import { CrewController, type ControllerOptions } from "./controller.js";
@@ -108,7 +107,6 @@ export class ScoutController extends CrewController {
         benefit: () => benefit,
       });
     }
-    void earliestIgnitionMs;
     return planMissions(ctx, targets);
   }
 
