@@ -29,11 +29,18 @@ describe("value of information", () => {
     expect(score([member(500), member(500)]).total).toBe(0);
   });
 
+  it("reports information bits alongside, without changing the score", () => {
+    const e = score([member(50), member(500)]).edges[0]!;
+    expect(e.infoBits).toBeCloseTo(1, 12);
+    expect(e.disagreement).toBeCloseTo(1, 12);
+    expect(e.voi).toBeCloseTo(e.disagreement * e.importance, 12);
+  });
+
   it("is largest at an even split and rises as the split evens out", () => {
     const at = (closed: number, of: number) => score([...Array(closed).fill(member(50)), ...Array(of - closed).fill(member(500))]).total;
     expect(at(2, 4)).toBeGreaterThan(at(1, 4));
     expect(at(1, 4)).toBeGreaterThan(at(0, 4));
-    expect(at(2, 4)).toBeCloseTo(2, 12); // 1 bit times importance 2
+    expect(at(2, 4)).toBeCloseTo(2, 12); // full disagreement times importance 2
   });
 
   it("scales with public importance and is zero for an unimportant corridor", () => {
