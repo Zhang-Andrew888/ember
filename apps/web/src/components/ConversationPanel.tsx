@@ -1,6 +1,7 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { FormEvent, KeyboardEvent, PointerEvent } from "react";
 import type { TranscriptLine } from "../conversation/transcript.js";
+import { isNearBottom } from "../conversation/stickToBottom.js";
 import { formatIncidentClock } from "../format/time.js";
 import { createBrowserVoiceCapture, type BrowserVoiceCapture } from "../net/browserVoiceCapture.js";
 import { createVoiceCapture, type MicPermissionState, type VoiceCaptureAdapter } from "../net/voiceCapture.js";
@@ -56,6 +57,14 @@ export function ConversationPanel({
     ),
   );
   const latest = transcript[transcript.length - 1] ?? null;
+  const transcriptRef = useRef<HTMLOListElement>(null);
+  // Follow new lines unless the reader scrolled up to read earlier ones.
+  const followingRef = useRef(true);
+
+  useEffect(() => {
+    const list = transcriptRef.current;
+    if (list !== null && followingRef.current) list.scrollTop = list.scrollHeight;
+  }, [transcript.length]);
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -146,7 +155,14 @@ export function ConversationPanel({
         {activeRecipientCallsign ? `Addressing: ${activeRecipientCallsign}` : "No recipient addressed yet"}
       </div>
 
-      <ol className="conversation-panel__transcript" aria-label="Conversation transcript">
+      <ol
+        ref={transcriptRef}
+        className="conversation-panel__transcript"
+        aria-label="Conversation transcript"
+        onScroll={(event) => {
+          followingRef.current = isNearBottom(event.currentTarget);
+        }}
+      >
         {transcript.map((line) => (
           <li key={line.id} className={LINE_CLASS[line.kind]}>
             <span className="conversation-panel__report-time">{formatIncidentClock(line.simTimeMs)}</span>

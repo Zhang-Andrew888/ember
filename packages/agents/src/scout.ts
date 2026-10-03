@@ -114,7 +114,7 @@ export class ScoutController extends CrewController {
   }
 
   protected override missionVerb(id: string): string {
-    return `scouting ${id}`;
+    return `scouting ${this.nodeName(id)}`;
   }
 
   override tick(...args: Parameters<CrewController["tick"]>): ReturnType<CrewController["tick"]> {
