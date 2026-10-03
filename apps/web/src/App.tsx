@@ -39,7 +39,7 @@ import { ReplayView, type ReplaySource } from "./components/ReplayView.js";
 import { ConnectionBanner } from "./components/ConnectionBanner.js";
 import { DemoBanner } from "./components/DemoBanner.js";
 import { MockPlaybackEndedOverlay } from "./components/MockPlaybackEndedOverlay.js";
-import { playPreparedSpeech } from "./net/grokSpeechPlayback.js";
+import { handleGrokAudioCue, PreparedSpeechPlayback } from "./net/grokSpeechPlayback.js";
 import { transcribeViaServer } from "./net/grokStt.js";
 
 const INCIDENT_ID = import.meta.env.VITE_INCIDENT_ID ?? "demo";
@@ -73,6 +73,7 @@ export function App() {
   const mockSocketRef = useRef<MockIncidentSocket | null>(null);
   const protocolSocketRef = useRef<ProtocolWebSocket | null>(null);
   const liveSessionRef = useRef<{ incidentId: string; token: string } | null>(null);
+  const grokPlaybackRef = useRef(new PreparedSpeechPlayback());
   const liveWsUrlRef = useRef<string | null>(null);
   const reducedMotion = useReducedMotion();
 
@@ -115,10 +116,13 @@ export function App() {
     const cues = sideband.audioCues.slice(lastAudioCueCount.current);
     lastAudioCueCount.current = sideband.audioCues.length;
     for (const cue of cues) {
-      if (cue.event !== "started") continue;
-      const itemId = cue.itemId;
-      void playPreparedSpeech(REST_BASE_URL ?? "", session.incidentId, session.token, itemId).finally(() => {
-        protocolSocketRef.current?.sendCommand({ type: "audio_finished", itemId });
+      handleGrokAudioCue(cue, grokPlaybackRef.current, {
+        apiBase: REST_BASE_URL ?? "",
+        incidentId: session.incidentId,
+        token: session.token,
+        notifyFinished: (itemId) => {
+          protocolSocketRef.current?.sendCommand({ type: "audio_finished", itemId });
+        },
       });
     }
   }, [sideband.audioCues]);
@@ -133,7 +137,10 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    if (view?.incidentEnd) speechStubRef.current.cancel();
+    if (view?.incidentEnd) {
+      speechStubRef.current.cancel();
+      grokPlaybackRef.current.stopAll();
+    }
   }, [view?.incidentEnd]);
 
   const openSocket = useCallback(() => {
