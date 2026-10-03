@@ -18,7 +18,8 @@
     "ws": "8.18.2",
     "@ember/knowledge": "workspace:*",
     "@ember/forecast": "workspace:*",
-    "@ember/navigation": "workspace:*"
+    "@ember/navigation": "workspace:*",
+    "zod": "3.24.2"
   },
   "devDependencies": {
     "tsx": "4.19.3"

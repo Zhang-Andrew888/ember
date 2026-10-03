@@ -23,3 +23,5 @@ export {
   type Variant,
   type VariantReport,
 } from "./evaluation.js";
+export { SessionHub, LiveRun, type ClientId } from "./hub.js";
+export { ClientMessage, ServerMessage, decode, encode } from "./protocol.js";
