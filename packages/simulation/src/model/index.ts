@@ -5,3 +5,4 @@ export * from "./rng.js";
 export * from "./map.js";
 export * from "./terrain.js";
 export * from "./fire.js";
+export * from "./refuge.js";

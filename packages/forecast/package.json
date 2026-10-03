@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@ember/domain": "workspace:*",
-    "@ember/knowledge": "workspace:*"
+    "@ember/knowledge": "workspace:*",
+    "@ember/simulation": "workspace:*"
   }
 }

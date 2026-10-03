@@ -12,12 +12,13 @@ import {
   cellIndexOf,
   cellsWithin,
   createTerrain,
+  refugeCells,
   streamRng,
   type FireParams,
   type RoadEdge,
 } from "./model/index.js";
 import type { PlanMode } from "./inputs.js";
-import { refugeCells, type AgentSpec, type SimScenario } from "./scenario.js";
+import type { AgentSpec, SimScenario } from "./scenario.js";
 
 export interface PrivateWorldParameters {
   readonly spreadMultiplier: number;
