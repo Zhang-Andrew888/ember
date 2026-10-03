@@ -416,13 +416,12 @@ export class CrewController implements AgentController {
     void reason;
   }
 
-  /** Stop where the agent is. A mid-edge emergency stop is allowed only when stranded. */
+  /**
+   * Stop where the agent is, replacing whatever the simulator still holds for it: a stranded agent
+   * must not later walk a leg it was told to abandon. A mid-edge emergency stop is allowed only here.
+   */
   private halt(proj: AgentProjection, out: TickOutput): void {
-    if (proj.position.kind === "node") {
-      this.active = null;
-      return;
-    }
-    const refuge = this.map.refuges[0]?.nodeId ?? proj.position.edgeId;
+    const refuge = this.map.refuges[0]?.nodeId ?? (proj.position.kind === "node" ? proj.position.nodeId : proj.position.edgeId);
     const plan = MissionPlan.parse({
       id: `halt-${this.agentId}-${proj.simTimeMs}`,
       recipientId: this.agentId,

@@ -235,7 +235,10 @@ describe("autonomous withdrawal and survival", () => {
       projection(store, atSite, 301_000, { planId, legIndex: 4, legCount: 7, mode: "normal", working: true }),
     );
     expect(out.decisions.map((d) => d.type)).toContain("stranded_reported");
-    expect(out.orders).toHaveLength(0);
+    // The old plan is replaced by an empty one, so the simulator cannot later walk an abandoned leg.
+    expect(out.orders).toHaveLength(1);
+    const halt = out.orders[0];
+    expect(halt?.kind === "commit_plan" && halt.plan.timedLegs.length).toBe(0);
     expect(out.state).toBe("STRANDED");
     expect(out.reports[0]?.urgent).toBe(true);
     // Fresh evidence that reopens nothing keeps it stranded without repeating the report.
