@@ -1626,3 +1626,33 @@ Self-critique: the legend list said "Observed cells (84)" with truth on, which w
 78 never observed - replay only)". The mock fire is a boxy rectangle (fine for mock data). Replay does not yet interpolate
 between snapshots or animate the spread between events; it steps by event.
 Blocked: nothing. Next: self-review of the whole diff (dead code, bugs, missing tests), then the final summary.
+
+### Commit 13: self-review of the whole diff (own pass + independent code-review over 16b82c4..HEAD)
+Method: a mechanical unused-export scan, a manual read, then the code-review skill over the full range. Fixed, each with a
+test or a measurement where one is possible:
+- DEAD CODE removed: the `fireLightUniforms` re-export in Fire.tsx, the unused `ring()` geometry helper, the unused
+  `worldMeters` parameter of `createHeightField`, a no-op shader branch in fireLight.ts, a clumsy `--real-gpu` filter.
+- BUG: route/forecast labels stayed on screen when their layer was toggled off (labels memo ignored the toggles).
+- BUG (truthfulness): in replay, a truth cell that replaced a stale/different observation was built as `stale:false,
+  ageMs:0, unseen:false`, so it read "last observed (0s ago)". It is now `unseen` (dashed frame, "not observed"); tests added.
+- BUG/RISK: `resolveGridCellPosition` hard-coded a 64x25 m grid while terrain, fire light and tree char used the scenario's
+  grid. It now takes the scenario map; a test uses a 32x50 m grid to prove it follows the scenario.
+- BUG: the middle mouse button (zoom in OrbitControls) paused follow and touch panning never did. `isPanGesture` now matches
+  OrbitControls (right button, modifier+left, two fingers); tests added.
+- PERF: RenderPipeline wrote frame timing into the React store every 4th frame in production, re-rendering the whole Canvas
+  tree. Timing now lives in its own store, written only in dev builds; only a tier change touches the main store (tested).
+- LEAK: Fire.tsx replaced instanced attributes on a shared geometry, leaving GPU buffers allocated. Each flame/smoke set now
+  has its own geometry, disposed when replaced. (Reasoned from three's buffer lifecycle; not measurable from here.)
+- UX: clicking the already-selected agent on the map after a pan now resumes follow.
+- CLEANUP: stale materials (agents, sites) moved from mutate-in-render to a `useStaleMaterial` hook with an explicit repaint
+  request. I TRIED to prove this fixes a missed repaint in reduced motion (new dev preset `?scenario=stale-transition`):
+  the canvas repainted WITH and WITHOUT the explicit request (other layers also request a frame on each snapshot), so this is
+  defensive cleanup, NOT a demonstrated bug fix.
+Not mine, reported only (pre-existing `lane/web` code in `App.tsx`; outside the brief, so not touched):
+  1. with `VITE_INCIDENT_REST_BASE_URL` set, Start always creates a new incident and ignores the preconfigured
+     `VITE_INCIDENT_WS_URL`/`VITE_INCIDENT_ID`/`VITE_INCIDENT_TOKEN`, contradicting `.env.example`;
+  2. a failed `createIncident` leaves Start doing nothing and shows no error;
+  3. the "Received: ..." speech plays even when the socket is not open (the `say` is dropped), and `crypto.randomUUID()` throws
+     on plain-http non-localhost pages.
+Still no test for: GL components (RenderPipeline, Trees, Fire, markers - the repo has no DOM/GL test environment; verified by
+screenshot and the Playwright scripts), the Vite plugin's `load` hook (its pure core, `stripPrivateFields`, is tested).

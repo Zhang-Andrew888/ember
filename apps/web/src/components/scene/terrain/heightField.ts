@@ -1,5 +1,6 @@
 import type { ScenarioTerrain } from "../../../map/scenarioSchema.js";
-import { DEFAULT_WORLD_METERS, SCENE_SIZE } from "../../../map/worldScale.js";
+import { SCENE_SIZE } from "../../../map/worldScale.js";
+import { GRID_SIZE } from "../../../map/positions.js";
 
 /**
  * Terrain elevation and vegetation sampled in scene units. Heights are the
@@ -32,11 +33,10 @@ function clampIndex(value: number, max: number): number {
   return Math.min(max, Math.max(0, value));
 }
 
-export function createHeightField(terrain: ScenarioTerrain | null, worldMeters = DEFAULT_WORLD_METERS): HeightField {
-  const gridSize = terrain?.gridSize ?? 64;
+export function createHeightField(terrain: ScenarioTerrain | null): HeightField {
+  const gridSize = terrain?.gridSize ?? GRID_SIZE;
   const cells = gridSize * gridSize;
   const cellSize = SCENE_SIZE / gridSize;
-  void worldMeters; // world extent is implied by gridSize * cellSize in scene units
 
   const cellHeights = new Float32Array(cells);
   const fuel = new Float32Array(cells).fill(1);

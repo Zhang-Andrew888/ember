@@ -176,7 +176,7 @@ export function fanOutAtNodes(agents: AgentMarker[], view: CoordinatorView, map:
  * overlapping markers with no defined precedence between them. Keeps only
  * the entry with the greatest lastObservedAt per gridCellIndex.
  */
-function resolveFireCells(view: CoordinatorView, _map: ScenarioMap): FireCellMarker[] {
+function resolveFireCells(view: CoordinatorView, map: ScenarioMap): FireCellMarker[] {
   const latestByKey = new Map<number, CoordinatorView["observedCells"][number]>();
   for (const cell of view.observedCells) {
     const existing = latestByKey.get(cell.gridCellIndex);
@@ -190,7 +190,7 @@ function resolveFireCells(view: CoordinatorView, _map: ScenarioMap): FireCellMar
     fireCells.push({
       key: `cell-${cell.gridCellIndex}`,
       gridCellIndex: cell.gridCellIndex,
-      position: resolveGridCellPosition(cell.gridCellIndex),
+      position: resolveGridCellPosition(map, cell.gridCellIndex),
       burnState: cell.burnState,
       stale: cell.stale,
       lastObservedAt: cell.lastObservedAt as number,

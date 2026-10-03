@@ -8,7 +8,7 @@ import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import { ShaderPass } from "three/examples/jsm/postprocessing/ShaderPass.js";
 import { VignetteShader } from "./quality/vignette.js";
 import { initialAutoTier, percentile75, recordFrame, type AutoTierState } from "./quality/autoTier.js";
-import { qualityStore, type SceneParams } from "./quality/qualityStore.js";
+import { frameMsStore, qualityStore, type SceneParams } from "./quality/qualityStore.js";
 import type { QualityConfig } from "./quality/tiers.js";
 
 /** Every Nth frame is timed with a GPU finish() so asynchronous GPU cost is counted. */
@@ -96,10 +96,11 @@ export function RenderPipeline({
       const cost = performance.now() - start;
       if (autoEnabled) {
         autoRef.current = recordFrame(autoRef.current, cost, performance.now());
-        qualityStore.setAutoTier(autoRef.current.tier, percentile75(autoRef.current.samples));
-      } else {
-        qualityStore.setAutoTier(qualityStore.getState().autoTier, cost);
+        // Only a tier CHANGE touches the main store (and so re-renders the scene).
+        qualityStore.setAutoTier(autoRef.current.tier);
       }
+      // The readout is for the dev panel only; production builds never write it.
+      if (import.meta.env.DEV) frameMsStore.set(autoEnabled ? percentile75(autoRef.current.samples) : cost);
     }
   }, 1);
 

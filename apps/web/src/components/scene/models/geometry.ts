@@ -5,7 +5,6 @@ import {
   CylinderGeometry,
   Float32BufferAttribute,
   SphereGeometry,
-  TorusGeometry,
   Uint16BufferAttribute,
 } from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
@@ -66,13 +65,6 @@ export function cone(radius: number, height: number, x: number, y: number, z: nu
 export function dome(radius: number, x: number, y: number, z: number): BufferGeometry {
   const geo = new SphereGeometry(radius, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2);
   geo.translate(x, y, z);
-  return geo;
-}
-
-export function ring(radius: number, tube: number, y: number): BufferGeometry {
-  const geo = new TorusGeometry(radius, tube, 4, 20);
-  geo.rotateX(Math.PI / 2);
-  geo.translate(0, y, 0);
   return geo;
 }
 

@@ -47,11 +47,9 @@ export interface QualityState {
   readonly mode: QualityMode;
   readonly autoTier: QualityTier;
   readonly params: SceneParams;
-  /** 75th-percentile recent render cost, ms, for the debug panel. */
-  readonly frameMs: number;
 }
 
-let state: QualityState = { mode: "auto", autoTier: "high", params: DEFAULT_PARAMS, frameMs: 0 };
+let state: QualityState = { mode: "auto", autoTier: "high", params: DEFAULT_PARAMS };
 const listeners = new Set<() => void>();
 
 function set(next: QualityState): void {
@@ -66,9 +64,9 @@ export const qualityStore = {
     return () => listeners.delete(listener);
   },
   setMode: (mode: QualityMode) => set({ ...state, mode }),
-  setAutoTier: (autoTier: QualityTier, frameMs: number) => {
-    if (autoTier === state.autoTier && Math.abs(frameMs - state.frameMs) < 0.5) return;
-    set({ ...state, autoTier, frameMs });
+  setAutoTier: (autoTier: QualityTier) => {
+    if (autoTier === state.autoTier) return;
+    set({ ...state, autoTier });
   },
   setParams: (patch: Partial<SceneParams>) => set({ ...state, params: { ...state.params, ...patch } }),
   resetParams: () => set({ ...state, params: DEFAULT_PARAMS }),
@@ -80,4 +78,30 @@ export function currentTier(s: QualityState): QualityTier {
 
 export function useQualityState(): QualityState {
   return useSyncExternalStore(qualityStore.subscribe, qualityStore.getState);
+}
+
+/**
+ * Recent render cost for the dev debug panel. Kept OUT of the main store on
+ * purpose: it changes every few frames, and anything subscribed to the main
+ * store (the whole Canvas tree) would re-render with it. Only the dev panel
+ * subscribes, and only dev builds write it.
+ */
+let frameMs = 0;
+const frameListeners = new Set<() => void>();
+
+export const frameMsStore = {
+  get: (): number => frameMs,
+  set(value: number): void {
+    if (Math.abs(value - frameMs) < 0.5) return;
+    frameMs = value;
+    for (const listener of frameListeners) listener();
+  },
+  subscribe(listener: () => void): () => void {
+    frameListeners.add(listener);
+    return () => frameListeners.delete(listener);
+  },
+};
+
+export function useFrameMs(): number {
+  return useSyncExternalStore(frameMsStore.subscribe, frameMsStore.get);
 }

@@ -105,10 +105,25 @@ describe("map/positions - resolveAgentPosition", () => {
 
 describe("map/positions - resolveGridCellPosition", () => {
   it("maps grid index 0 to scene coordinates", () => {
-    expect(resolveGridCellPosition(0)).toEqual({ x: -689.0625, z: -689.0625 });
+    expect(resolveGridCellPosition(scenarioMap, 0)).toEqual({ x: -689.0625, z: -689.0625 });
   });
 
   it("maps a fixture fire cell index", () => {
-    expect(resolveGridCellPosition(1203)).toMatchObject({ x: expect.any(Number), z: expect.any(Number) });
+    expect(resolveGridCellPosition(scenarioMap, 2891)).toMatchObject({ x: expect.any(Number), z: expect.any(Number) });
+  });
+
+  it("follows the scenario's own grid, not a hard-coded one", () => {
+    // A 32 x 50 m grid covers the same 1600 m world with cells four times larger in area.
+    const coarse = {
+      ...scenarioMap,
+      terrain: { gridSize: 32, cellMeters: 50, height: [], fuel: [] },
+      worldMeters: 1600,
+    };
+    const a = resolveGridCellPosition(coarse, 0);
+    expect(a.x).toBeCloseTo((25 - 800) * 0.875);
+    // Index 33 on a 32-wide grid is (1, 1); on the default 64-wide grid it would be (33, 0).
+    const b = resolveGridCellPosition(coarse, 33);
+    expect(b.x).toBeCloseTo((75 - 800) * 0.875);
+    expect(b.z).toBeCloseTo((75 - 800) * 0.875);
   });
 });

@@ -103,12 +103,20 @@ export function resolveAgentPosition(map: ScenarioMap, position: AgentPosition):
   return resolveEdgePoint(map, position.edgeId, position.distanceAlongPolyline);
 }
 
-const GRID_SIZE = 64;
+/** The simulation's default grid (64 x 64 cells of 25 m); scenario terrain overrides it when present. */
+export const GRID_SIZE = 64;
 const CELL_METERS = 25;
 
-/** Resolves the center of a flat terrain grid cell (matches @ember/simulation/model). */
-export function resolveGridCellPosition(gridCellIndex: number): SceneVector {
-  const gx = gridCellIndex % GRID_SIZE;
-  const gy = Math.floor(gridCellIndex / GRID_SIZE);
-  return worldToScene((gx + 0.5) * CELL_METERS, (gy + 0.5) * CELL_METERS, GRID_SIZE * CELL_METERS);
+/**
+ * Centre of a flat terrain grid cell in scene units. The grid comes from the
+ * scenario (terrain gridSize/cellMeters) so fire, ground light and tree char
+ * all index the same cells; the simulation defaults apply only when the
+ * scenario carries no terrain.
+ */
+export function resolveGridCellPosition(map: ScenarioMap, gridCellIndex: number): SceneVector {
+  const size = map.terrain?.gridSize ?? GRID_SIZE;
+  const cellMeters = map.terrain?.cellMeters ?? CELL_METERS;
+  const gx = gridCellIndex % size;
+  const gy = Math.floor(gridCellIndex / size);
+  return worldToScene((gx + 0.5) * cellMeters, (gy + 0.5) * cellMeters, map.worldMeters);
 }
