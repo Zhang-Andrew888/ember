@@ -686,3 +686,16 @@ input {
   background: repeating-linear-gradient(135deg, #5b6a6d 0 2px, transparent 2px 4px);
   outline: 1px dashed #5b6a6d;
 }
+
+.scene-legend__swatch--unseen {
+  background: transparent;
+  outline: 2px dashed #b79cff;
+}
+
+.replay-banner__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-left: auto;
+  margin-right: 0.75rem;
+}

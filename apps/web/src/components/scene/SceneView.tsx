@@ -173,6 +173,7 @@ export function SceneView({
         showForecast={showForecast}
         onToggleForecast={() => setShowForecast((value) => !value)}
         forecast={entities.forecast}
+        showUnseenKey={entities.fireCells.some((cell) => cell.unseen === true)}
         onResetCamera={() => {
           setFollow(false);
           controlsRef.current?.reset();
@@ -229,12 +230,22 @@ function CellInspectionPanel({
         </dd>
         <dt>State</dt>
         <dd>{cell.burnState}</dd>
-        <dt>Last observed</dt>
-        <dd>
-          {formatIncidentClock(cell.lastObservedAt)}
-          {ageMs !== null ? ` (${Math.round(ageMs / 1000)}s ago)` : ""}
-          {cell.stale ? " — stale" : ""}
-        </dd>
+        {cell.unseen ? (
+          <>
+            <dt>Observation</dt>
+            <dd>Never observed by the coordinator (full simulated fire, replay only)</dd>
+          </>
+        ) : null}
+        {cell.unseen ? null : (
+          <>
+            <dt>Last observed</dt>
+            <dd>
+              {formatIncidentClock(cell.lastObservedAt)}
+              {ageMs !== null ? ` (${Math.round(ageMs / 1000)}s ago)` : ""}
+              {cell.stale ? " — stale" : ""}
+            </dd>
+          </>
+        )}
       </dl>
     </div>
   );
