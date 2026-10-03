@@ -322,6 +322,22 @@ describe("coordinator objectives", () => {
     expect(update?.event.type).toBe("mission_update");
   });
 
+  it("applies every distinct objective received before a tick and keeps the first when the second is rejected", () => {
+    const scenario = scenarioWith({ fire: far });
+    const inc = new Incident({ scenario, seed: "oq", overrides: calm });
+    const c = crew(scenario);
+    c.receiveObjective(objective("hold", null, "obj-1"));
+    c.receiveObjective(objective("protect_site", "site-missing", "obj-2"));
+    const log = runControllers(inc, [c], 1000);
+    const rejected = log.decisions.filter((d) => d.event.type === "objective_rejected");
+    expect(rejected).toHaveLength(1);
+    expect(rejected[0]?.event.actualAction).toContain("obj-2");
+    expect(rejected[0]?.event.reasonCode).toBe("unknown_site");
+    expect(log.decisions.filter((d) => d.event.type === "mission_start")).toHaveLength(0);
+    expect(c.state).toBe("HOLDING");
+    expect(c.status(inc.projectAgent(crew1)).objective).toBe("hold");
+  });
+
   it("holds at the refuge on a hold objective until it resumes autonomous selection", () => {
     const scenario = scenarioWith({ fire: far });
     const inc = new Incident({ scenario, seed: "o3", overrides: calm });
