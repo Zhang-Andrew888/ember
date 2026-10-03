@@ -2,7 +2,7 @@ import { SimTimeMs, type AgentId } from "@ember/domain";
 import { hashValue, type AgentKnowledgeSnapshot } from "@ember/knowledge";
 import { FireField, streamRng, type PublicMap } from "@ember/simulation/model";
 import { DEFAULT_FORECAST_CONFIG, physicalRanges, widenRanges, type ForecastConfig } from "./config.js";
-import { FitAccumulator, fitMember, type FitObservation } from "./fit.js";
+import { FitAccumulator, fitIgnition, fitMember, type FitObservation } from "./fit.js";
 import {
   boundaryCandidates,
   buildMember,
@@ -13,7 +13,7 @@ import {
   sampledCandidates,
   type Candidate,
 } from "./members.js";
-import { rolloutContext, type RolloutContext } from "./rollout.js";
+import { rolloutContext, type RolloutContext, type WarmRollout } from "./rollout.js";
 import { forecastStep } from "./dynamics.js";
 import type { ForecastEnsemble, ForecastEvent, ForecastMember, ParameterRanges } from "./types.js";
 
@@ -241,6 +241,7 @@ export class ForecastService {
   ): { members: ForecastMember[]; firstFailure: string | null } {
     const members: ForecastMember[] = [];
     let firstFailure: string | null = null;
+    let groups: FitObservation[][] | null = null;
     for (const c of candidates) {
       let member: ForecastMember;
       if ("ignitionMs" in c) {
@@ -248,12 +249,13 @@ export class ForecastService {
       } else {
         // Screen incrementally in time order, stopping at the first observation it cannot explain;
         // only supported candidates pay for the full horizon.
-        const screen = this.screen(c, fitObs);
+        groups ??= groupByTime(fitObs);
+        const screen = this.screen(c, groups);
         if (!screen.pass) {
           if (firstFailure === null) firstFailure = screen.failedObservationId;
           continue;
         }
-        member = buildMember(this.ctx, this.config, c.id, c.kind, c.params, horizonEndMs);
+        member = buildMember(this.ctx, this.config, c.id, c.kind, c.params, horizonEndMs, screen.warm);
         this.verified.set(member, { generation: this.accum.generation, upTo: fitObs.length });
         members.push(member);
         continue;
@@ -271,35 +273,29 @@ export class ForecastService {
 
   /**
    * Roll a candidate forward only as far as each observation needs, checking observations in time
-   * order and stopping at the first it cannot explain. Equivalent to fitting a full rollout.
+   * order and stopping at the first it cannot explain. Equivalent to fitting a full rollout. A
+   * passing candidate hands back its field so the full rollout can carry on from there.
    */
-  private screen(c: Candidate, fitObs: readonly FitObservation[]): { pass: boolean; failedObservationId: string | null } {
+  private screen(
+    c: Candidate,
+    groups: readonly (readonly FitObservation[])[],
+  ): { pass: boolean; failedObservationId: string | null; warm?: WarmRollout } {
     const step = this.config.rolloutStepMs;
     const field = new FireField(this.ctx.terrain, this.ctx.nonburnable);
     field.ignite(this.ctx.initialCells, 0, c.params.initialProgress ?? 0);
-    const ordered = [...fitObs].sort((a, b) => a.timeMs - b.timeMs);
     let t = 0;
-    let i = 0;
-    while (i < ordered.length) {
-      const time = ordered[i]!.timeMs;
-      const group: FitObservation[] = [];
-      while (i < ordered.length && ordered[i]!.timeMs === time) group.push(ordered[i++]!);
+    for (const group of groups) {
+      const time = group[0]!.timeMs;
       // Include the step after `time`: its cells are recorded as igniting at the start of that step.
       while (t < time + step) {
         t += step;
         forecastStep(field, t, step, c.params);
       }
       // Same convention as full rollouts: ignition is recorded at the start of its step.
-      const ign = new Float64Array(field.ignitedAtMs.length);
-      for (let k = 0; k < ign.length; k++) {
-        const v = field.ignitedAtMs[k]!;
-        ign[k] = v === 0 || !Number.isFinite(v) ? v : Math.max(0, v - step);
-      }
-      const partial = { id: c.id, kind: c.kind, params: c.params, ignitionMs: ign, rolloutEndMs: t };
-      const fit = fitMember(partial, group, this.config.disagreementTolerance);
+      const fit = fitIgnition(field.ignitedAtMs, step, group, this.config.disagreementTolerance);
       if (!fit.pass) return fit;
     }
-    return { pass: true, failedObservationId: null };
+    return { pass: true, failedObservationId: null, warm: { field, atMs: t, stepMs: step } };
   }
 
   /** Seeded perturbations of supported members, kept only if they are themselves supported. */
@@ -315,18 +311,32 @@ export class ForecastService {
     const rng = streamRng(seed, "forecast-replenish");
     const bounds = physicalRanges(this.config);
     let attempts = 0;
+    const groups = groupByTime(fitObs);
     const maxAttempts = (target - members.length) * 8;
     while (members.length < target && attempts < maxAttempts) {
       const base = supported[attempts % supported.length]!;
       const cand = perturb(base.params, rng, bounds, `${base.id}~${attempts}`);
       attempts += 1;
-      if (!this.screen(cand, fitObs).pass) continue;
-      const member = buildMember(this.ctx, this.config, cand.id, cand.kind, cand.params, horizonEndMs);
+      const screened = this.screen(cand, groups);
+      if (!screened.pass) continue;
+      const member = buildMember(this.ctx, this.config, cand.id, cand.kind, cand.params, horizonEndMs, screened.warm);
       this.verified.set(member, { generation: this.accum.generation, upTo: fitObs.length });
       members.push(member);
     }
     return members;
   }
+}
+
+/** Observations in time order, those at the same time together (stable among equals). */
+function groupByTime(fitObs: readonly FitObservation[]): FitObservation[][] {
+  const ordered = [...fitObs].sort((a, b) => a.timeMs - b.timeMs);
+  const groups: FitObservation[][] = [];
+  for (const o of ordered) {
+    const last = groups[groups.length - 1];
+    if (last !== undefined && last[0]!.timeMs === o.timeMs) last.push(o);
+    else groups.push([o]);
+  }
+  return groups;
 }
 
 /** Cells ever directly observed burning or burned in this snapshot: closed for good. */

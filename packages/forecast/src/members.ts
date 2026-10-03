@@ -1,6 +1,6 @@
 import type { Rng } from "@ember/simulation/model";
 import { priorRanges, type ForecastConfig } from "./config.js";
-import { rolloutEndFor, rolloutIgnition, type RolloutContext } from "./rollout.js";
+import { rolloutEndFor, rolloutIgnition, type RolloutContext, type WarmRollout } from "./rollout.js";
 import type { ForecastMember, ForecastParameterRanges, ForecastParams, MemberKind, ParameterRanges } from "./types.js";
 
 const RAD = Math.PI / 180;
@@ -35,12 +35,13 @@ export function buildMember(
   kind: MemberKind,
   params: ForecastParams,
   horizonEndMs: number,
+  warm?: WarmRollout,
 ): ForecastMember {
   return {
     id,
     kind,
     params,
-    ignitionMs: rolloutIgnition(ctx, params, horizonEndMs, config.rolloutStepMs),
+    ignitionMs: rolloutIgnition(ctx, params, horizonEndMs, config.rolloutStepMs, false, warm),
     rolloutEndMs: rolloutEndFor(horizonEndMs),
   };
 }
