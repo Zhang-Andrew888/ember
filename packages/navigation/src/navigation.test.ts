@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { AgentId, EdgeId, NodeId, SiteId, type AgentPosition } from "@ember/domain";
 import { buildSyntheticScenario } from "@ember/simulation";
-import { RoadIndex, SIM_DEFAULTS } from "@ember/simulation/model";
+import { Rng, RoadIndex, SIM_DEFAULTS } from "@ember/simulation/model";
 import {
   DEFAULT_NAV_CONFIG,
   HazardModel,
+  ReturnTable,
   cellOnEdge,
   cellsOfEdge,
   certifyPlan,
@@ -13,6 +14,7 @@ import {
   planRetreat,
   planReturn,
   protectionTargets,
+  timeExpandedSearch,
   workOptions,
   type PlanningContext,
   type ReservationOracle,
@@ -333,5 +335,46 @@ describe("withdrawal, reversal and retreat", () => {
     expect(retreat?.plan.timedLegs[0]?.edgeId).toBe("e-n-h");
     expect(retreat?.bestEffort).toBe(true);
     expect(SiteId.parse("x")).toBe("x");
+  });
+});
+
+describe("backward return table agrees with the forward search", () => {
+  it("gives the same earliest refuge arrival from many random starts and random forecasts", () => {
+      const rng = new Rng(4242);
+    const edges = map.edges.map((e) => e.id as string);
+    const nodes = map.nodes.map((n) => n.id);
+    let compared = 0;
+    for (let trial = 0; trial < 12; trial++) {
+      const ignition = new Map<number, number>();
+      for (let j = 0; j < rng.int(0, 4); j++) {
+        const e = edges[rng.int(0, edges.length - 1)]!;
+        for (const [c, t] of ignite(road, [e], rng.int(100, 900) * 1000)) ignition.set(c, t);
+      }
+      const ensemble = makeEnsemble(map, [{ id: "r", ignition }]);
+      const hm = new HazardModel(road, ensemble, new Set(), DEFAULT_NAV_CONFIG);
+      const table = new ReturnTable(hm, 0, { isFree: () => true }, undefined, DEFAULT_NAV_CONFIG);
+      const refuges = new Set(road.map.refuges.map((r) => r.nodeId));
+      for (let s = 0; s < 6; s++) {
+        const node = nodes[rng.int(0, nodes.length - 1)]!;
+        const k = rng.int(0, 120);
+        const reach = timeExpandedSearch({ hm, nowMs: 0, starts: [{ nodeId: node, k, prefix: [] }], oracle: { isFree: () => true }, config: DEFAULT_NAV_CONFIG });
+        const forward = reach.earliest(refuges);
+        const backward = table.arrival(node, k);
+        expect(backward).toBe(forward === null ? -1 : forward.k);
+        if (backward >= 0) {
+          // The reconstructed legs are chronological and end at a refuge by the stated arrival.
+          const ret = table.returnFrom(node, k);
+          let last = k * 5000;
+          for (const l of ret.legs) {
+            expect(l.departMs).toBeGreaterThanOrEqual(last);
+            last = l.arriveMs;
+          }
+          if (ret.legs.length > 0) expect(last).toBe(backward * 5000);
+          expect(refuges.has(ret.refuge)).toBe(true);
+        }
+        compared += 1;
+      }
+    }
+    expect(compared).toBe(72);
   });
 });
