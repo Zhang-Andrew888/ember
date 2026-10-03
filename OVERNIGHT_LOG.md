@@ -816,3 +816,37 @@ unreachable architectural note rather than a silent gap.)
 **Verified:** typecheck/lint/test green (120 tests, 17 files).
 
 **Status:** CI green on `41df397` (verified via the GitHub Actions API).
+
+## 2026-10-03 08:4x UTC (04:4x ET) - second-pass verification round complete
+
+Closed out the remaining threads from this round of re-checking earlier
+work against its own requirements:
+
+- Re-ran the full replay flow under `reducedMotion: "reduce"` end to end
+  (scrubbing every index, selecting every agent card to trigger
+  `CameraControls.focusOn`'s reduced-motion branch, toggling "Show fire
+  observations", Reset camera, Exit replay) - zero page errors.
+- Chased down why an earlier accessibility-snapshot check printed `null`
+  for `.replay-controls`/`.replay-banner`: that's expected Playwright
+  behavior (`interestingOnly: true`, the default, returns `null` for a
+  root with no "interesting" role of its own - the containing `<div>`/
+  `<header>` isn't one). Re-ran with `interestingOnly: false` and against
+  the full-page snapshot instead: every control resolves correctly
+  (Previous event correctly `disabled` at index 0, slider's `valuetext`
+  correct, agent cards' composed names and `pressed` state correct,
+  checkbox/Reset camera present) - no real gap was hiding behind that
+  `null`, confirmed rather than assumed.
+- Checked GitHub issues #1 and #2 (the route-emphasis and forecast-layer
+  contract changes opened earlier this session) - both still `OPEN`, no
+  schema change has landed, so nothing new is unblocked on that front.
+- Confirmed `AGENTS.md`'s forbidden-paths table (`docs/**`, `CHANGELOG.md`,
+  `.github/workflows/**`, every sim-lane package) against this session's
+  full commit history once more - still only `apps/web/**` and
+  `OVERNIGHT_LOG.md` touched, nothing forbidden.
+- Grepped for skipped/todo tests (`.skip`, `.todo`, `xdescribe`, `xit`) -
+  none.
+
+**No further issues found this round.** Will keep watching for
+instructions and re-check periodically until 10:00 ET per the active
+directive, rather than manufacturing speculative changes once legitimate,
+verifiable leads run out.
