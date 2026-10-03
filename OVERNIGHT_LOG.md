@@ -476,3 +476,85 @@ runs software WebGL (no GPU), so any FPS number captured here describes
 this sandbox, not the target hardware docs/VALIDATION.md asks for
 ("documented test machine") - will say so plainly rather than present a
 software-rendering number as a real-hardware performance claim.
+
+## 2026-10-03 08:0x-08:1x UTC (04:0x-04:1x ET) - backlog item 3: rendering performance
+
+**All numbers below are from this sandbox's headless Chromium, which runs
+software WebGL (no GPU) - confirmed by a blank-page rAF-floor check
+landing exactly on 60fps/16.67ms (the browser's own vsync cadence, not
+anything rendering-related) while the actual app, before any fix, idled
+at ~22fps. These numbers describe this sandbox, not real hardware; they
+are still valid for comparing this app's own before/after cost on itself,
+which is what "fix hot spots" needs.**
+
+Methodology: a `requestAnimationFrame` instrumentation script injected via
+Playwright sampled 180 consecutive frame deltas (computing avg/p50/p95),
+cross-checked against a `WebGLRenderingContext.drawElements`/`drawArrays`
+call counter patched in before the app loads (`page.addInitScript`), both
+at the 1440x900 target viewport. Hot-spot isolation was empirical A/B
+testing (temporarily disable a suspect, re-measure, revert), not guessing
+from reading the code.
+
+**Baseline (idle scene, no pointer interaction, commit before `d3225fd`):**
+- avg frame time 45.4ms (~22fps), median 44ms, p95 ~53ms
+- ~1000 WebGL draw calls over a 3s idle window
+- blank-page floor for comparison: 16.67ms (60fps) - so ~28ms/frame was
+  this app's own cost, even while fully idle
+
+**Isolating the cause (each an independent, reverted experiment):**
+- Disabling `SceneLabelLayer`'s per-frame work: no measurable change.
+- Removing `<CameraControls>` (OrbitControls) entirely: no measurable
+  change.
+- Disabling only `FireCells`' fresh-cell pulse animation (via
+  `prefers-reduced-motion`, no code change needed): draw calls dropped
+  from ~1000 to ~60 over the same 3s window. This isolated it as the
+  actual cause - a `useFrame` callback invalidating every single rAF
+  tick, which keeps `frameloop="demand"` rendering continuously
+  regardless of the setting, by design (every tick, something legitimately
+  asks for the next frame).
+
+**Fix (`d3225fd`), decoration-first as instructed:**
+1. `SceneCanvas.tsx`: `frameloop="demand"` on the Canvas.
+2. `CameraControls.tsx`: subscribes to OrbitControls' own `"change"`
+   event and calls `invalidate()` from there - covers pointer-driven
+   orbiting and the damping settle after a drag. The `focusOn` tween
+   explicitly invalidates per step and stops once it completes.
+3. `FireCells.tsx`: rather than removing the pulse (docs/FRONTEND.md
+   explicitly asks for "compact animated flame clusters"), moved it off
+   `useFrame` entirely onto its own `setInterval(150ms)`. This was not
+   the first thing tried - an earlier attempt throttled inside `useFrame`
+   by checking elapsed time and calling `invalidate()` either way, which
+   measured as no improvement at all: invalidating from inside `useFrame`
+   under demand mode just requests the very next vsync frame again,
+   rendering every tick regardless of whether the pulse itself updated.
+   Decoupling the pulse's own timer from the render loop was what
+   actually worked. Also found and fixed a related bug while here: the
+   layout effect that positions new fire cells mutates the instanced mesh
+   directly (bypassing R3F's reconciler, which auto-invalidates on prop
+   changes) - without an explicit `invalidate()` there too, a new
+   snapshot's cell positions would never have actually been drawn once
+   demand mode was on.
+
+**Result, same measurement setup:**
+- avg frame time: 45.4ms -> 20.6ms (**~55% reduction**)
+- median: 44ms -> 16.7ms (now sits exactly at the rAF floor - most idle
+  frames are genuinely free)
+- draw calls over an idle 3s window: ~1000 -> ~340
+- active camera drag (continuous orbiting, 2s of pointer movement): 50.9ms
+  avg (~20fps), p95 63.7ms - essentially unchanged from the old always-
+  render baseline, which is correct and expected: while the camera is
+  actually moving, continuous rendering is legitimate work, not waste.
+  Demand mode's entire benefit is on the (much more common, for a
+  monitoring UI) idle case.
+
+**Verified no regression:** full test suite still green; an 8-scenario
+Playwright smoke re-run shows zero page errors on all of them; explicit
+before/after screenshots confirm agent-card camera focus (the 250ms
+tween) and Reset camera both still work correctly frame-to-frame, not
+just "doesn't crash."
+
+**Status:** CI green (verified via the GitHub Actions API).
+
+**Next:** backlog item 4, conversation UI against a mock adapter
+(push-to-talk release-to-commit, typed input, transcript, urgent strip,
+exact-text speech playback stub).
