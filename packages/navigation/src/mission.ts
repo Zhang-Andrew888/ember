@@ -105,14 +105,20 @@ export function planWithHazard(ctx: PlanningContext, hm: HazardModel, targets: r
               ? "work_interval_limited_by_forecast"
               : null,
         };
-        const plan = MissionPlan.parse({
-          ...planBody,
-          id: MissionPlanId.parse(`plan-${hashValue({ t: target.id, p: planBody, n: ctx.nowMs }).slice(0, 12)}`),
-        });
+        // Validating and hashing a plan costs more than finding it, and a search yields many candidates of
+        // which a caller reads only the best few, so each plan is built on first access.
+        let plan: MissionPlan | null = null;
+        const buildPlan = (): MissionPlan =>
+          (plan ??= MissionPlan.parse({
+            ...planBody,
+            id: MissionPlanId.parse(`plan-${hashValue({ t: target.id, p: planBody, n: ctx.nowMs }).slice(0, 12)}`),
+          }));
         out.push({
           mission: {
             target,
-            plan,
+            get plan(): MissionPlan {
+              return buildPlan();
+            },
             score: target.benefit(w) / total,
             approachMs: arriveMs - ctx.nowMs,
             workMs: w,

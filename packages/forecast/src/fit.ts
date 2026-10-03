@@ -60,6 +60,14 @@ function predicted(ign: number, t: number): number {
   return t < ign + BURN_MS ? 2 : 3;
 }
 
+/**
+ * A rollout stores ignition at the start of the step it happened in (one step earlier than the
+ * field recorded it), leaving never-ignited and time-zero cells as they are.
+ */
+function recorded(raw: number, shiftMs: number): number {
+  return raw === 0 || !Number.isFinite(raw) ? raw : Math.max(0, raw - shiftMs);
+}
+
 export interface FitResult {
   readonly pass: boolean;
   readonly disagreement: number;
@@ -77,7 +85,22 @@ export function fitMember(
   tolerance: number,
   startIndex = 0,
 ): FitResult {
-  const ign = member.ignitionMs;
+  return fitIgnition(member.ignitionMs, 0, observations, tolerance, startIndex);
+}
+
+/**
+ * fitMember on raw ignition times. With `shiftMs` > 0 the times are read as a live FireField's
+ * ignitedAtMs and converted per cell exactly as a finished rollout would store them, so a partial
+ * rollout can be screened without copying the grid.
+ */
+export function fitIgnition(
+  rawIgnition: Float64Array,
+  shiftMs: number,
+  observations: readonly FitObservation[],
+  tolerance: number,
+  startIndex = 0,
+): FitResult {
+  const at = (cell: number): number => (shiftMs === 0 ? rawIgnition[cell]! : recorded(rawIgnition[cell]!, shiftMs));
   let mismatched = 0;
   let compared = 0;
   for (let oi = startIndex; oi < observations.length; oi++) {
@@ -87,7 +110,7 @@ export function fitMember(
     for (let i = 0; i < o.cells.length; i++) {
       const cell = o.cells[i]!;
       const want = o.states[i]!;
-      if (predicted(ign[cell]!, o.timeMs) === want) continue;
+      if (predicted(at(cell), o.timeMs) === want) continue;
       mismatches += 1;
       mismatched += 1;
       const gx = cell % SIZE;
@@ -98,7 +121,7 @@ export function fitMember(
           const nx = gx + dx;
           const ny = gy + dy;
           if (nx < 0 || ny < 0 || nx >= SIZE || ny >= SIZE) continue;
-          if (predicted(ign[ny * SIZE + nx]!, o.timeMs) === want) {
+          if (predicted(at(ny * SIZE + nx), o.timeMs) === want) {
             explained = true;
             break;
           }
