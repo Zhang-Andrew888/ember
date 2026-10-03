@@ -2,6 +2,7 @@ import type { NodeId } from "@ember/domain";
 import { planMissions, type MissionSearchResult, type MissionTarget, type PlanningContext } from "@ember/navigation";
 import { cellsWithin, type RoadIndex } from "@ember/simulation/model";
 import { CrewController, type ControllerOptions } from "./controller.js";
+import { scoreObservationPoint, type VoiScore } from "./voi.js";
 
 const SCOUT_DWELL_MS = 10_000;
 const REVISIT_COOLDOWN_MS = 60_000;
@@ -52,8 +53,9 @@ export function edgeImportance(road: RoadIndex): Map<string, number> {
 /**
  * Ground scout. Same movement, observation radius, forecast admission, withdrawal and loss
  * rules as a crew, but its mission is a short observation dwell at an authored scouting
- * point, ranked by forecast disagreement about corridor closure times public access importance
- * per unit of travel, dwell and return time. Recently observed points rest for a cooldown
+ * point, ranked by value of information (expected bits about corridor closure among the retained
+ * forecast members, weighted by public access importance, see voi.ts) per unit of travel, dwell
+ * and return time. Recently observed points rest for a cooldown
  * unless new fire evidence arrived.
  */
 export class ScoutController extends CrewController {
@@ -62,28 +64,22 @@ export class ScoutController extends CrewController {
   private lastFireEvidenceMs = -Infinity;
   private evidenceSeenAtVisit = new Map<string, number>();
   private lastFireIds = "";
+  private lastRanking: { point: string; score: VoiScore }[] = [];
 
   constructor(options: ControllerOptions) {
     super({ ...options, role: "scout" });
     this.importance = edgeImportance(this.road);
   }
 
-  /** Disagreement among retained members about whether a corridor is closed at tMs, in [0, 1]. */
-  disagreement(ctx: PlanningContext, edgeId: string, tMs: number): number {
-    const members = ctx.ensemble.members;
-    if (members.length === 0) return 0;
-    const edge = this.road.mustEdge(edgeId as never);
-    let closed = 0;
-    for (const m of members) {
-      if (edge.cells.some((c) => m.ignitionMs[c.cell]! <= tMs)) closed += 1;
-    }
-    const f = closed / members.length;
-    return 4 * f * (1 - f);
+  /** Value-of-information score of every point considered at the last candidate search, best first. */
+  get voiRanking(): readonly { readonly point: string; readonly score: VoiScore }[] {
+    return this.lastRanking;
   }
 
   override candidateSearch(ctx: PlanningContext, allowed: ReadonlySet<string> | null): MissionSearchResult {
     const now = ctx.nowMs;
     const targets: MissionTarget[] = [];
+    const ranking: { point: string; score: VoiScore }[] = [];
     for (const point of this.map.scoutPoints) {
       if (allowed !== null && !allowed.has(point)) continue;
       const last = this.visitedAt.get(point);
@@ -93,10 +89,16 @@ export class ScoutController extends CrewController {
       const nearby = new Set(cellsWithin(p.x, p.y, OBSERVATION_RADIUS_M));
       const edges = [...this.road.edges.values()].filter((e) => e.cells.some((c) => nearby.has(c.cell)));
       const relevantMs = now + 120_000;
-      let benefit = 0;
-      for (const e of edges) benefit += this.disagreement(ctx, e.id, relevantMs) * (this.importance.get(e.id) ?? 0);
+      const score = scoreObservationPoint({
+        members: ctx.ensemble.members,
+        edges: edges.map((e) => ({ id: e.id, cells: e.cells.map((c) => c.cell) })),
+        importance: this.importance,
+        closedCells: ctx.closedCells,
+        relevantMs,
+      });
+      ranking.push({ point, score });
       // A little weight keeps equally uninformative points ordered by travel time, not ignored.
-      benefit += 1e-6;
+      const benefit = score.total + 1e-6;
       targets.push({
         id: point,
         kind: "observe",
@@ -107,6 +109,7 @@ export class ScoutController extends CrewController {
         benefit: () => benefit,
       });
     }
+    this.lastRanking = ranking.sort((x, y) => y.score.total - x.score.total || (x.point < y.point ? -1 : 1));
     return planMissions(ctx, targets);
   }
 

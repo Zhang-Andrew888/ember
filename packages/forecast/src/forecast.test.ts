@@ -121,6 +121,7 @@ describe("forecast service", () => {
     const snap = snapshotOf("crew-1", evidence(fast, 100_000), 100_000);
     const service = new ForecastService(agent, map);
     const e = service.update(snap, 100_000);
+    expect(e.version).toBe(1);
     expect(e.reliability).toBe("unreliable");
     expect(e.members).toHaveLength(0);
     expect(e.provisional.length).toBeGreaterThan(0);
@@ -136,8 +137,9 @@ describe("forecast service", () => {
     const fast: FireParams = { ...inPrior, spreadMultiplier: 1.55 };
     const snap = snapshotOf("crew-1", evidence(fast, 100_000), 100_000);
     const service = new ForecastService(agent, map, { ...DEFAULT_FORECAST_CONFIG, rebuildCandidates: 40 });
-    service.update(snap, 100_000);
+    expect(service.update(snap, 100_000).version).toBe(1);
     const rebuilt = service.rebuild(snap, 100_000);
+    expect(rebuilt.version).toBe(2);
     expect(rebuilt.reliability).toBe("reliable");
     expect(rebuilt.widenFactor).toBeGreaterThanOrEqual(2);
     expect(rebuilt.members.length).toBeGreaterThanOrEqual(8);
@@ -166,8 +168,9 @@ describe("forecast service", () => {
     ];
     const snap = snapshotOf("crew-1", impossible, 10_000);
     const service = new ForecastService(agent, map, { ...DEFAULT_FORECAST_CONFIG, rebuildCandidates: 24 });
-    service.update(snap, 10_000);
+    expect(service.update(snap, 10_000).version).toBe(1);
     const rebuilt = service.rebuild(snap, 10_000);
+    expect(rebuilt.version).toBe(2);
     expect(rebuilt.reliability).toBe("unreliable");
     expect(admitsProtection(rebuilt)).toBe(false);
     expect(service.events.some((e) => e.kind === "rebuild_failed")).toBe(true);
@@ -177,8 +180,11 @@ describe("forecast service", () => {
     const snap = snapshotOf("crew-1", evidence(inPrior, 30_000), 30_000);
     const service = new ForecastService(agent, map);
     const a = service.update(snap, 30_000);
+    expect(a.version).toBe(1);
     expect(service.update(snap, 40_000)).toBe(a);
-    expect(service.update(snap, 30_000 + DEFAULT_FORECAST_CONFIG.refreshMs)).not.toBe(a);
+    const refreshed = service.update(snap, 30_000 + DEFAULT_FORECAST_CONFIG.refreshMs);
+    expect(refreshed).not.toBe(a);
+    expect(refreshed.version).toBe(2);
     expect(SIM_DEFAULTS.gridSize).toBe(64);
   });
 });
@@ -225,19 +231,20 @@ describe("tolerance sensitivity", () => {
 });
 
 describe("capping a large supported set", () => {
-  it("never exceeds the member cap and keeps the parameter extremes of what was supported", () => {
+  it("exceeds the cap when needed to keep the supported hazard envelope and parameter extremes", () => {
     const obs = [briefingObservation(map), ...observeFire(map, inPrior, [watcher], 20_000)];
     const snap = snapshotOf("crew-1", obs, 20_000);
     const config = { ...DEFAULT_FORECAST_CONFIG, rebuildCandidates: 120, memberCount: 12, maxMembers: 14 };
     const service = new ForecastService(agent, map, config);
     const rebuilt = service.rebuild(snap, 20_000);
     expect(rebuilt.reliability).toBe("reliable");
-    expect(rebuilt.members.length).toBeLessThanOrEqual(14);
+    expect(rebuilt.members.length).toBeGreaterThan(14);
     expect(rebuilt.members.length).toBeGreaterThanOrEqual(8);
     const mult = rebuilt.members.map((m) => m.params.spreadMultiplier);
     // Weak early evidence supports a wide spread of rates, and the cap keeps both ends of it.
     expect(Math.max(...mult) - Math.min(...mult)).toBeGreaterThan(0.3);
     const done = service.events.find((e) => e.kind === "rebuild_complete");
     expect(done?.kind === "rebuild_complete" && done.supportedCount).toBeGreaterThan(14);
+    if (done?.kind === "rebuild_complete") expect(rebuilt.members.length).toBeLessThan(done.supportedCount);
   });
 });

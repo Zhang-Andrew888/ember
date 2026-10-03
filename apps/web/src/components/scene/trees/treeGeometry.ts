@@ -4,6 +4,7 @@ import {
   Float32BufferAttribute,
   type BufferGeometry,
   type IUniform,
+  type MeshLambertMaterial,
   type MeshStandardMaterial,
 } from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
@@ -45,6 +46,18 @@ export function createSpruceGeometry(): BufferGeometry {
   ]);
 }
 
+/** Low-tier tree: stub trunk + one cone (~16 triangles instead of ~50). */
+export function createSimpleTreeGeometry(): BufferGeometry {
+  const trunk = new CylinderGeometry(0.8, 1, 3, 4);
+  trunk.translate(0, 1.5, 0);
+  const crown = new ConeGeometry(4.6, 13, 5);
+  crown.translate(0, 9, 0);
+  return build([
+    { geometry: trunk, color: TRUNK },
+    { geometry: crown, color: [0.2, 0.4, 0.25] },
+  ]);
+}
+
 /** Pine: taller bare trunk with a narrow two-cone crown, ~16 units tall. */
 export function createPineGeometry(): BufferGeometry {
   const trunk = new CylinderGeometry(0.6, 0.85, 7, 5);
@@ -71,7 +84,7 @@ export interface SwayUniforms {
  * forest ripples instead of nodding in unison. uSway = 0 freezes it
  * (low tier, reduced motion) at zero per-frame cost.
  */
-export function applySway(material: MeshStandardMaterial, uniforms: SwayUniforms): void {
+export function applySway(material: MeshStandardMaterial | MeshLambertMaterial, uniforms: SwayUniforms): void {
   material.onBeforeCompile = (shader) => {
     shader.uniforms.uTime = uniforms.uTime;
     shader.uniforms.uSway = uniforms.uSway;

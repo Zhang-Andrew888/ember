@@ -11,9 +11,12 @@ import { CrewController } from "./controller.js";
  * has been directly observed burning or burned.
  */
 export class DispatchController extends CrewController {
+  private dispatchVersion = 0;
+
   protected override refreshForecast(proj: AgentProjection, now: number): ForecastEnsemble {
     const n = SIM_DEFAULTS.gridSize * SIM_DEFAULTS.gridSize;
     return {
+      version: ++this.dispatchVersion,
       inputHash: `dispatch-${proj.knowledgeRevision}`,
       knowledgeRevision: proj.knowledgeRevision,
       members: [

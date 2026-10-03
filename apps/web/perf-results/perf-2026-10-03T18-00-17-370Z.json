@@ -1,0 +1,89 @@
+{
+  "label": "cloud VM, headless Chromium, software rendering, not representative",
+  "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+  "softwareRendering": true,
+  "targetFps": 30,
+  "secondsPerTier": 6,
+  "date": "2026-10-03T18:00:17.370Z",
+  "node": "v22.22.0",
+  "results": [
+    {
+      "viewport": "1440x900",
+      "tier": "low",
+      "frames": 32,
+      "meanMs": 191.14,
+      "p50Ms": 166.7,
+      "p95Ms": 316.6,
+      "p99Ms": 733.4,
+      "maxMs": 733.4,
+      "fps": 5.23,
+      "over33msShare": 0.97,
+      "meetsTarget": false
+    },
+    {
+      "viewport": "1440x900",
+      "tier": "medium",
+      "frames": 8,
+      "meanMs": 674.97,
+      "p50Ms": 683.3,
+      "p95Ms": 766.6,
+      "p99Ms": 766.6,
+      "maxMs": 766.6,
+      "fps": 1.48,
+      "over33msShare": 1,
+      "meetsTarget": false
+    },
+    {
+      "viewport": "1440x900",
+      "tier": "high",
+      "frames": 6,
+      "meanMs": 1047.2,
+      "p50Ms": 1033.3,
+      "p95Ms": 1083.3,
+      "p99Ms": 1083.3,
+      "maxMs": 1083.3,
+      "fps": 0.95,
+      "over33msShare": 1,
+      "meetsTarget": false
+    },
+    {
+      "viewport": "1024x720",
+      "tier": "low",
+      "frames": 42,
+      "meanMs": 136.1,
+      "p50Ms": 133.3,
+      "p95Ms": 233.4,
+      "p99Ms": 250,
+      "maxMs": 250,
+      "fps": 7.35,
+      "over33msShare": 0.93,
+      "meetsTarget": false
+    },
+    {
+      "viewport": "1024x720",
+      "tier": "medium",
+      "frames": 13,
+      "meanMs": 424.35,
+      "p50Ms": 416.6,
+      "p95Ms": 816.6,
+      "p99Ms": 816.6,
+      "maxMs": 816.6,
+      "fps": 2.36,
+      "over33msShare": 0.92,
+      "meetsTarget": false
+    },
+    {
+      "viewport": "1024x720",
+      "tier": "high",
+      "frames": 8,
+      "meanMs": 752.05,
+      "p50Ms": 733.4,
+      "p95Ms": 816.6,
+      "p99Ms": 816.6,
+      "maxMs": 816.6,
+      "fps": 1.33,
+      "over33msShare": 1,
+      "meetsTarget": false
+    }
+  ]
+}

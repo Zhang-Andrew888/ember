@@ -54,6 +54,7 @@ export function SceneView({
   const [showFireCells, setShowFireCells] = useState(true);
   const [showRoutes, setShowRoutes] = useState(true);
   const [showForecast, setShowForecast] = useState(true);
+  const [follow, setFollow] = useState(true);
   const [inspectedCell, setInspectedCell] = useState<FireCellMarker | null>(null);
   const controlsRef = useRef<CameraControlsHandle>(null);
   const legendRef = useRef<HTMLDivElement>(null);
@@ -67,15 +68,18 @@ export function SceneView({
   const entitiesRef = useRef(entities);
   entitiesRef.current = entities;
 
-  // Selecting an agent (from the map or the agent rail) re-centers the
-  // camera once; it must not fight the user's own pan on every snapshot,
-  // so this only reacts to a changed selection, not to every tick's entities.
+  // Selecting an agent (from the map or the agent rail) starts following it; a pan
+  // gesture or the Follow toggle turns that off, so the camera never fights the user.
   useEffect(() => {
-    if (!selectedAgentId) return;
-    const agent = entitiesRef.current.agents.find((candidate) => candidate.id === selectedAgentId);
-    if (!agent) return;
-    controlsRef.current?.focusOn(agent.position.x, agent.position.z);
+    if (selectedAgentId) setFollow(true);
   }, [selectedAgentId]);
+
+  const followTarget = useMemo(() => {
+    if (!follow || !selectedAgentId) return null;
+    const agent = entities.agents.find((candidate) => candidate.id === selectedAgentId);
+    return agent ? { x: agent.position.x, z: agent.position.z } : null;
+  }, [follow, selectedAgentId, entities.agents]);
+  const handleUserPan = useCallback(() => setFollow(false), []);
 
   const labels = useMemo<LabelDescriptor[]>(() => {
     const refugeLabels = listRefugeNodes(scenarioMap).map((refuge) => ({
@@ -147,6 +151,8 @@ export function SceneView({
         showRoutes={showRoutes}
         showForecast={showForecast}
         selectedAgentId={selectedAgentId}
+        followTarget={followTarget}
+        onUserPan={handleUserPan}
         onInspectAgent={onInspectAgent}
         onInspectCell={setInspectedCell}
         onReady={handleReady}
@@ -167,7 +173,13 @@ export function SceneView({
         showForecast={showForecast}
         onToggleForecast={() => setShowForecast((value) => !value)}
         forecast={entities.forecast}
-        onResetCamera={() => controlsRef.current?.reset()}
+        onResetCamera={() => {
+          setFollow(false);
+          controlsRef.current?.reset();
+        }}
+        canFollow={selectedAgentId !== null}
+        follow={follow}
+        onToggleFollow={() => setFollow((value) => !value)}
         fireCells={entities.fireCells}
         onInspectCell={setInspectedCell}
       />
