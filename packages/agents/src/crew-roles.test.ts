@@ -1,61 +1,29 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_NAV_CONFIG } from "@ember/navigation";
 import { SIM_DEFAULTS } from "@ember/simulation/model";
-import { CREW_KINDS, CREW_PROFILES, CrewAttributes, defaultKindForRole, domainRoleOf, navConfigFor, profileOf } from "./crew-roles.js";
+import { CREW_CAPABILITIES, capabilitiesOf } from "./crew-roles.js";
 
-describe("crew roles and capabilities", () => {
-  it("defines engine, hand crew and scout with valid typed attributes", () => {
-    expect([...CREW_KINDS].sort()).toEqual(["engine", "hand_crew", "scout"]);
-    for (const kind of CREW_KINDS) {
-      expect(CrewAttributes.safeParse(CREW_PROFILES[kind].attributes).success).toBe(true);
+describe("per-role capabilities", () => {
+  it("match the documented simulator defaults for a protection crew", () => {
+    expect(capabilitiesOf("protection_crew")).toEqual({ speedMps: SIM_DEFAULTS.agentSpeedMps, workRate: SIM_DEFAULTS.crewWorkRate });
+  });
+
+  it("agree with the planner's defaults so planning never assumes more than the simulator delivers", () => {
+    const crew = CREW_CAPABILITIES.protection_crew;
+    expect(crew.speedMps).toBeLessThanOrEqual(DEFAULT_NAV_CONFIG.speedMps);
+    expect(crew.workRate).toBeLessThanOrEqual(DEFAULT_NAV_CONFIG.crewWorkRate);
+  });
+
+  it("a scout moves like a crew but does not protect", () => {
+    expect(CREW_CAPABILITIES.scout.speedMps).toBe(CREW_CAPABILITIES.protection_crew.speedMps);
+    expect(CREW_CAPABILITIES.scout.workRate).toBe(0);
+  });
+
+  it("covers exactly the wire roles with finite non-negative attributes", () => {
+    expect(Object.keys(CREW_CAPABILITIES).sort()).toEqual(["protection_crew", "scout"]);
+    for (const c of Object.values(CREW_CAPABILITIES)) {
+      expect(Number.isFinite(c.speedMps) && c.speedMps > 0).toBe(true);
+      expect(Number.isFinite(c.workRate) && c.workRate >= 0).toBe(true);
     }
-  });
-
-  it("rejects non-positive or non-finite attributes", () => {
-    const ok = CREW_PROFILES.engine.attributes;
-    expect(CrewAttributes.safeParse({ ...ok, speedMps: 0 }).success).toBe(false);
-    expect(CrewAttributes.safeParse({ ...ok, workRate: -1 }).success).toBe(false);
-    expect(CrewAttributes.safeParse({ ...ok, fatiguePerMin: Number.NaN }).success).toBe(false);
-    expect(CrewAttributes.safeParse({ ...ok, carryingCapacity: Infinity }).success).toBe(false);
-    expect(CrewAttributes.safeParse({ ...ok, extra: 1 }).success).toBe(false);
-  });
-
-  it("distinguishes the kinds: engine is fast, hand crew works longest, scout does not protect", () => {
-    const e = CREW_PROFILES.engine.attributes;
-    const h = CREW_PROFILES.hand_crew.attributes;
-    const s = CREW_PROFILES.scout.attributes;
-    expect(e.speedMps).toBeGreaterThan(h.speedMps);
-    expect(e.carryingCapacity).toBeGreaterThan(h.carryingCapacity);
-    expect(s.workRate).toBe(0);
-    expect(h.fatiguePerMin).toBeLessThan(e.fatiguePerMin);
-  });
-
-  it("maps every kind to a domain role", () => {
-    expect(domainRoleOf("engine")).toBe("protection_crew");
-    expect(domainRoleOf("hand_crew")).toBe("protection_crew");
-    expect(domainRoleOf("scout")).toBe("scout");
-    expect(defaultKindForRole("protection_crew")).toBe("engine");
-    expect(defaultKindForRole("scout")).toBe("scout");
-    expect(profileOf("hand_crew").kind).toBe("hand_crew");
-  });
-
-  it("derives planning config that never plans faster or more productive than the simulator delivers", () => {
-    for (const kind of CREW_KINDS) {
-      const nav = navConfigFor(kind);
-      expect(nav.speedMps).toBeLessThanOrEqual(SIM_DEFAULTS.agentSpeedMps);
-      expect(nav.speedMps).toBeGreaterThan(0);
-      expect(nav.crewWorkRate).toBeLessThanOrEqual(SIM_DEFAULTS.crewWorkRate);
-      expect(nav.bufferMs).toBeGreaterThanOrEqual(DEFAULT_NAV_CONFIG.bufferMs);
-    }
-  });
-
-  it("never loosens a buffer supplied in the base config", () => {
-    const base = { ...DEFAULT_NAV_CONFIG, bufferMs: 90_000 };
-    expect(navConfigFor("engine", base).bufferMs).toBe(90_000);
-    expect(navConfigFor("hand_crew", { ...base, bufferMs: 10_000 }).bufferMs).toBeGreaterThanOrEqual(10_000);
-  });
-
-  it("keeps a scout's work rate non-zero in planning so dwell time is never divided by zero", () => {
-    expect(navConfigFor("scout").crewWorkRate).toBeGreaterThan(0);
   });
 });

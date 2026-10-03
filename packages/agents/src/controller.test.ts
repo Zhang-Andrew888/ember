@@ -516,21 +516,11 @@ describe("older relayed clear versus fresh local fire", () => {
   });
 });
 
-describe("crew kinds", () => {
-  it("defaults the kind from the role and rejects a mismatched kind", () => {
+describe("controller capabilities", () => {
+  it("expose the role's documented speed and work rate, and a crew plans from its own work rate", () => {
     const scenario = scenarioWith({ fire: far });
-    expect(crew(scenario).kind).toBe("engine");
-    expect(() => new CrewController({ agentId: crew1, callsign: "Crew 1", role: "scout", kind: "engine", map: scenario.map })).toThrow(/does not match/);
-  });
-
-  it("a hand crew plans with its slower speed and still completes work without rejected plans", () => {
-    const scenario = scenarioWith({ fire: far, work: 30 });
-    const inc = new Incident({ scenario, seed: "k1", overrides: calm });
-    const c = new CrewController({ agentId: crew1, callsign: "Crew 1", role: "protection_crew", kind: "hand_crew", map: scenario.map });
-    expect(c.profile.attributes.speedMps).toBeLessThan(4);
-    const log = runControllers(inc, [c], 700_000);
-    expect(log.decisions[0]?.event.type).toBe("mission_start");
-    expect(inc.truth().sites[0]?.completedWork).toBeGreaterThan(0);
-    expect(inc.projectAgent(crew1).state).not.toBe("lost");
+    const c = crew(scenario);
+    expect(c.capabilities).toEqual({ speedMps: 4, workRate: 1 });
+    expect(new CrewController({ agentId: crew1, callsign: "Scout", role: "scout", map: scenario.map }).capabilities.workRate).toBe(0);
   });
 });

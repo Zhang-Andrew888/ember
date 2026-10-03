@@ -29,7 +29,7 @@ import {
 } from "@ember/navigation";
 import type { AgentProjection, SimInput } from "@ember/simulation";
 import { RoadIndex, type PublicMap } from "@ember/simulation/model";
-import { defaultKindForRole, domainRoleOf, navConfigFor, type CrewKind, type CrewProfile, profileOf } from "./crew-roles.js";
+import { capabilitiesOf, type CrewCapabilities } from "./crew-roles.js";
 import { EvidenceTracker } from "./evidence.js";
 import { explain } from "./explain.js";
 import {
@@ -60,8 +60,6 @@ export interface ControllerOptions {
   readonly agentId: AgentId;
   readonly callsign: string;
   readonly role: "protection_crew" | "scout";
-  /** Optional finer kind. When given, its role must match `role` and planning uses its capabilities. */
-  readonly kind?: CrewKind;
   readonly map: PublicMap;
   readonly config?: Partial<ControllerConfig>;
 }
@@ -76,7 +74,6 @@ export class CrewController implements AgentController {
   readonly agentId: AgentId;
   readonly callsign: string;
   protected readonly role: "protection_crew" | "scout";
-  readonly kind: CrewKind;
   protected readonly map: PublicMap;
   protected readonly road: RoadIndex;
   protected readonly cfg: ControllerConfig;
@@ -109,21 +106,16 @@ export class CrewController implements AgentController {
     this.agentId = options.agentId;
     this.callsign = options.callsign;
     this.role = options.role;
-    if (options.kind !== undefined && domainRoleOf(options.kind) !== options.role) {
-      throw new Error(`crew kind ${options.kind} does not match role ${options.role}`);
-    }
-    this.kind = options.kind ?? defaultKindForRole(options.role);
     this.map = options.map;
     this.road = new RoadIndex(options.map);
-    const cfg = { ...DEFAULT_CONTROLLER_CONFIG, ...options.config };
-    // Capabilities only reshape planning when a kind was asked for; the default keeps prior behaviour.
-    this.cfg = options.kind === undefined ? cfg : { ...cfg, nav: navConfigFor(options.kind, cfg.nav) };
+    this.cfg = { ...DEFAULT_CONTROLLER_CONFIG, ...options.config };
     this.forecast = new ForecastService(options.agentId, options.map, this.cfg.forecast);
     this.evidence = new EvidenceTracker(options.map);
   }
 
-  get profile(): CrewProfile {
-    return profileOf(this.kind);
+  /** This role's documented speed and work rate. */
+  get capabilities(): CrewCapabilities {
+    return capabilitiesOf(this.role);
   }
 
   get state(): ControllerState {
@@ -462,7 +454,7 @@ export class CrewController implements AgentController {
   }
 
   candidateSearch(ctx: PlanningContext, allowed: ReadonlySet<string> | null): MissionSearchResult {
-    const targets = protectionTargets(this.evidence.siteKnowledge(), this.cfg.nav?.crewWorkRate ?? 1, allowed);
+    const targets = protectionTargets(this.evidence.siteKnowledge(), this.cfg.nav?.crewWorkRate ?? this.capabilities.workRate, allowed);
     return planMissions(ctx, targets);
   }
 

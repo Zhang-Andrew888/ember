@@ -118,9 +118,6 @@ importers:
       '@ember/simulation':
         specifier: workspace:*
         version: link:../simulation
-      zod:
-        specifier: 3.24.2
-        version: 3.24.2
 
   packages/communication:
     dependencies:
