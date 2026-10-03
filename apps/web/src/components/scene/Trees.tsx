@@ -5,12 +5,13 @@ import { sceneTerrain, waterCells, roadSamplePoints } from "./terrain/sceneTerra
 import { createProximityTest } from "./trees/roadMask.js";
 import { burnByCell, placeTrees, treeBrightness, type CellBurn, type TreeInstance } from "./trees/treePlacement.js";
 import { applySway, createPineGeometry, createSpruceGeometry, type SwayUniforms } from "./trees/treeGeometry.js";
+import { applyFireLight } from "./fire/fireLight.js";
+import { sceneClock } from "./anim/sceneClock.js";
 import { useQuality } from "./quality/QualityContext.js";
 import type { FireCellMarker } from "./sceneEntities.js";
 
 /** Wide enough to keep the forecast ribbon (up to 16 units each side of the road) and route clear of canopies. */
 const ROAD_CLEARANCE = 26;
-const SWAY_INTERVAL_MS = 80;
 
 /**
  * Instanced conifers: two species, one draw call each. Density follows the
@@ -33,21 +34,12 @@ export function Trees({ fireCells, reducedMotion }: { readonly fireCells: readon
   );
   const burns = useMemo(() => burnByCell(fireCells), [fireCells]);
 
-  const uniforms = useMemo<SwayUniforms>(() => ({ uTime: { value: 0 }, uSway: { value: 0 } }), []);
+  // uSway scales the shared clock's displacement; 0 freezes the forest (low tier, reduced motion).
+  const uniforms = useMemo<SwayUniforms>(() => ({ uTime: sceneClock.uTime, uSway: { value: 0 } }), []);
   const swaying = quality.sway && !reducedMotion;
   useEffect(() => {
     uniforms.uSway.value = swaying ? 1 : 0;
     invalidate();
-  }, [swaying, uniforms, invalidate]);
-  // Under frameloop="demand" a timer (not useFrame) drives the sway so the
-  // render rate is capped independently of vsync (same approach as FireCells).
-  useEffect(() => {
-    if (!swaying) return;
-    const interval = setInterval(() => {
-      uniforms.uTime.value = performance.now() / 1000;
-      invalidate();
-    }, SWAY_INTERVAL_MS);
-    return () => clearInterval(interval);
   }, [swaying, uniforms, invalidate]);
 
   return (
@@ -75,6 +67,7 @@ function TreeSpecies({
   const material = useMemo(() => {
     const m = new MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.95 });
     applySway(m, uniforms);
+    applyFireLight(m, true, false);
     return m;
   }, [uniforms]);
   useEffect(
