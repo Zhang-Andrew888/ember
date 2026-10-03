@@ -134,6 +134,13 @@ Reading these honestly:
 - Not implemented from the docs: the scout using relayed crew missions or deadlines for relevance; objective kinds
   "avoid corridor" (contract gap, issue #3); real-map extraction.
 
+## CI notes
+
+Two pushed commits (`fb01dc1`, `d67effe`) showed a red `Test` job even though every test passed: vitest exited 1
+on an unhandled "Timeout calling onTaskUpdate" because one long synchronous test file starved the worker's RPC
+channel on the slower runner. Fixed in `3591b00` (one test per variant/seed, macrotask yield between heavy server
+tests). `Typecheck` and `Lint` were green throughout.
+
 ## Review of own diff
 
 Bugs found and fixed after the fact: relay `receivedAt` used the pre-step time; replans fired every step on any new
