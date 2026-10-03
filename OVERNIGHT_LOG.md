@@ -3,6 +3,11 @@
 Autonomous overnight session. No one is available to answer questions;
 decisions below were made unilaterally and are recorded here for review.
 
+**Live instruction mid-session:** user told this session to push small
+focused commits directly to `lane/web` (not the `claude/web-scene-threejs-83jkrv`
+branch this cloud session was originally started on) for the rest of the
+overnight run. Commit `766df9d` onward goes to `lane/web`.
+
 ## 2026-10-03 07:0x UTC (03:0x ET) - increment 1
 
 **What changed**
@@ -73,3 +78,44 @@ instanced fire cells, site/refuge/agent markers, bounded orthographic
 camera, DOM label overlay) and the surrounding accessible DOM UI (briefing,
 top bar, conversation panel, urgent strip, agent rail, end overlay), then
 wire it all together in `main.tsx`/`App.tsx`.
+
+## 2026-10-03 07:1x UTC (03:1x ET) - increment 2
+
+**What changed:** commit `81c530a` - the Three.js/R3F scene itself
+(Terrain, Roads, FireCells, SiteMarkers/RefugeMarkers, AgentMarkers,
+CameraControls, SceneLabelLayer, SceneLegend, SceneView), built on top of
+`sceneEntities.ts` (CoordinatorView resolved against the local scenario
+map; unit tested).
+
+**Decision: no `@react-three/drei`.** docs/FRONTEND.md suggests "a small
+selection of Drei camera/label helpers", but it isn't in `apps/web`'s
+dependencies yet and AGENTS.md asks for a comment justifying any new
+direct dependency. Used three's own `OrbitControls` from
+`three/examples/jsm/controls/OrbitControls.js` (ships inside the already-
+installed `three` package, typed via the already-installed `@types/three`)
+for bounded camera orbit/zoom, and a hand-rolled `requestAnimationFrame`
+DOM label layer (`SceneLabelLayer.tsx` + `projectToScreen.ts`, the latter
+unit tested) instead of drei's `<Html>`. If a future increment wants
+drei's richer helpers, that's a one-line dependency add + lockfile update,
+not a blocker.
+
+**Decision: pan is bounded by zoom/distance limits, not a hard rectangular
+clamp.** `CameraControls.tsx` sets `minDistance`/`maxDistance` and a
+polar-angle range so the camera can't flip below the horizon or zoom
+arbitrarily far, satisfying "bounded pan and zoom" in spirit. A pixel-exact
+pan boundary would need custom clamping logic on top of OrbitControls;
+deferred as a follow-up rather than adding untested geometry under time
+pressure overnight.
+
+**Status:** typecheck, lint, test green (`pnpm typecheck`, `pnpm lint`,
+`pnpm test`; 60 web-lane tests). `vite build` not yet run end-to-end -
+`main.tsx` is still the original stub, so nothing imports the new scene
+code yet and a build right now would tree-shake all of it away. Will run
+a real `vite build` once `App.tsx`/`main.tsx` wire everything together
+(next increment).
+
+**Blocked:** nothing.
+
+**Next:** surrounding DOM UI (briefing screen, top bar, conversation
+panel + urgent strip, agent rail, end overlay), then wire into
+`main.tsx`/`App.tsx` and verify a real production build.
