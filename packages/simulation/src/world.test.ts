@@ -149,6 +149,27 @@ describe("work and damage", () => {
   });
 });
 
+describe("destroyed sites", () => {
+  it("accept no further useful work once destroyed, and keep the failed outcome", () => {
+    const base = buildSyntheticScenario({ sites: ["site-a", "site-b"] });
+    const scenario: SimScenario = {
+      ...base,
+      agents: [{ ...base.agents[0]!, id: AgentId.parse("crew-1"), startNodeId: NodeId.parse("n-sa") }],
+      map: { ...base.map, initialFireCells: [nearSite] },
+    };
+    const inc = new Incident({ scenario, seed: "late", overrides: slow });
+    // Site A burns unprotected and is destroyed at about 167 s; a crew is only sent to work there afterwards.
+    inc.advanceTo(190_000);
+    expect(inc.truth().sites.find((s) => s.id === "site-a")?.destroyed).toBe(true);
+    inc.submit(workAtSite(inc, "crew-1", 100_000, 190_000));
+    inc.advanceTo(400_000);
+    const a = inc.truth().sites.find((s) => s.id === "site-a")!;
+    expect(a.destroyed).toBe(true);
+    expect(a.completedWork).toBe(0);
+    expect(inc.end).toBeNull(); // site B is unresolved, so the incident goes on
+  });
+});
+
 describe("losses", () => {
   const road = (inc: Incident) => new RoadIndex(inc.scenario.map);
 

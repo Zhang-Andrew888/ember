@@ -489,3 +489,26 @@ describe("mid-edge replanning against the simulator", () => {
     expect(inc.projectAgent(crew1).state).not.toBe("lost");
   });
 });
+
+describe("older relayed clear versus fresh local fire", () => {
+  it("keeps a cell closed once seen burning, whatever older relay says", async () => {
+    const { EvidenceTracker } = await import("./evidence.js");
+    const scenario = scenarioWith({ fire: patch(1500, 100) });
+    const tracker = new EvidenceTracker(scenario.map);
+    const cell = cellIndexOf(900, 740)!;
+    const obs = (id: string, at: number, state: "burning" | "unburned", by: string) =>
+      Observation.parse({
+        id,
+        sourceAgentId: by,
+        observedAt: at,
+        receivedAt: at + 10_000,
+        spatialFootprint: { centerX: 900, centerY: 740, radius: 150 },
+        observedFields: [{ kind: "cell", edgeId: GRID_EDGE, cellIndex: cell, burnState: state }],
+      });
+    tracker.ingest([obs("local", 300_000, "burning", "crew-1")]);
+    expect(tracker.closed.has(cell)).toBe(true);
+    // A coordinator relay of a scout's older "clear" arrives afterwards.
+    tracker.ingest([obs("local", 300_000, "burning", "crew-1"), obs("old-clear", 200_000, "unburned", "scout")]);
+    expect(tracker.closed.has(cell)).toBe(true);
+  });
+});
