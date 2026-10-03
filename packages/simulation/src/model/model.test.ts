@@ -15,6 +15,10 @@ import {
   createTerrain,
   hashValue,
   spreadRate,
+  type Terrain,
+  rothermelPhiW,
+  FUEL_MODELS,
+  FUEL_SHRUB,
   streamRng,
   type FireParams,
   type PublicMap,
@@ -30,6 +34,7 @@ const params: FireParams = {
 const flatTerrain = () => ({
   fuel: new Float64Array(64 * 64).fill(1),
   height: new Float64Array(64 * 64),
+  fuelModel: new Uint8Array(64 * 64).fill(1),
 });
 
 describe("model/rng", () => {
@@ -102,7 +107,7 @@ describe("model/fire", () => {
     const down = spreadRate(params, 0, east, 1, 0);
     const up = spreadRate(params, 0, west, 1, 0);
     expect(down).toBeGreaterThan(up);
-    expect(down).toBeCloseTo(0.5 * Math.exp(0.6), 6);
+    expect(down).toBeCloseTo(0.5 * SIM_DEFAULTS.rothermelGain * (1 + rothermelPhiW(FUEL_MODELS[FUEL_SHRUB]!, SIM_DEFAULTS.windSpeedMps)), 6);
     expect(spreadRate({ ...params, spreadMultiplier: 10 }, 0, east, 1.4, 0)).toBe(2.0);
     expect(spreadRate({ ...params, spreadMultiplier: 0.01 }, 0, west, 0.6, 0)).toBe(0.1);
   });
@@ -121,9 +126,9 @@ describe("model/fire", () => {
       field.step(t, 1000, params);
       if (ignitedEast === Infinity && field.state[start + 1] !== CELL_UNBURNED) ignitedEast = t;
     }
-    // 25 m at 0.5 * exp(0.6) m/s is about 27.4 s, so ignition lands on step 28.
-    expect(ignitedEast).toBe(28_000);
-    expect(field.ignitedAtMs[start + 1]).toBe(28_000);
+    // 25 m at 0.5 * 1.35 * (1 + phi_w) m/s is about 22.9 s, so ignition lands on step 23.
+    expect(ignitedEast).toBe(23_000);
+    expect(field.ignitedAtMs[start + 1]).toBe(23_000);
     expect(field.state[start]).toBe(CELL_BURNED);
   });
 
@@ -180,7 +185,7 @@ describe("model/fire", () => {
 
 describe("model/fire fast path", () => {
   /** Reference implementation straight from the documented formula, one exp() per cell and direction. */
-  function referenceIgnitions(terrain: { fuel: Float64Array; height: Float64Array }, p: FireParams, steps: number): Float64Array {
+  function referenceIgnitions(terrain: Terrain, p: FireParams, steps: number): Float64Array {
     const SIZE = 64;
     const state = new Uint8Array(SIZE * SIZE).fill(CELL_UNBURNED);
     const ign = new Float64Array(SIZE * SIZE).fill(Infinity);
@@ -218,7 +223,7 @@ describe("model/fire fast path", () => {
           if (nx < 0 || ny < 0 || nx >= SIZE || ny >= SIZE) return;
           const target = ny * SIZE + nx;
           if (state[target] !== CELL_UNBURNED) return;
-          const rate = spreadRate(p, wind, d, terrain.fuel[target]!, terrain.height[target]! - terrain.height[c]!);
+          const rate = spreadRate(p, wind, d, terrain.fuel[target]!, terrain.height[target]! - terrain.height[c]!, terrain.fuelModel[target]!);
           progress[c * 8 + i] = progress[c * 8 + i]! + rate;
           if (progress[c * 8 + i]! >= d.dist && !reached.includes(target)) reached.push(target);
         });

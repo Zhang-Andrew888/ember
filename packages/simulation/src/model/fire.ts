@@ -1,4 +1,13 @@
 import { SIM_DEFAULTS } from "./constants.js";
+import {
+  FUEL_MODELS,
+  FUEL_SHRUB,
+  ellipseEccentricity,
+  ellipseFactor,
+  noWindRateFtMin,
+  rothermelPhiS,
+  rothermelPhiW,
+} from "./rothermel.js";
 import type { Terrain } from "./terrain.js";
 
 /** Cell burn states. Nonburnable cells never ignite (refuge protection areas). */
@@ -16,6 +25,10 @@ export interface FireParams {
   readonly postShiftWindRad: number;
   /** Fraction (0..1) of cell distance already accumulated from the initial front. */
   readonly initialProgress?: number;
+  /** Effective midflame wind speed in m/s; defaults to SIM_DEFAULTS.windSpeedMps. */
+  readonly windSpeedMps?: number;
+  /** Dead fuel moisture fraction; defaults to SIM_DEFAULTS.fuelMoisture. */
+  readonly moisture?: number;
 }
 
 export function windDirectionAt(params: FireParams, tMs: number): number {
@@ -45,35 +58,54 @@ const NEIGHBORS: readonly Neighbor[] = (() => {
   return out;
 })();
 
+const REFERENCE_R0 = noWindRateFtMin(FUEL_MODELS[FUEL_SHRUB]!, SIM_DEFAULTS.fuelMoisture);
+
+/** Rothermel R0 relative to the reference fuel and moisture, so baseSpreadRate keeps its documented meaning. */
+export function relativeNoWindRate(model: number, moisture: number): number {
+  return noWindRateFtMin(FUEL_MODELS[model]!, moisture) / REFERENCE_R0;
+}
+
 export function spreadRate(
   params: FireParams,
   windRad: number,
   neighbor: Neighbor,
   targetFuel: number,
   rise: number,
+  model: number = FUEL_SHRUB,
 ): number {
-  const alignment = Math.cos(windRad) * neighbor.ux + Math.sin(windRad) * neighbor.uy;
+  const fm = FUEL_MODELS[model]!;
+  const windMps = params.windSpeedMps ?? SIM_DEFAULTS.windSpeedMps;
+  const moisture = params.moisture ?? SIM_DEFAULTS.fuelMoisture;
+  const cosTheta = Math.cos(windRad) * neighbor.ux + Math.sin(windRad) * neighbor.uy;
   const run = neighbor.dist;
   const slope = Math.max(-SIM_DEFAULTS.slopeClamp, Math.min(SIM_DEFAULTS.slopeClamp, rise / run));
+  const wind = ellipseFactor(ellipseEccentricity(windMps), cosTheta) * (1 + rothermelPhiW(fm, windMps));
   const raw =
     SIM_DEFAULTS.baseSpreadRate *
+    SIM_DEFAULTS.rothermelGain *
     params.spreadMultiplier *
     targetFuel *
-    Math.exp(SIM_DEFAULTS.windCoefficient * alignment + SIM_DEFAULTS.slopeCoefficient * slope);
+    relativeNoWindRate(model, moisture) *
+    (wind + rothermelPhiS(fm, slope));
   const [lo, hi] = SIM_DEFAULTS.spreadRateClamp;
   return Math.max(lo, Math.min(hi, raw));
 }
 
-const staticCache = new WeakMap<Terrain, Float64Array>();
+interface StaticFactors {
+  /** Public fuel-continuity multiplier of the target cell, per cell and direction. */
+  readonly fuelMul: Float64Array;
+  /** Rothermel slope coefficient phi_s of the target cell's fuel model, per cell and direction. */
+  readonly slopePhi: Float64Array;
+}
 
-/**
- * The part of the spread rate that never changes in a run: target fuel times the uphill slope
- * term, per cell and direction. Splitting it out turns the per-step work into multiplications.
- */
-function staticFactors(terrain: Terrain): Float64Array {
+const staticCache = new WeakMap<Terrain, StaticFactors>();
+
+/** The parts of the spread rate that never change in a run: target fuel and the uphill slope term. */
+function staticFactors(terrain: Terrain): StaticFactors {
   const hit = staticCache.get(terrain);
   if (hit !== undefined) return hit;
-  const out = new Float64Array(SIZE * SIZE * 8);
+  const fuelMul = new Float64Array(SIZE * SIZE * 8);
+  const slopePhi = new Float64Array(SIZE * SIZE * 8);
   for (let cell = 0; cell < SIZE * SIZE; cell++) {
     const gx = cell % SIZE;
     const gy = (cell - gx) / SIZE;
@@ -84,9 +116,11 @@ function staticFactors(terrain: Terrain): Float64Array {
       if (nx < 0 || ny < 0 || nx >= SIZE || ny >= SIZE) continue;
       const target = ny * SIZE + nx;
       const slope = Math.max(-SIM_DEFAULTS.slopeClamp, Math.min(SIM_DEFAULTS.slopeClamp, (terrain.height[target]! - terrain.height[cell]!) / nb.dist));
-      out[cell * 8 + d] = terrain.fuel[target]! * Math.exp(SIM_DEFAULTS.slopeCoefficient * slope);
+      fuelMul[cell * 8 + d] = terrain.fuel[target]!;
+      slopePhi[cell * 8 + d] = rothermelPhiS(FUEL_MODELS[terrain.fuelModel[target]!]!, slope);
     }
   }
+  const out = { fuelMul, slopePhi };
   staticCache.set(terrain, out);
   return out;
 }
@@ -151,13 +185,24 @@ export class FireField {
     const wind = windDirectionAt(params, toMs);
     const dtSec = dtMs / 1000;
     const stat = staticFactors(this.terrain);
-    const baseRate = SIM_DEFAULTS.baseSpreadRate * params.spreadMultiplier;
+    const baseRate = SIM_DEFAULTS.baseSpreadRate * SIM_DEFAULTS.rothermelGain * params.spreadMultiplier;
     const [rateLo, rateHi] = SIM_DEFAULTS.spreadRateClamp;
-    const windFactor = new Float64Array(8);
-    for (let d = 0; d < 8; d++) {
-      const nb = NEIGHBORS[d]!;
-      windFactor[d] = Math.exp(SIM_DEFAULTS.windCoefficient * (Math.cos(wind) * nb.ux + Math.sin(wind) * nb.uy));
+    const windMps = params.windSpeedMps ?? SIM_DEFAULTS.windSpeedMps;
+    const moisture = params.moisture ?? SIM_DEFAULTS.fuelMoisture;
+    const ecc = ellipseEccentricity(windMps);
+    // Per fuel model: relative R0 and per direction (1 + phi_w) times the ellipse factor.
+    const modelCount = FUEL_MODELS.length;
+    const r0Rel = new Float64Array(modelCount);
+    const windTerm = new Float64Array(modelCount * 8);
+    for (let m = 0; m < modelCount; m++) {
+      r0Rel[m] = relativeNoWindRate(m, moisture);
+      const phiW = rothermelPhiW(FUEL_MODELS[m]!, windMps);
+      for (let d = 0; d < 8; d++) {
+        const nb = NEIGHBORS[d]!;
+        windTerm[m * 8 + d] = ellipseFactor(ecc, Math.cos(wind) * nb.ux + Math.sin(wind) * nb.uy) * (1 + phiW);
+      }
     }
+    const modelOf = this.terrain.fuelModel;
     const reached: number[] = [];
     const seen = new Set<number>();
     for (const cell of this.burning) {
@@ -171,7 +216,8 @@ export class FireField {
         const target = ny * SIZE + nx;
         if (this.state[target] !== CELL_UNBURNED) continue;
         const slot = cell * 8 + d;
-        const raw = baseRate * stat[slot]! * windFactor[d]!;
+        const m = modelOf[target]!;
+        const raw = baseRate * stat.fuelMul[slot]! * r0Rel[m]! * (windTerm[m * 8 + d]! + stat.slopePhi[slot]!);
         const rate = raw < rateLo ? rateLo : raw > rateHi ? rateHi : raw;
         const next = this.progress[slot]! + rate * dtSec;
         this.progress[slot] = next;
