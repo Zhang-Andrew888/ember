@@ -123,6 +123,14 @@ export interface VariantReport {
   readonly controllerTickP95Ms: number;
 }
 
+/** Runs worth reading closely: a crew lost, a crew stranded, or no normal return available. */
+export interface RepresentativeFailure {
+  readonly variant: Variant;
+  readonly seed: string;
+  readonly kind: "crew_lost" | "stranded" | "no_normal_return";
+  readonly detail: string;
+}
+
 export interface EvaluationReport {
   readonly format: "ember-evaluation-v1";
   readonly scenarioVersion: string;
@@ -131,6 +139,7 @@ export interface EvaluationReport {
   readonly seeds: readonly string[];
   readonly untilMs: number;
   readonly variants: readonly VariantReport[];
+  readonly failures: readonly RepresentativeFailure[];
   readonly caveats: readonly string[];
 }
 
@@ -148,6 +157,7 @@ export function runEvaluation(options: { seeds: readonly string[]; variants?: re
   const scenario = buildSyntheticScenario();
   const untilMs = options.untilMs ?? 1_500_000;
   const reports: VariantReport[] = [];
+  const failures: RepresentativeFailure[] = [];
   for (const variant of variants) {
     const runs: RunMetrics[] = [];
     const latencies: number[] = [];
@@ -156,6 +166,10 @@ export function runEvaluation(options: { seeds: readonly string[]; variants?: re
     options.seeds.forEach((seed, i) => {
       const result = runVariant({ variant, seed, scenario, overrides: overridesForSeed(seed, i), untilMs });
       runs.push(result.metrics);
+      const m = result.metrics;
+      if (m.crewsLost > 0) failures.push({ variant, seed, kind: "crew_lost", detail: `${m.crewsLost} crew(s) lost; ${m.lostBeforeReturn} before returning` });
+      if (m.strandedSeconds > 0) failures.push({ variant, seed, kind: "stranded", detail: `${m.strandedSeconds} stranded seconds` });
+      if (m.retreats > 0) failures.push({ variant, seed, kind: "no_normal_return", detail: `${m.retreats} best-effort retreat(s)` });
       latencies.push(...result.replanLatencyMs);
       steps.push(...result.simStepMs);
       ctrl.push(...result.controllerMs);
@@ -182,6 +196,7 @@ export function runEvaluation(options: { seeds: readonly string[]; variants?: re
     seeds: options.seeds,
     untilMs,
     variants: reports,
+    failures,
     caveats: CAVEATS,
   };
 }

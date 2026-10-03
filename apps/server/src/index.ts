@@ -18,6 +18,7 @@ export {
   type EvaluationReport,
   type Fault,
   type RunOptions,
+  type RepresentativeFailure,
   type RunResult,
   type Variant,
   type VariantReport,

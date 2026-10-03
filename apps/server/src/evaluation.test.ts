@@ -103,5 +103,6 @@ describe("evaluation harness", () => {
       expect(v.runs.every((r) => r.simSeconds <= 120)).toBe(true);
     }
     expect(report.scenarioHash).toMatch(/^[0-9a-f]{32}$/);
+    expect(Array.isArray(report.failures)).toBe(true);
   });
 });
