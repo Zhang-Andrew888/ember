@@ -11,7 +11,8 @@ const LIMITING_REASON_LABEL: Record<string, string> = {
 
 /** Plain-language route label suffix for a limitingReason code from the server. */
 export function limitingReasonDisplayText(reason: string): string {
-  const mapped = LIMITING_REASON_LABEL[reason];
-  if (mapped !== undefined) return mapped;
+  if (Object.hasOwn(LIMITING_REASON_LABEL, reason)) {
+    return LIMITING_REASON_LABEL[reason]!;
+  }
   return reason.replace(/[_-]+/g, " ").trim();
 }

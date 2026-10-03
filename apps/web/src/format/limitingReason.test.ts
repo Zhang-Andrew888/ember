@@ -11,4 +11,9 @@ describe("format/limitingReason", () => {
   it("falls back to spaced words for unknown codes", () => {
     expect(limitingReasonDisplayText("single-capacity_hold")).toBe("single capacity hold");
   });
+
+  it("does not treat inherited object keys as mapped codes", () => {
+    expect(limitingReasonDisplayText("toString")).toBe("toString");
+    expect(limitingReasonDisplayText("constructor")).toBe("constructor");
+  });
 });
