@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { mockRecording } from "../replay/mockRecording.js";
-import { mergeTruthCells, truthFrameAt } from "../replay/recording.js";
+import { mergeTruthCells, truthFrameAt, type ReplayRecording } from "../replay/recording.js";
 import { truthForDisplay } from "../replay/truthGate.js";
 import { buildSceneEntities } from "./scene/sceneEntities.js";
 import { scenarioMap } from "../map/activeScenario.js";
@@ -11,8 +11,13 @@ import { formatIncidentClock } from "../format/time.js";
 import { useReducedMotion } from "../state/useReducedMotion.js";
 import { latestUrgentReport } from "../format/reports.js";
 
+export type ReplaySource = "incident" | "illustrative";
+
 export interface ReplayViewProps {
   readonly onExit: () => void;
+  readonly source: ReplaySource;
+  /** Required when `source` is `incident` (this run's server export). */
+  readonly recording?: ReplayRecording;
 }
 
 /**
@@ -26,7 +31,8 @@ export interface ReplayViewProps {
  * the toggle on. The truth comes from the recording's separate truthFrames
  * channel (replay/recording.ts), never from the coordinator log itself.
  */
-export function ReplayView({ onExit }: ReplayViewProps) {
+export function ReplayView({ onExit, source, recording }: ReplayViewProps) {
+  const bundle = source === "illustrative" ? mockRecording : recording!;
   const [index, setIndex] = useState(0);
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [showFullFire, setShowFullFire] = useState(false);
@@ -42,13 +48,13 @@ export function ReplayView({ onExit }: ReplayViewProps) {
     bannerLabelRef.current?.focus();
   }, []);
 
-  const replayLog = mockRecording.coordinatorLog;
+  const replayLog = bundle.coordinatorLog;
   const view = replayLog[index]!;
   const baseEntities = useMemo(() => buildSceneEntities(view, scenarioMap), [view]);
   const truth = truthForDisplay({
     phase: "replay",
     showFullFire,
-    frame: truthFrameAt(mockRecording.truthFrames, view.simTimeMs as number),
+    frame: truthFrameAt(bundle.truthFrames, view.simTimeMs as number),
   });
   const entities = useMemo(
     () => (truth ? { ...baseEntities, fireCells: mergeTruthCells(baseEntities.fireCells, truth, scenarioMap) } : baseEntities),
@@ -61,6 +67,11 @@ export function ReplayView({ onExit }: ReplayViewProps) {
         <span className="replay-banner__label" ref={bannerLabelRef} tabIndex={-1}>
           REPLAY
         </span>
+        {source === "illustrative" ? (
+          <span className="replay-banner__notice">Illustrative recording — not from this run.</span>
+        ) : (
+          <span className="replay-banner__notice">This run.</span>
+        )}
         <span>
           Commands disabled.{" "}
           {showFullFire

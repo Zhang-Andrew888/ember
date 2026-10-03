@@ -1,12 +1,14 @@
 import { randomBytes } from "node:crypto";
-import type { CoordinatorView, IncidentEnd } from "@ember/domain";
+import type { CoordinatorView } from "@ember/domain";
 import { buildSyntheticScenario, type SimScenario } from "@ember/simulation";
 import { ConversationBridge } from "./conversation.js";
 import { grokVoiceEnabled } from "./xai/env.js";
 import { SpeechAudioStore } from "./xai/speech-audio-store.js";
 import { LiveRun, SessionHub } from "./hub.js";
+import { buildReplayExport } from "./replay-export.js";
 import { IncidentSession, type SessionOptions } from "./session.js";
 import type { MonotonicClock } from "./runner.js";
+import { ViewRecorder } from "./view-recorder.js";
 
 export interface IncidentRecord {
   readonly id: string;
@@ -19,6 +21,7 @@ export interface IncidentRecord {
   readonly seed: string;
   started: boolean;
   readonly speechStore: SpeechAudioStore;
+  readonly viewRecorder: ViewRecorder;
 }
 
 export interface CreateIncidentBody {
@@ -43,9 +46,22 @@ export class IncidentRegistry {
     const speechStore = new SpeechAudioStore();
     const grokTts = grokVoiceEnabled();
     const bridge = new ConversationBridge(session, { speechStore, grokTts });
-    const hub = new SessionHub(session, bridge);
+    const viewRecorder = new ViewRecorder();
+    const hub = new SessionHub(session, bridge, viewRecorder);
     const live = new LiveRun(session, bridge, hub, clock);
-    const record: IncidentRecord = { id, token, session, bridge, hub, live, scenario, seed, started: false, speechStore };
+    const record: IncidentRecord = {
+      id,
+      token,
+      session,
+      bridge,
+      hub,
+      live,
+      scenario,
+      seed,
+      started: false,
+      speechStore,
+      viewRecorder,
+    };
     this.records.set(id, record);
     this.byToken.set(token, id);
     return record;
@@ -72,12 +88,8 @@ export class IncidentRegistry {
     record.live.start();
   }
 
-  replayPayload(record: IncidentRecord): { views: CoordinatorView[]; end: IncidentEnd | null } | null {
-    if (!record.session.incident.ended) return null;
-    return {
-      views: [record.session.coordinatorView()],
-      end: record.session.incident.end,
-    };
+  replayPayload(record: IncidentRecord): ReturnType<typeof buildReplayExport> {
+    return buildReplayExport(record.session, record.viewRecorder);
   }
 
   all(): Iterable<IncidentRecord> {

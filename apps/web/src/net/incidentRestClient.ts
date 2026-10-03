@@ -1,10 +1,15 @@
 /**
  * Thin wrapper over the REST half of the browser/server transport contract
- * (docs/ARCHITECTURE.md: `POST /incidents`, `POST /incidents/:id/start`).
+ * (docs/ARCHITECTURE.md: `POST /incidents`, `POST /incidents/:id/start`,
+ * `GET /incidents/:id/replay`).
  * Best-effort: the authoritative clock is server-owned, so a failed request
  * just leaves the incident un-started and surfaces through the connection
  * status rather than throwing into the render tree.
  */
+
+import { ReplayRecording, type ReplayRecording as IncidentReplayRecording } from "../replay/recording.js";
+
+export type { IncidentReplayRecording };
 
 export interface CreatedIncident {
   readonly incidentId: string;
@@ -74,5 +79,36 @@ export async function startIncident(
     return response.ok;
   } catch {
     return false;
+  }
+}
+
+export type FetchIncidentReplayResult =
+  | { readonly status: "ok"; readonly recording: IncidentReplayRecording }
+  | { readonly status: "active" }
+  | { readonly status: "error" };
+
+/** Finished-run replay export (coordinator log + truth frames). Ignores server `end` metadata. */
+export async function fetchIncidentReplay(
+  baseUrl: string,
+  incidentId: string,
+  token: string,
+): Promise<FetchIncidentReplayResult> {
+  try {
+    const response = await fetch(restUrl(baseUrl, `/incidents/${encodeURIComponent(incidentId)}/replay`), {
+      headers: { "x-incident-token": token },
+    });
+    if (response.status === 409) return { status: "active" };
+    if (!response.ok) return { status: "error" };
+    const data: unknown = await response.json();
+    if (typeof data !== "object" || data === null) return { status: "error" };
+    const body = data as { coordinatorLog?: unknown; truthFrames?: unknown };
+    const parsed = ReplayRecording.safeParse({
+      coordinatorLog: body.coordinatorLog,
+      truthFrames: body.truthFrames,
+    });
+    if (!parsed.success) return { status: "error" };
+    return { status: "ok", recording: parsed.data };
+  } catch {
+    return { status: "error" };
   }
 }

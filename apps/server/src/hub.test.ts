@@ -6,6 +6,7 @@ import { ConversationBridge } from "./conversation.js";
 import { LiveRun, SessionHub } from "./hub.js";
 import { parseServerWire } from "./protocol.js";
 import { IncidentSession } from "./session.js";
+import { ViewRecorder } from "./view-recorder.js";
 
 vi.setConfig({ testTimeout: 300_000 });
 
@@ -42,7 +43,7 @@ function setup(scenario?: SimScenario) {
   const sc = scenario ?? { ...base, map: { ...base.map, initialFireCells: patch(230, 1100) } };
   const session = new IncidentSession({ scenario: sc, seed: SECRET_SEED, overrides: { spreadMultiplier: 1.3737373, windShiftMs: 333_000, initialWindRad: 0.1234567 }, controllerConfig: { forecast: steady } });
   const bridge = new ConversationBridge(session);
-  const hub = new SessionHub(session, bridge);
+  const hub = new SessionHub(session, bridge, new ViewRecorder());
   const clock = new FakeClock();
   const live = new LiveRun(session, bridge, hub, clock);
   return { session, bridge, hub, clock, live };

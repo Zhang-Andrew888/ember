@@ -3,7 +3,9 @@ import { dueSimTimeMs, SIM_DEFAULTS } from "@ember/simulation";
 import type { ConversationBridge } from "./conversation.js";
 import { decode, encodeServer, type ServerMessage } from "./protocol.js";
 import type { MonotonicClock, TechnicalFailure } from "./runner.js";
+import type { CoordinatorView } from "@ember/domain";
 import type { IncidentSession } from "./session.js";
+import type { ViewRecorder } from "./view-recorder.js";
 
 export type ClientId = number;
 
@@ -29,14 +31,21 @@ export class SessionHub {
   constructor(
     private readonly session: IncidentSession,
     private readonly bridge: ConversationBridge,
+    private readonly viewRecorder: ViewRecorder,
     private readonly viewEverySteps = 1,
   ) {}
+
+  private emitView(view: CoordinatorView, clientId?: ClientId): void {
+    this.viewRecorder.record(view);
+    if (clientId !== undefined) this.send(clientId, { type: "view", view });
+    else this.broadcast({ type: "view", view });
+  }
 
   connect(): ClientId {
     const id = this.nextClient++;
     this.outboxes.set(id, []);
     this.ptt.set(id, new PushToTalk());
-    this.send(id, { type: "view", view: this.session.coordinatorView() });
+    this.emitView(this.session.coordinatorView(), id);
     return id;
   }
 
@@ -50,7 +59,7 @@ export class SessionHub {
   reconnect(id: ClientId): void {
     if (!this.ptt.has(id)) return;
     this.outboxes.set(id, []);
-    this.send(id, { type: "view", view: this.session.coordinatorView() });
+    this.emitView(this.session.coordinatorView(), id);
     const unsent = this.ptt.get(id)?.unsentUtterance;
     if (unsent !== null && unsent !== undefined) {
       this.send(id, { type: "notice", kind: "unsent_utterance", detail: unsent.text });
@@ -135,7 +144,7 @@ export class SessionHub {
     const stepIndex = Math.floor(inc.simTimeMs / SIM_DEFAULTS.stepMs);
     if (stepIndex !== this.lastViewStep && stepIndex % this.viewEverySteps === 0) {
       this.lastViewStep = stepIndex;
-      this.broadcast({ type: "view", view: this.session.coordinatorView() });
+      this.emitView(this.session.coordinatorView());
     }
     for (; this.transcriptPointer < this.bridge.transcript.length; this.transcriptPointer++) {
       const t = this.bridge.transcript[this.transcriptPointer]!;
@@ -152,7 +161,7 @@ export class SessionHub {
     for (const n of this.bridge.gateway.takeNotices()) this.broadcast({ type: "notice", kind: n.kind, detail: n.commandId });
     if (inc.ended && !this.endSent && inc.end !== null) {
       this.endSent = true;
-      this.broadcast({ type: "view", view: this.session.coordinatorView() });
+      this.emitView(this.session.coordinatorView());
       this.broadcast({ type: "ended", end: inc.end });
     }
   }
