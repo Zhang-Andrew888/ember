@@ -28,6 +28,13 @@ export function rolloutContext(map: PublicMap): RolloutContext {
   return ctx;
 }
 
+/** A field already rolled out to `atMs` for the same context and parameters; consumed by the rollout. */
+export interface WarmRollout {
+  readonly field: FireField;
+  readonly atMs: number;
+  readonly stepMs: number;
+}
+
 interface Cached {
   endMs: number;
   ign: Float64Array;
@@ -49,15 +56,25 @@ function paramKey(ctx: RolloutContext, p: ForecastParams, stepMs: number): strin
  * Ignition is recorded at the start of the step in which it happens, so timing errs early
  * (conservative). Results are cached per parameter set and extended on demand.
  */
-export function rolloutIgnition(ctx: RolloutContext, params: ForecastParams, endMs: number, stepMs: number, exact = false): Float64Array {
+export function rolloutIgnition(
+  ctx: RolloutContext,
+  params: ForecastParams,
+  endMs: number,
+  stepMs: number,
+  exact = false,
+  warm?: WarmRollout,
+): Float64Array {
   const key = paramKey(ctx, params, stepMs);
   const hit = cache.get(key);
   if (hit !== undefined && hit.endMs >= endMs) return hit.ign;
   // `exact` rolls out only as far as asked: a cheap probe whose early times are identical to a full rollout.
   const target = exact ? Math.ceil(endMs / stepMs) * stepMs : Math.max(ROLLOUT_FLOOR_MS, Math.ceil(endMs / ROUND_MS) * ROUND_MS);
-  const field = new FireField(ctx.terrain, ctx.nonburnable);
-  field.ignite(ctx.initialCells, 0, params.initialProgress ?? 0);
-  for (let t = stepMs; t <= target; t += stepMs) forecastStep(field, t, stepMs, params);
+  // A warm start continues a field already stepped from the same start with the same parameters, so
+  // the result is identical to rolling out from zero.
+  const resume = warm !== undefined && warm.stepMs === stepMs && warm.atMs <= target;
+  const field = resume ? warm.field : new FireField(ctx.terrain, ctx.nonburnable);
+  if (!resume) field.ignite(ctx.initialCells, 0, params.initialProgress ?? 0);
+  for (let t = resume ? warm.atMs + stepMs : stepMs; t <= target; t += stepMs) forecastStep(field, t, stepMs, params);
   const ign = new Float64Array(field.ignitedAtMs.length);
   for (let i = 0; i < ign.length; i++) {
     const v = field.ignitedAtMs[i]!;
