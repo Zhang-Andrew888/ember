@@ -150,6 +150,10 @@ Reading these honestly:
 
 - Fixed: `ScriptedInterpreter` threw on a callsign containing regex metacharacters (now escaped); the WebSocket
   server now caps messages at 64 KiB (closes with 1009) and absorbs socket errors.
+- Fixed: `KnowledgeStore` site and cell beliefs no longer depend on arrival order for equal-time observations;
+  `revealFire` always ends on a frame at the recorded final time; the hub passed simulated time to
+  `PushToTalk.disconnect` while begin/release use wall time (now wall time throughout).
+- Added: a test that no per-agent projection carries private parameters.
 - Known gap: the server does not apply backpressure to a client that stops reading its socket (the `ws` library
   buffers without limit). Acceptable for the loopback-only demo server; not handled.
 
