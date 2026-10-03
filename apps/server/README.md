@@ -47,13 +47,14 @@ Web: `VITE_INCIDENT_REST_BASE_URL=` and `VITE_GROK_VOICE=1` in `apps/web/.env.lo
 ```sh
 pnpm --filter ember-server exec tsx src/evaluate-cli.ts heldout out.json   # 20 held-out seeds x 3 variants
 pnpm --filter ember-server exec tsx src/evaluate-cli.ts dev out.json       # 5 development seeds
-pnpm --filter ember-server exec tsx src/evaluate-cli.ts showcase out.json  # the rehearsed seed
+pnpm --filter ember-server exec tsx src/evaluate-cli.ts showcase out.json  # rehearsal seed only — not for variant comparison
 pnpm --filter ember-server exec tsx src/sensitivity-cli.ts out.json        # exploratory prior-width study
 pnpm --filter ember-server exec tsx src/nav-calibration-cli.ts out.json   # nav + switch-margin dev-seed sweep (not RL)
 ```
 
 A full held-out run takes about 16 minutes on four cores. Recorded results live in `evaluation-results/`; read the
-caveats in each report and `OVERNIGHT_LOG.md` before quoting a number.
+caveats in each report and `OVERNIGHT_LOG.md` before quoting a number. For the demo pitch table, run
+`scripts/demo.sh --comparison` from the repo root (held-out aggregates only).
 
 ## Rules this package enforces
 

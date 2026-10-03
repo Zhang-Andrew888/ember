@@ -94,15 +94,18 @@ real Oakland extract.
 
 Files: `apps/server/evaluation-results/` (`heldout-20-seeds.json`, `dev-5-seeds.json`, `showcase-seed.json`,
 `prior-sensitivity-exploratory.json`). Policy: `scripted-relay` v2. Seeds: `heldout-01..20`, with every fourth seed
-forcing an earlier-than-prior wind shift (280 s) and every fourth-plus-one a wider spread rate (1.55).
+forcing an earlier-than-prior wind shift (280 s) and every fourth-plus-one a wider spread rate (1.55). **Demo pitch:** run `scripts/demo.sh --comparison` (held-out aggregates only; do not quote `showcase-1` for variant
+comparison). Check `measuredAtCommit` in `heldout-20-seeds.json` (re-run
+`pnpm --filter ember-server exec tsx src/evaluate-cli.ts heldout evaluation-results/heldout-20-seeds.json` on current
+main before changing headline numbers).
 
 | 20 held-out seeds | Dispatch baseline | Forecast, no scout | Ember Line |
 |---|---|---|---|
-| Mean protection work delivered | 802.5 | 634.8 | 633.3 |
+| Mean protection work delivered | 802.5 | 600 | 600 |
 | Mean sites protected and standing (of 3) | 1.45 | 1.00 | 1.00 |
 | Mean sites destroyed | 1.2 | 1.3 | 1.3 |
 | Crews lost (total over 20 runs) | 11 | 0 | 0 |
-| Missions started / returns / interrupted by end / superseded / lost before return | 186 / 99 / 26 / 108 / 7 | 74 / 74 / 0 / 71 / 0 | 75 / 75 / 0 / 72 / 0 |
+| Missions started / returns / interrupted by end / superseded / lost before return | 186 / 99 / 26 / 108 / 7 | 60 / 60 / 0 / 60 / 0 | 60 / 60 / 0 / 60 / 0 |
 | Stranded seconds (total) | 758 | 0 | 0 |
 | Runs ended by | resolved 14, expired 5, all crews lost 1 | expired 10, resolved 10 | expired 10, resolved 10 |
 
@@ -111,17 +114,17 @@ Reading these honestly:
 - The no-forecast baseline delivers more work and saves more sites, but it loses crews (11 over 20 runs, 7 before
   returning) and spends time stranded; forecast planning lost none. That is a safety/productivity trade, not a win for
   either side. Final health here is an endpoint measure and runs end at different times.
-- **The scout shows no measurable benefit on this scenario** (633 vs 635 work; same sites). Three reasons visible in
+- **The scout shows no measurable benefit on this scenario** (600 vs 600 work; same sites). Three reasons visible in
   traces: all three crews independently pick the same best site at t=0 (spec: no shared knowledge), finishing it at
   about 509 s and then finding no admissible mission once the fire nears; the scout's information-value ranking mostly
   picks points near the corridor, far from the fire front; and the scripted policy only relays, it never allocates.
   No claim of a navigation benefit from scouting can be made from this data.
 - Prior width is not the limiting factor: widening, narrowing or matching the prior to the true sampling ranges gave
   600-648 work (`prior-sensitivity-exploratory.json`, 5 dev seeds, exploratory).
-- Performance (all variants, held-out): authoritative step mean 0.12-0.15 ms, p95 1 ms, max 18 ms (target p95 < 20 ms
-  met); controller work p95 22-32 ms per simulated second; replanning (ticks that produced a plan) p50 7-12 ms and
-  p95 218-228 ms for forecast variants (target p95 < 500 ms met). Contradiction rebuilds can take 1-4 s in this
-  single-threaded harness; the design runs them asynchronously, so a real server must run forecasts off the step loop.
+- Performance (all variants, held-out, from JSON timing fields at `measuredAtCommit`): authoritative step mean ~0.04-0.05 ms
+  (forecast) / ~0.05 ms (dispatch), p95 **0-1 ms** (harness percentile, not “under 1 ms”), max **3 ms** — target p95
+  &lt; 20 ms met; replanning p95 ~7-24 ms in this run (target p95 &lt; 500 ms met). Contradiction rebuilds can take 1-4 s
+  in this single-threaded harness; the design runs them asynchronously, so a real server must run forecasts off the step loop.
 - Representative failures (15 in the held-out report): dispatch lost crews on heldout-02, 06, 10, 14, 15, 18 and 19
   and was stranded on 01, 08, 13 and 19; the forecast variants never lost a crew but needed a best-effort retreat on
   heldout-07 (no scout) and 01, 15, 17 (Ember Line); see `failures` in the JSON.
