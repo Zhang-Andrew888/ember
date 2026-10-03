@@ -1,3 +1,4 @@
+import { INTERPRETATION_DEADLINE_MS } from "@ember/communication";
 import { xaiApiKey } from "./env.js";
 
 export interface TtsRequest {
@@ -28,6 +29,7 @@ export async function synthesizeSpeech(
       voice_id: request.voiceId ?? DEFAULT_VOICE,
       language: request.language ?? DEFAULT_LANGUAGE,
     }),
+    signal: AbortSignal.timeout(INTERPRETATION_DEADLINE_MS),
   });
 
   if (!response.ok) {

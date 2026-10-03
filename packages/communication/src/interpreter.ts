@@ -13,6 +13,10 @@ export interface InterpretationRequest {
 /** Anything that turns coordinator text into a proposed envelope. A real provider fits here. */
 export interface Interpreter {
   interpret(request: InterpretationRequest): IntentEnvelope | null;
+  /** Stop one in-flight provider call. Scripted interpreters have nothing to cancel. */
+  cancel?(inputSequence: number): void;
+  /** Stop every in-flight provider call. */
+  cancelAll?(): void;
 }
 
 const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");

@@ -81,7 +81,8 @@ interface Pending {
 }
 
 const STILL_INTERPRETING_MS = 5000;
-const FAILED_MS = 10_000;
+/** Wall-clock bound for one interpretation. Provider calls must abort on this same deadline. */
+export const INTERPRETATION_DEADLINE_MS = 10_000;
 
 const KIND_OF: Record<string, ObjectiveKind | undefined> = {
   protect: "protect_site",
@@ -168,8 +169,9 @@ export class CommandGateway {
     for (const p of this.pending.values()) {
       if (p.status !== "interpreting") continue;
       const waited = wallMs - p.message.wallMs;
-      if (waited >= FAILED_MS) {
+      if (waited >= INTERPRETATION_DEADLINE_MS) {
         p.status = "failed";
+        this.env.interpreter.cancel?.(p.sequence);
         out.push(
           this.finish(p.message, p.sequence, "rejected", null, [], "Interpretation failed. Nothing was applied; please resend by text.", [], ["interpretation_timeout"]),
         );
@@ -184,6 +186,7 @@ export class CommandGateway {
 
   /** The incident ended: cancel everything not yet applied. */
   endIncident(): GatewayOutcome[] {
+    this.env.interpreter.cancelAll?.();
     const out: GatewayOutcome[] = [];
     for (const p of [...this.pending.values()]) {
       if (p.status === "failed") continue;
