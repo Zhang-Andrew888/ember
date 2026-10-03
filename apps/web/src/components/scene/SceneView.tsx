@@ -6,8 +6,10 @@ import { SceneCanvas } from "./SceneCanvas.js";
 import { SceneLabelLayer, type LabelDescriptor } from "./SceneLabelLayer.js";
 import { SceneLegend } from "./SceneLegend.js";
 import type { CameraControlsHandle } from "./CameraControls.js";
+import { sceneTerrain } from "./terrain/sceneTerrain.js";
+import { polylineMidpoint } from "./sceneLayers.js";
 import { listRefugeNodes, type FireCellMarker, type SceneEntities } from "./sceneEntities.js";
-import { scenarioMap } from "../../map/scenarioMap.js";
+import { scenarioMap } from "../../map/activeScenario.js";
 import { siteProtectionStatusLabel, siteDamageLabel } from "../../format/reports.js";
 import { formatIncidentClock } from "../../format/time.js";
 
@@ -35,6 +37,8 @@ export function SceneView({
 }: SceneViewProps) {
   const [renderContext, setRenderContext] = useState<RenderContext | null>(null);
   const [showFireCells, setShowFireCells] = useState(true);
+  const [showRoutes, setShowRoutes] = useState(true);
+  const [showForecast, setShowForecast] = useState(true);
   const [inspectedCell, setInspectedCell] = useState<FireCellMarker | null>(null);
   const controlsRef = useRef<CameraControlsHandle>(null);
   const legendRef = useRef<HTMLDivElement>(null);
@@ -62,7 +66,7 @@ export function SceneView({
     const refugeLabels = listRefugeNodes(scenarioMap).map((refuge) => ({
       id: `refuge:${refuge.id}`,
       x: refuge.x,
-      y: 14,
+      y: sceneTerrain.groundY(refuge.x, refuge.z) + 14,
       z: refuge.z,
       text: refuge.label ?? "Refuge",
       variant: "refuge" as const,
@@ -77,7 +81,7 @@ export function SceneView({
       return {
         id: `site:${site.id}`,
         x: site.position.x,
-        y: 18,
+        y: sceneTerrain.groundY(site.position.x, site.position.z) + 18,
         z: site.position.z,
         text: `${site.name} — ${siteProtectionStatusLabel(site.protectionStatus)}${damageLabel ? `, ${damageLabel}` : ""}${site.stale ? " (stale)" : ""}`,
         variant: "site" as const,
@@ -86,12 +90,34 @@ export function SceneView({
     const agentLabels = entities.agents.map((agent) => ({
       id: `agent:${agent.id}`,
       x: agent.position.x,
-      y: 22,
+      y: sceneTerrain.groundY(agent.position.x, agent.position.z) + 22,
       z: agent.position.z,
       text: agent.callsign,
       variant: "agent" as const,
     }));
-    return [...refugeLabels, ...siteLabels, ...agentLabels];
+    const routeLabels = entities.routes.map((line) => {
+      const mid = polylineMidpoint(line.points);
+      return {
+        id: `route:${line.key}`,
+        x: mid.x,
+        y: sceneTerrain.groundY(mid.x, mid.z) + 10,
+        z: mid.z,
+        text: line.limitingReason ? `${line.label} — ${line.limitingReason}` : line.label,
+        variant: "route" as const,
+      };
+    });
+    const forecastLabels = (entities.forecast?.bands ?? []).map((band) => {
+      const mid = polylineMidpoint(band.points);
+      return {
+        id: `forecast:${band.key}`,
+        x: mid.x,
+        y: sceneTerrain.groundY(mid.x, mid.z) + 9,
+        z: mid.z,
+        text: entities.forecast?.trusted ? band.label : `${band.label} (unreliable)`,
+        variant: "forecast" as const,
+      };
+    });
+    return [...refugeLabels, ...siteLabels, ...agentLabels, ...routeLabels, ...forecastLabels];
   }, [entities]);
 
   return (
@@ -100,6 +126,8 @@ export function SceneView({
         ref={controlsRef}
         entities={entities}
         showFireCells={showFireCells}
+        showRoutes={showRoutes}
+        showForecast={showForecast}
         selectedAgentId={selectedAgentId}
         onInspectAgent={onInspectAgent}
         onInspectCell={setInspectedCell}
@@ -116,6 +144,11 @@ export function SceneView({
         ref={legendRef}
         showFireCells={showFireCells}
         onToggleFireCells={() => setShowFireCells((value) => !value)}
+        showRoutes={showRoutes}
+        onToggleRoutes={() => setShowRoutes((value) => !value)}
+        showForecast={showForecast}
+        onToggleForecast={() => setShowForecast((value) => !value)}
+        forecast={entities.forecast}
         onResetCamera={() => controlsRef.current?.reset()}
         fireCells={entities.fireCells}
         onInspectCell={setInspectedCell}

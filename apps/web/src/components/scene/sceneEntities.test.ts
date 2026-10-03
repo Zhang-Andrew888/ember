@@ -1,13 +1,17 @@
 import { describe, it, expect } from "vitest";
-import { fixtureCoordinatorView } from "../../../../../tests/fixtures/coordinator-view.fixture.js";
-import { scenarioMap } from "../../map/scenarioMap.js";
+import { fixtureCoordinatorView as rawFixture } from "../../../../../tests/fixtures/coordinator-view.fixture.js";
+import { adaptToScenarioIds } from "../../net/mockBase.js";
+import { scenarioMap } from "../../map/activeScenario.js";
 import { buildSceneEntities, listRefugeNodes } from "./sceneEntities.js";
+
+// The frozen fixture uses placeholder ids; the adapter maps it onto the real scenario.
+const fixtureCoordinatorView = adaptToScenarioIds(rawFixture);
 
 describe("components/scene/sceneEntities - listRefugeNodes", () => {
   it("returns exactly the refuge-kind nodes", () => {
     const refuges = listRefugeNodes(scenarioMap);
     expect(refuges.map((r) => r.id).sort()).toEqual(
-      ["placeholder-node-refuge-south", "placeholder-node-refuge-west"].sort(),
+      ["n-rs", "n-rw"].sort(),
     );
   });
 });
@@ -39,9 +43,9 @@ describe("components/scene/sceneEntities - buildSceneEntities", () => {
   });
 
   it("carries gridCellIndex/lastObservedAt through for inspection", () => {
-    const freshCell = entities.fireCells.find((c) => c.gridCellIndex === 1203);
+    const freshCell = entities.fireCells.find((c) => c.gridCellIndex === 2891);
     expect(freshCell).toMatchObject({
-      gridCellIndex: 1203,
+      gridCellIndex: 2891,
       lastObservedAt: 85_000,
       stale: false,
     });

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { replayLog } from "../net/replayLog.js";
 import { buildSceneEntities } from "./scene/sceneEntities.js";
-import { scenarioMap } from "../map/scenarioMap.js";
+import { scenarioMap } from "../map/activeScenario.js";
 import { SceneView } from "./scene/SceneView.js";
 import { AgentRail } from "./AgentRail.js";
 import { UrgentStrip } from "./UrgentStrip.js";

@@ -1,5 +1,6 @@
 import { DoubleSide } from "three";
 import type { SiteMarker } from "./sceneEntities.js";
+import { sceneTerrain } from "./terrain/sceneTerrain.js";
 import type { SceneNode } from "../../map/scenarioMap.js";
 import { colors } from "../../styles/colors.js";
 
@@ -18,7 +19,7 @@ export function SiteMarkers({ sites }: { readonly sites: SiteMarker[] }) {
   return (
     <group>
       {sites.map((site) => (
-        <group key={site.id} position={[site.position.x, MARKER_Y, site.position.z]}>
+        <group key={site.id} position={[site.position.x, sceneTerrain.groundY(site.position.x, site.position.z) + MARKER_Y, site.position.z]}>
           <mesh>
             <cylinderGeometry args={[9, 9, 10, 10]} />
             <meshStandardMaterial
@@ -44,7 +45,7 @@ export function RefugeMarkers({ refuges }: { readonly refuges: SceneNode[] }) {
   return (
     <group>
       {refuges.map((refuge) => (
-        <mesh key={refuge.id} position={[refuge.x, MARKER_Y, refuge.z]}>
+        <mesh key={refuge.id} position={[refuge.x, sceneTerrain.groundY(refuge.x, refuge.z) + MARKER_Y, refuge.z]}>
           <cylinderGeometry args={[11, 11, 4, 16]} />
           <meshStandardMaterial color={colors.refuge} />
         </mesh>
