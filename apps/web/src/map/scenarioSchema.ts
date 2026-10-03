@@ -47,6 +47,8 @@ export const ScenarioFile = z
       initialFireCells: z.array(z.number().int().nonnegative()),
     }),
     terrain: ScenarioTerrain.optional(),
+    /** Public roster for the briefing screen; only the callsign is kept. */
+    agents: z.array(z.object({ callsign: z.string().min(1) })).default([]),
   })
   .superRefine((file, ctx) => {
     const nodeIds = new Set(file.map.nodes.map((node) => node.id as string));

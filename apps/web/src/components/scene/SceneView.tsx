@@ -111,7 +111,7 @@ export function SceneView({
         x: site.position.x,
         y: sceneTerrain.groundY(site.position.x, site.position.z) + 40,
         z: site.position.z,
-        text: `${site.name} — ${siteProtectionStatusLabel(site.protectionStatus)}${damageLabel ? `, ${damageLabel}` : ""}${fresh.stale && site.ageMs !== null ? ` (stale, ${fresh.ageLabel})` : ""}`,
+        text: `${site.name} — ${siteProtectionStatusLabel(site.protectionStatus)}${damageLabel ? `, ${damageLabel}` : ""}${fresh.stale && site.ageMs !== null ? ` (${fresh.ageLabel})` : ""}`,
         variant: "site" as const,
         stale: fresh.stale && site.ageMs !== null,
       };

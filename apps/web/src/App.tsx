@@ -24,6 +24,7 @@ import { createSpeechPlaybackStub } from "./state/speechPlaybackStub.js";
 import { useSpeechPlaybackStub } from "./state/useSpeechPlaybackStub.js";
 import { buildConversationTranscript } from "./conversation/transcript.js";
 import { buildSceneEntities } from "./components/scene/sceneEntities.js";
+import { briefingContent } from "./briefing/briefingInfo.js";
 import { scenarioMap } from "./map/activeScenario.js";
 import { latestUrgentReport } from "./format/reports.js";
 import { isDemoMode } from "./demo/demoMode.js";
@@ -293,6 +294,7 @@ export function App() {
       <Briefing
         onStart={handleStart}
         starting={starting}
+        content={briefingContent(scenarioMap, IS_MOCK_MODE)}
         demoMode={demoMode}
         transportMode={TRANSPORT_MODE}
         error={startError}

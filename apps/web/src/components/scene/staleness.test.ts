@@ -12,7 +12,7 @@ describe("freshness", () => {
     expect(f.stale).toBe(true);
     expect(f.opacity).toBeLessThan(1);
     expect(f.opacity).toBeGreaterThan(0.95);
-    expect(f.ageLabel).toBe("seen 0:31 ago");
+    expect(f.ageLabel).toBe("last seen 0:31 ago");
   });
 
   it("fades monotonically with age and bottoms out at MIN_OPACITY", () => {
