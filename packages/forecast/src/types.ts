@@ -29,6 +29,8 @@ export interface ParameterRanges {
 }
 
 export interface ForecastEnsemble {
+  /** Monotonically increasing for each newly published state of one forecast service. */
+  readonly version: number;
   readonly inputHash: string;
   readonly knowledgeRevision: number;
   /** Supported members. Empty whenever the forecast is unreliable. */

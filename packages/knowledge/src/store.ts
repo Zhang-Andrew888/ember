@@ -31,6 +31,18 @@ export interface SiteBelief {
   readonly sourceAgentId: AgentId;
 }
 
+export type ContradictionKind = "clear_overturned" | "equal_time_conflict";
+
+/** New evidence that disagrees with what this store believed. The cell stays closed afterwards. */
+export interface Contradiction {
+  readonly cell: number;
+  readonly kind: ContradictionKind;
+  /** The earlier belief that was overturned (or, for equal-time conflicts, the lower observation id). */
+  readonly overturnedObservationId: string;
+  readonly byObservationId: string;
+  readonly byObservedAt: SimTimeMs;
+}
+
 interface Entry {
   readonly observation: Observation;
   readonly provenance: Provenance;
@@ -49,6 +61,8 @@ export class KnowledgeStore {
   private readonly cells = new Map<number, CellBelief>();
   private readonly sites = new Map<SiteId, SiteBelief>();
   private readonly closed = new Set<number>();
+  private readonly contradictionList: Contradiction[] = [];
+  private readonly contradictionKeys = new Set<string>();
   private rev = 0;
   /** Order-independent running digest of every entry, updated in O(1) per ingest. */
   private readonly digest = [0, 0, 0, 0];
@@ -105,6 +119,7 @@ export class KnowledgeStore {
     const cell = field.gridCellIndex;
     if (field.burnState !== "unburned") this.closed.add(cell);
     const prev = this.cells.get(cell);
+    if (prev !== undefined) this.noteContradiction(prev, observation, field.burnState);
     const next: CellBelief = {
       cell,
       state: field.burnState,
@@ -126,6 +141,62 @@ export class KnowledgeStore {
         this.cells.set(cell, { ...next, conflict: prev.conflict });
       }
     }
+  }
+
+  private noteContradiction(prev: CellBelief, observation: Observation, state: BurnState): void {
+    let kind: ContradictionKind;
+    let overturned: string;
+    let by: string;
+    if (prev.state === "unburned" && state !== "unburned" && observation.observedAt > prev.observedAt) {
+      kind = "clear_overturned";
+      overturned = prev.observationId;
+      by = observation.id;
+    } else if (prev.state !== state && observation.observedAt === prev.observedAt) {
+      // Canonical pair order so arrival order never changes the record.
+      kind = "equal_time_conflict";
+      [overturned, by] = prev.observationId < observation.id ? [prev.observationId, observation.id] : [observation.id, prev.observationId];
+    } else {
+      return;
+    }
+    const key = `${kind}:${prev.cell}:${overturned}:${by}`;
+    if (this.contradictionKeys.has(key)) return;
+    this.contradictionKeys.add(key);
+    this.contradictionList.push({ cell: prev.cell, kind, overturnedObservationId: overturned, byObservationId: by, byObservedAt: observation.observedAt });
+  }
+
+  /** Every contradiction seen so far, in the order detected. */
+  contradictions(): readonly Contradiction[] {
+    return this.contradictionList;
+  }
+
+  /** Cells whose clear belief was contradicted: a hint that forecasts built on older evidence need rebuilding. */
+  contradictedCells(): number[] {
+    return [...new Set(this.contradictionList.map((c) => c.cell))].sort((a, b) => a - b);
+  }
+
+  /** Beliefs older than the stale limit. They are history, never present truth, and are not erased. */
+  staleBeliefs(now: SimTimeMs): { cells: CellBelief[]; sites: SiteBelief[] } {
+    return {
+      cells: this.cellBeliefs().filter((b) => this.isStale(b, now)),
+      sites: this.siteBeliefs().filter((b) => this.isStale(b, now)),
+    };
+  }
+
+  /** Age of a belief or observation in simulated ms; never negative. */
+  ageMs(item: { readonly observedAt: SimTimeMs }, now: SimTimeMs): number {
+    return Math.max(0, now - item.observedAt);
+  }
+
+  /**
+   * True when no field of this observation is the store's current word on its cell or site (an
+   * observation with no fields carries nothing, so it counts as superseded too).
+   */
+  isSuperseded(observation: Observation): boolean {
+    for (const f of observation.observedFields) {
+      const current = f.kind === "site" ? this.sites.get(f.siteId) : this.cells.get(f.gridCellIndex);
+      if (current === undefined || current.observationId === observation.id) return false;
+    }
+    return true;
   }
 
   cellBelief(cell: number): CellBelief | undefined {
