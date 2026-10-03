@@ -88,7 +88,11 @@ export class KnowledgeStore {
   private apply(observation: Observation, provenance: Provenance, field: ObservedField): void {
     if (field.kind === "site") {
       const prev = this.sites.get(field.siteId);
-      if (prev !== undefined && prev.observedAt > observation.observedAt) return;
+      if (prev !== undefined) {
+        // Equal observation times resolve by observation id so arrival order never changes the belief.
+        if (prev.observedAt > observation.observedAt) return;
+        if (prev.observedAt === observation.observedAt && prev.observationId > observation.id) return;
+      }
       this.sites.set(field.siteId, {
         siteId: field.siteId,
         completedWork: field.completedWork,

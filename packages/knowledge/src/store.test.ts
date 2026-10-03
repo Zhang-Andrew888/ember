@@ -124,6 +124,23 @@ describe("knowledge/KnowledgeStore", () => {
     expect(store.siteBelief(site)?.completedWork).toBe(50);
   });
 
+  it("resolves equal-time site observations the same way in either arrival order", () => {
+    const site = SiteId.parse("site-a");
+    const siteObs = (id: string, work: number): Observation => ({
+      ...obs(id, crew, 3000, []),
+      observedFields: [
+        { kind: "site", siteId: site, completedWork: WorkUnits.parse(work), damage: 0, destroyed: false },
+      ],
+    });
+    const a = new KnowledgeStore(crew);
+    a.ingest(siteObs("s1", 10));
+    a.ingest(siteObs("s2", 20));
+    const b = new KnowledgeStore(crew);
+    b.ingest(siteObs("s2", 20));
+    b.ingest(siteObs("s1", 10));
+    expect(a.siteBelief(site)?.completedWork).toBe(b.siteBelief(site)?.completedWork);
+  });
+
   it("ignores non-grid cell fields but retains them in history", () => {
     const store = new KnowledgeStore(crew);
     const o = obs("o1", crew, 1000, []);
