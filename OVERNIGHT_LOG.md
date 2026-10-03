@@ -343,3 +343,62 @@ copy-paste; the original apps/web backlog (product-critical UI states,
 accessibility, render performance, conversation UI, replay/debrief, test
 coverage, all fixture/mock-driven, verified not just typechecked) is what
 this session should run, until 10:00 ET. Resuming it now.
+
+## 2026-10-03 07:4x-07:5x UTC (03:4x-03:5x ET) - backlog item 1: product-critical UI states
+
+Three commits, each independently verified (unit tests + live Playwright,
+not just typechecked):
+
+1. **`9cc030b`** - a real correctness bug, found while designing the
+   contradiction scenario below rather than by accident this time:
+   `buildSceneEntities` rendered every entry in `observedCells` as its own
+   marker, with no resolution when two entries share an edgeId+cellIndex
+   (a contradiction - an old report conflicting with a fresher one). Now
+   keeps only the freshest (`lastObservedAt`) entry per cell, matching
+   docs/ARCHITECTURE.md ("fresh local hazard controls planning"). Two
+   tests, including an order-independence check.
+2. **`92b1df8`** - extracted `format/endReason.ts` out of `EndOverlay.tsx`
+   (was an inline untested `Record`) and added two new opt-in
+   `mockIncidentSocket` behaviors, `failToOpen` and `disconnectAfterMs`,
+   for the connection-state scenarios below. Four new tests.
+3. **`3c4b4c8`** - the scenario content itself: `net/scenarios.ts`
+   (empty / stale-contradiction / one-per-EndReason views, all built from
+   the fixture's shape, fixture itself untouched) and
+   `net/scenarioSelection.ts` (pure `?scenario=<name>` query resolver,
+   returns `null` - falls through to the normal demo - for anything it
+   doesn't recognize, so it can't affect default behavior). Wired into
+   `App.tsx`'s mock-socket factory, mock mode only. 16 new tests between
+   the two files.
+
+**Bug caught by actually using the scenario, not just writing it:**
+`failToOpen` fired `onerror` then `onclose` in the same synchronous
+`setTimeout` callback. React batches synchronous state updates from the
+same tick into one commit, so the "error" connection status was computed
+internally but never actually painted to the DOM - dead code with a
+passing unit test (the test only checked call counts, not paint timing).
+Caught by polling the live status text every 10ms after triggering
+`?scenario=connection-error` and seeing it jump straight from
+"Connecting…" to "Disconnected — reconnecting"; fixed by separating the
+two events by 50ms (also just more realistic - a real WebSocket failure
+has a gap between error and close too). Re-verified live: the status text
+now shows "Connection error — reconnecting" for a real, visible window,
+then cycles through closed → connecting → error realistically on repeated
+failed reconnects.
+
+**All 8 scenarios verified live** (`empty`, `stale-contradiction`, the 4
+`ended-*` reasons, `connection-error`, `disconnect`): zero page errors on
+any of them; screenshots confirm each renders its intended state - empty
+shows no markers/no crash with a genuinely empty agent rail; the
+contradiction scenario shows exactly one marker at the contested cell,
+using the fresher data, while the other unrelated stale/fresh cells are
+unaffected; each ended reason shows the correct debrief sentence, a
+dimmed and non-interactive background, and (for all_protection_crews_lost
+specifically) crews marked "Lost" with the scout still "Approaching".
+
+**Status:** typecheck/lint/test green locally and in CI for every commit
+in this batch (verified via the GitHub Actions API after each push, not
+assumed). 108 web-lane tests as of `3c4b4c8`.
+
+**Next:** backlog item 2, accessibility (keyboard nav, focus order,
+visible focus, ARIA labels, reduced-motion - already partly covered
+earlier but not yet systematically audited - and non-color cues).
