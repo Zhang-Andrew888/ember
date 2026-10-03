@@ -7,8 +7,10 @@ import { createMockIncidentSocket, type MockIncidentSocket } from "./net/mockInc
 import { resolveScenario } from "./net/scenarioSelection.js";
 import {
   createIncident,
+  fetchIncidentReplay,
   resolveWebSocketUrl,
   startIncident,
+  type IncidentReplayRecording,
 } from "./net/incidentRestClient.js";
 import { newCommandId } from "./net/commandId.js";
 import { planStart, START_FAILED_MESSAGE } from "./net/startPlan.js";
@@ -31,7 +33,7 @@ import { ConversationPanel } from "./components/ConversationPanel.js";
 import { UrgentStrip } from "./components/UrgentStrip.js";
 import { AgentRail } from "./components/AgentRail.js";
 import { EndOverlay } from "./components/EndOverlay.js";
-import { ReplayView } from "./components/ReplayView.js";
+import { ReplayView, type ReplaySource } from "./components/ReplayView.js";
 import { ConnectionBanner } from "./components/ConnectionBanner.js";
 import { DemoBanner } from "./components/DemoBanner.js";
 import { playPreparedSpeech } from "./net/grokSpeechPlayback.js";
@@ -60,6 +62,10 @@ export function App() {
   const [startError, setStartError] = useState<string | null>(null);
   const [client, setClient] = useState<CoordinatorViewClient | null>(null);
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
+  const [replaySource, setReplaySource] = useState<ReplaySource>("illustrative");
+  const [replayRecording, setReplayRecording] = useState<IncidentReplayRecording | null>(null);
+  const [replayLoading, setReplayLoading] = useState(false);
+  const [replayError, setReplayError] = useState<string | null>(null);
   const mockSocketRef = useRef<MockIncidentSocket | null>(null);
   const protocolSocketRef = useRef<ProtocolWebSocket | null>(null);
   const liveSessionRef = useRef<{ incidentId: string; token: string } | null>(null);
@@ -173,7 +179,38 @@ export function App() {
     window.location.reload();
   }, []);
 
-  const handleReplay = useCallback(() => setPhase("replay"), []);
+  const replayOffer = IS_MOCK_MODE ? "illustrative" : HAS_LIVE_REST ? "this-run" : "none";
+
+  const handleReplay = useCallback(async () => {
+    setReplayError(null);
+    if (IS_MOCK_MODE) {
+      setReplaySource("illustrative");
+      setReplayRecording(null);
+      setPhase("replay");
+      return;
+    }
+    const incidentId = liveSessionRef.current?.incidentId ?? INCIDENT_ID;
+    const token = liveSessionRef.current?.token ?? INCIDENT_TOKEN;
+    if (!HAS_LIVE_REST || token === undefined) {
+      setReplayError("Replay is not available for this session.");
+      return;
+    }
+    setReplayLoading(true);
+    const result = await fetchIncidentReplay(REST_BASE_URL ?? "", incidentId, token);
+    setReplayLoading(false);
+    if (result.status === "ok") {
+      setReplaySource("incident");
+      setReplayRecording(result.recording);
+      setPhase("replay");
+      return;
+    }
+    setReplayError(
+      result.status === "active"
+        ? "This run is still active; replay unlocks when the incident ends."
+        : "Could not load replay for this run.",
+    );
+  }, []);
+
   const handleExitReplay = useCallback(() => setPhase("live"), []);
 
   const dispatchSay = useCallback(
@@ -259,7 +296,13 @@ export function App() {
   }
 
   if (phase === "replay") {
-    return <ReplayView onExit={handleExitReplay} />;
+    return (
+      <ReplayView
+        onExit={handleExitReplay}
+        source={replaySource}
+        {...(replayRecording === null ? {} : { recording: replayRecording })}
+      />
+    );
   }
 
   const hasEnded = Boolean(view?.incidentEnd);
@@ -310,7 +353,16 @@ export function App() {
         />
       </div>
       {view?.incidentEnd ? (
-        <EndOverlay incidentEnd={view.incidentEnd} onStartAgain={handleStartAgain} onReplay={handleReplay} />
+        <EndOverlay
+          incidentEnd={view.incidentEnd}
+          onStartAgain={handleStartAgain}
+          onReplay={() => {
+            void handleReplay();
+          }}
+          replayOffer={replayOffer}
+          replayLoading={replayLoading}
+          replayError={replayError}
+        />
       ) : null}
     </div>
   );

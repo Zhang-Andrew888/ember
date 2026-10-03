@@ -2,6 +2,7 @@ import { WebSocketServer } from "ws";
 import { ConversationBridge } from "./conversation.js";
 import { LiveRun, SessionHub, type ClientId } from "./hub.js";
 import { IncidentSession, type SessionOptions } from "./session.js";
+import { ViewRecorder } from "./view-recorder.js";
 
 export interface ServerHandle {
   readonly port: number;
@@ -23,7 +24,7 @@ const MAX_MESSAGE_BYTES = 64 * 1024;
 export async function startServer(options: SessionOptions & { port?: number }): Promise<ServerHandle> {
   const session = new IncidentSession(options);
   const bridge = new ConversationBridge(session);
-  const hub = new SessionHub(session, bridge);
+  const hub = new SessionHub(session, bridge, new ViewRecorder());
   const live = new LiveRun(session, bridge, hub, { nowMs: () => performance.now() });
   const wss = new WebSocketServer({ port: options.port ?? 0, host: "127.0.0.1", maxPayload: MAX_MESSAGE_BYTES });
   await new Promise<void>((resolve) => wss.on("listening", resolve));

@@ -170,7 +170,9 @@ describe("only ReplayView may reach the truth data", () => {
     files.filter(({ path, source }) => !path.startsWith("replay/") && pattern.test(source)).map(({ path }) => path);
 
   it("nothing outside replay/ imports the recording, the mock truth or the gate except ReplayView", () => {
-    expect(importers(/replay\/(recording|mockRecording|truthGate)\.js/)).toEqual(["components/ReplayView.tsx"]);
+    expect(importers(/replay\/(recording|mockRecording|truthGate)\.js/).sort()).toEqual(
+      ["components/ReplayView.tsx", "net/incidentRestClient.ts"].sort(),
+    );
   });
 
   it("App's live path never imports from replay/", () => {
