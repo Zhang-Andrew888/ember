@@ -54,8 +54,10 @@ describe("evaluation harness", () => {
 
   it("logs every relay and never relays an agent's own observation back to it", () => {
     const r = runVariant({ variant: "ember_line", seed: "dev-5", untilMs: 400_000 });
-    expect(r.bundle.policyLog).toHaveLength(r.metrics.relays);
-    expect(r.bundle.policy).toEqual({ name: "scripted-relay", version: "1" });
+    // The log lists relays issued; the metric counts those applied. A relay issued on the very last step is never applied.
+    expect(r.bundle.policyLog.length - r.metrics.relays).toBeGreaterThanOrEqual(0);
+    expect(r.bundle.policyLog.length - r.metrics.relays).toBeLessThanOrEqual(1);
+    expect(r.bundle.policy).toEqual({ name: "scripted-relay", version: "2" });
     for (const relay of r.relays) {
       expect(relay.observationId.startsWith(`obs:${relay.toAgentId}:`)).toBe(false);
       expect(relay.tick % 1000).toBe(0);

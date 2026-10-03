@@ -71,7 +71,8 @@ export function computeMetrics(input: MetricsInput): RunMetrics {
       protectionComplete: s.completedWork >= required,
     };
   });
-  const accepted = new Map<string, { agentId: string; mode: string; hasWork: boolean }>();
+  const roleOf = (id: string): string => incident.scenario.agents.find((a) => a.id === id)?.role ?? "";
+  const accepted = new Map<string, { agentId: string; mode: string; hasWork: boolean; legCount: number }>();
   let started = 0;
   let returned = 0;
   let lostBefore = 0;
@@ -79,19 +80,21 @@ export function computeMetrics(input: MetricsInput): RunMetrics {
   let interrupted = 0;
   for (const n of incident.notices) {
     if (n.kind === "plan_accepted") {
-      accepted.set(n.planId, { agentId: n.agentId, mode: n.mode, hasWork: n.hasWork });
-      if (n.hasWork && n.mode === "normal") started += 1;
+      accepted.set(n.planId, { agentId: n.agentId, mode: n.mode, hasWork: n.hasWork, legCount: n.legCount });
+      if (n.hasWork && n.mode === "normal" && roleOf(n.agentId) === "protection_crew") started += 1;
     } else if (n.kind === "plan_complete") {
+      // Every plan ends at a refuge, so a completed plan with legs is a completed return, whether
+      // it was a mission's own return, a withdrawal, a retreat or a plain return order.
       const a = accepted.get(n.planId);
-      if (a !== undefined && a.hasWork) returned += 1;
+      if (a !== undefined && a.legCount > 0 && roleOf(a.agentId) === "protection_crew") returned += 1;
     } else if (n.kind === "plan_cancelled") {
       const a = accepted.get(n.planId);
-      if (a === undefined || !a.hasWork) continue;
-      if (n.reason === "superseded") superseded += 1;
-      if (n.reason === "agent_lost") lostBefore += 1;
+      if (a === undefined || roleOf(a.agentId) !== "protection_crew") continue;
+      if (n.reason === "superseded" && a.hasWork) superseded += 1;
+      if (n.reason === "agent_lost" && a.legCount > 0) lostBefore += 1;
     } else if (n.kind === "plan_interrupted_by_end") {
       const a = accepted.get(n.planId);
-      if (a?.hasWork === true) interrupted += 1;
+      if (a !== undefined && a.legCount > 0 && roleOf(a.agentId) === "protection_crew") interrupted += 1;
     }
   }
   let stranded = 0;
@@ -109,7 +112,6 @@ export function computeMetrics(input: MetricsInput): RunMetrics {
   }
   const count = (type: string): number => decisions.filter((d) => d.type === type).length;
   const agents = truth.agents;
-  const roleOf = (id: string): string => incident.scenario.agents.find((a) => a.id === id)?.role ?? "";
   return {
     seed: incident.seed,
     scenarioVersion: incident.scenario.version,

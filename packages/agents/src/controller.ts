@@ -358,7 +358,14 @@ export class CrewController implements AgentController {
 
   // ---------- survival responses ----------
 
-  private withdraw(reason: string, proj: AgentProjection, ctx: PlanningContext, out: TickOutput): void {
+  /** The same planning context, but seeing reservations from this priority class's point of view. */
+  private asClass(ctx: PlanningContext, cls: PriorityClass): PlanningContext {
+    const hooks = this.lastEnv.reservations;
+    return hooks === undefined ? ctx : { ...ctx, oracle: hooks.oracle(this.agentId, cls, ctx.nowMs) };
+  }
+
+  private withdraw(reason: string, proj: AgentProjection, ctx0: PlanningContext, out: TickOutput): void {
+    const ctx = this.asClass(ctx0, "emergency");
     const ret = planReturn(ctx);
     if (ret !== null && this.commit(proj, ret.plan, "withdrawing", "emergency", null, null, 0, out)) {
       this.decide(out, proj, "withdrawal_triggered", reason, `withdrawing to ${ret.refugeNodeId}`);
@@ -368,7 +375,8 @@ export class CrewController implements AgentController {
     this.retreatOrStrand(reason, proj, ctx, out);
   }
 
-  private returnNow(reason: string, proj: AgentProjection, ctx: PlanningContext, out: TickOutput): void {
+  private returnNow(reason: string, proj: AgentProjection, ctx0: PlanningContext, out: TickOutput): void {
+    const ctx = this.asClass(ctx0, "return");
     const ret = planReturn(ctx);
     if (ret !== null && this.commit(proj, ret.plan, "normal", "return", null, null, 0, out)) {
       this.decide(out, proj, "mission_update", reason, `returning to ${ret.refugeNodeId}`);
@@ -378,11 +386,12 @@ export class CrewController implements AgentController {
     this.retreatOrStrand("no_normal_return", proj, ctx, out);
   }
 
-  private replanEmergency(reason: string, proj: AgentProjection, ctx: PlanningContext, out: TickOutput, wasNormal: boolean): void {
+  private replanEmergency(reason: string, proj: AgentProjection, ctx0: PlanningContext, out: TickOutput, wasNormal: boolean): void {
     if (wasNormal) {
-      this.withdraw(reason, proj, ctx, out);
+      this.withdraw(reason, proj, ctx0, out);
       return;
     }
+    const ctx = this.asClass(ctx0, "emergency");
     const ret = planReturn(ctx);
     if (ret !== null && this.commit(proj, ret.plan, "withdrawing", "emergency", null, null, 0, out)) {
       this.decide(out, proj, "withdrawal_triggered", reason, `withdrawing to ${ret.refugeNodeId}`);

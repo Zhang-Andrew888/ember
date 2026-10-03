@@ -92,7 +92,7 @@ export interface TruthSite {
 }
 
 export type SimNotice =
-  | { tick: number; kind: "plan_accepted"; agentId: AgentId; planId: string; mode: PlanMode; hasWork: boolean }
+  | { tick: number; kind: "plan_accepted"; agentId: AgentId; planId: string; mode: PlanMode; hasWork: boolean; legCount: number }
   | { tick: number; kind: "plan_rejected"; agentId: AgentId; reason: string }
   | { tick: number; kind: "plan_cancelled"; agentId: AgentId; planId: string; reason: string }
   | { tick: number; kind: "plan_complete"; agentId: AgentId; planId: string }
@@ -246,7 +246,7 @@ export class World {
     agent.commitment = { plan, workSiteId, mode, legIndex: 0, approachCount, hasWork, blockedNoticed: false };
     agent.planRevision += 1;
     agent.working = false;
-    this.notices.push({ tick: this.timeMs, kind: "plan_accepted", agentId, planId: plan.id, mode, hasWork });
+    this.notices.push({ tick: this.timeMs, kind: "plan_accepted", agentId, planId: plan.id, mode, hasWork, legCount: legs.length });
     this.refreshState(agent);
     return { accepted: true, reason: null };
   }

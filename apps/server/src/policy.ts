@@ -4,7 +4,7 @@ import { RoadIndex, type PublicMap } from "@ember/simulation/model";
 import type { IncidentSession } from "./session.js";
 
 export const POLICY_NAME = "scripted-relay";
-export const POLICY_VERSION = "1";
+export const POLICY_VERSION = "2";
 const PERIOD_MS = 5000;
 
 export interface RelayLogEntry {
@@ -16,8 +16,8 @@ export interface RelayLogEntry {
 /**
  * The deterministic scripted coordinator used for every comparison run. It sees only the
  * coordinator projection (what the coordinator has received) plus the public map. Every five
- * simulated seconds it may relay at most one newest unrelayed observation relevant to an agent's
- * last reported route and site, preferring agents that are withdrawing, then stable agent id.
+ * simulated seconds it may relay at most one newest unrelayed observation (fire or clear) touching an
+ * agent's last reported route and site, preferring agents that are withdrawing, then stable agent id.
  * Each delivery uses the same addressed-relay path as a human message; it never reads truth or
  * invents facts, and it logs every relay.
  */
@@ -62,16 +62,16 @@ export class ScriptedCoordinatorPolicy {
         const wb = b.state === "withdrawing" || b.state === "retreating" ? 0 : 1;
         return wa - wb || (a.id < b.id ? -1 : 1);
       });
-    const fireObs = inc.coordinator
-      .observations()
-      .filter((o) => o.sourceAgentId !== "briefing" && o.observedFields.some((f) => f.kind === "cell" && f.burnState !== "unburned"));
+    // Anything the coordinator received that touches an agent's route is relevant: a sighting of
+    // fire, and equally a recent sighting that a road is still unburned (old ones are history).
+    const received = inc.coordinator.observations().filter((o) => o.sourceAgentId !== "briefing");
     for (const agent of agents) {
       const routeCells = this.routeCells(agent.id, view);
       if (routeCells.size === 0) continue;
       const done = this.relayed.get(agent.id) ?? new Set<string>();
-      const candidates = fireObs
+      const candidates = received
         .filter((o) => o.sourceAgentId !== agent.id && !done.has(o.id))
-        .filter((o) => o.observedFields.some((f) => f.kind === "cell" && f.edgeId === GRID_EDGE && f.burnState !== "unburned" && routeCells.has(f.cellIndex)))
+        .filter((o) => o.observedFields.some((f) => f.kind === "cell" && f.edgeId === GRID_EDGE && routeCells.has(f.cellIndex)))
         .sort((a, b) => b.observedAt - a.observedAt || (a.id < b.id ? -1 : 1));
       const pick = candidates[0];
       if (pick === undefined) continue;
