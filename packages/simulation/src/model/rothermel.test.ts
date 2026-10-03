@@ -1,5 +1,6 @@
 import { createTerrain } from "./terrain.js";
-import { spreadRate } from "./fire.js";
+import { FireField, rothermelGain, spreadRate } from "./fire.js";
+import { SIM_DEFAULTS } from "./constants.js";
 import { describe, expect, it } from "vitest";
 import {
   FUEL_GRASS,
@@ -7,6 +8,9 @@ import {
   FUEL_SHRUB,
   FUEL_TIMBER,
   ellipseEccentricity,
+  firelineIntensityKwM,
+  flameLengthM,
+  reactionIntensity,
   ellipseFactor,
   noWindRateFtMin,
   rothermelPhiS,
@@ -38,9 +42,9 @@ describe("model/rothermel", () => {
   });
 
   it("builds an ellipse that is a circle in calm air and elongates with wind", () => {
-    expect(ellipseEccentricity(0)).toBe(0);
+    expect(ellipseEccentricity(0, 2)).toBe(0);
     expect(ellipseFactor(0, -1)).toBe(1);
-    const e = ellipseEccentricity(5);
+    const e = ellipseEccentricity(5, 2);
     expect(e).toBeGreaterThan(0.5);
     expect(ellipseFactor(e, 1)).toBe(1);
     expect(ellipseFactor(e, -1)).toBeLessThan(ellipseFactor(e, 0));
@@ -61,5 +65,42 @@ describe("model/rothermel", () => {
     const wet = spreadRate({ ...p, moisture: 0.12 }, 0, east, 1, 0);
     expect(wet).toBeLessThan(dry);
     expect(spreadRate(p, 0, east, 1, 5)).toBeGreaterThan(spreadRate(p, 0, east, 1, 0));
+  });
+
+  it("derives the game gain so the reference head fire runs at referenceHeadRateMps", () => {
+    const east = { dx: 1, dy: 0, dist: 25, ux: 1, uy: 0 };
+    const p = { spreadMultiplier: 1, initialWindRad: 0, windShiftMs: Infinity, postShiftWindRad: 0 };
+    expect(spreadRate(p, 0, east, 1, 0)).toBeCloseTo(SIM_DEFAULTS.referenceHeadRateMps, 9);
+    expect(rothermelGain()).toBeGreaterThan(1);
+    expect(rothermelGain()).toBeLessThan(1.5);
+  });
+
+  it("computes fireline intensity that rises with spread rate and falls with moisture", () => {
+    expect(reactionIntensity(shrub, 0.05)).toBeGreaterThan(reactionIntensity(shrub, 0.12));
+    const slow = firelineIntensityKwM(shrub, 0.08, 0.2);
+    const fast = firelineIntensityKwM(shrub, 0.08, 1.0);
+    expect(slow).toBeGreaterThan(0);
+    expect(fast / slow).toBeCloseTo(5, 6);
+    expect(firelineIntensityKwM(shrub, 0.08, 0)).toBe(0);
+    expect(firelineIntensityKwM(shrub, 0.12, 1.0)).toBeLessThan(fast);
+  });
+
+  it("gives plausible flame lengths for game-scale intensity, monotone in intensity", () => {
+    expect(flameLengthM(0)).toBe(0);
+    expect(flameLengthM(1000)).toBeGreaterThan(flameLengthM(100));
+    // Byram: 1000 kW/m is a flame a few meters long.
+    expect(flameLengthM(1000)).toBeGreaterThan(1);
+    expect(flameLengthM(1000)).toBeLessThan(5);
+  });
+
+  it("reports the head intensity of a burning cell, higher under faster spread", () => {
+    const terrain = createTerrain("intensity");
+    const field = new FireField(terrain, new Set());
+    const p = { spreadMultiplier: 1, initialWindRad: 0, windShiftMs: Infinity, postShiftWindRad: 0 };
+    const cell = 32 * 64 + 32;
+    const base = field.headIntensityKwM(cell, p, 0);
+    expect(base).toBeGreaterThan(0);
+    expect(field.headIntensityKwM(cell, { ...p, spreadMultiplier: 1.5 }, 0)).toBeGreaterThan(base);
+    expect(field.headIntensityKwM(cell, { ...p, moisture: 0.14 }, 0)).toBeLessThan(base);
   });
 });

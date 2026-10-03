@@ -3,6 +3,7 @@ import {
   FUEL_MODELS,
   FUEL_SHRUB,
   ellipseEccentricity,
+  firelineIntensityKwM,
   ellipseFactor,
   noWindRateFtMin,
   rothermelPhiS,
@@ -65,6 +66,17 @@ export function relativeNoWindRate(model: number, moisture: number): number {
   return noWindRateFtMin(FUEL_MODELS[model]!, moisture) / REFERENCE_R0;
 }
 
+/**
+ * Scale from the Rothermel rate to game meters per second. It is derived, not hand-set: the reference
+ * head fire (shrub, reference moisture, effective wind, flat, multiplier 1) must run at
+ * SIM_DEFAULTS.referenceHeadRateMps. The head ellipse factor is 1, so that rate is
+ * baseSpreadRate * gain * (1 + phi_w).
+ */
+export function rothermelGain(): number {
+  const phiW = rothermelPhiW(FUEL_MODELS[FUEL_SHRUB]!, SIM_DEFAULTS.windSpeedMps);
+  return SIM_DEFAULTS.referenceHeadRateMps / (SIM_DEFAULTS.baseSpreadRate * (1 + phiW));
+}
+
 export function spreadRate(
   params: FireParams,
   windRad: number,
@@ -79,10 +91,10 @@ export function spreadRate(
   const cosTheta = Math.cos(windRad) * neighbor.ux + Math.sin(windRad) * neighbor.uy;
   const run = neighbor.dist;
   const slope = Math.max(-SIM_DEFAULTS.slopeClamp, Math.min(SIM_DEFAULTS.slopeClamp, rise / run));
-  const wind = ellipseFactor(ellipseEccentricity(windMps), cosTheta) * (1 + rothermelPhiW(fm, windMps));
+  const wind = ellipseFactor(ellipseEccentricity(windMps, SIM_DEFAULTS.ellipseWindFactor), cosTheta) * (1 + rothermelPhiW(fm, windMps));
   const raw =
     SIM_DEFAULTS.baseSpreadRate *
-    SIM_DEFAULTS.rothermelGain *
+    rothermelGain() *
     params.spreadMultiplier *
     targetFuel *
     relativeNoWindRate(model, moisture) *
@@ -185,11 +197,11 @@ export class FireField {
     const wind = windDirectionAt(params, toMs);
     const dtSec = dtMs / 1000;
     const stat = staticFactors(this.terrain);
-    const baseRate = SIM_DEFAULTS.baseSpreadRate * SIM_DEFAULTS.rothermelGain * params.spreadMultiplier;
+    const baseRate = SIM_DEFAULTS.baseSpreadRate * rothermelGain() * params.spreadMultiplier;
     const [rateLo, rateHi] = SIM_DEFAULTS.spreadRateClamp;
     const windMps = params.windSpeedMps ?? SIM_DEFAULTS.windSpeedMps;
     const moisture = params.moisture ?? SIM_DEFAULTS.fuelMoisture;
-    const ecc = ellipseEccentricity(windMps);
+    const ecc = ellipseEccentricity(windMps, SIM_DEFAULTS.ellipseWindFactor);
     // Per fuel model: relative R0 and per direction (1 + phi_w) times the ellipse factor.
     const modelCount = FUEL_MODELS.length;
     const r0Rel = new Float64Array(modelCount);
@@ -233,6 +245,18 @@ export class FireField {
       this.burning.push(target);
     }
     return reached;
+  }
+
+  /**
+   * Head-fire fireline intensity in kW/m at a cell: the wind-aligned flat-ground spread rate through the
+   * same game spread function, with the cell's own fuel. Game-scale; used by crown fire and spotting rules.
+   */
+  headIntensityKwM(cell: number, params: FireParams, tMs: number): number {
+    const wind = windDirectionAt(params, tMs);
+    const head: Neighbor = { dx: 1, dy: 0, dist: CELL, ux: Math.cos(wind), uy: Math.sin(wind) };
+    const model = this.terrain.fuelModel[cell]!;
+    const rate = spreadRate(params, wind, head, this.terrain.fuel[cell]!, 0, model);
+    return firelineIntensityKwM(FUEL_MODELS[model]!, params.moisture ?? SIM_DEFAULTS.fuelMoisture, rate);
   }
 
   clone(): FireField {
