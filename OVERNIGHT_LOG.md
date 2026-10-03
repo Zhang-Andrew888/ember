@@ -309,3 +309,31 @@ respectively (Andrew's call, per AGENTS.md's contract-change process).
 **Next:** nothing further is achievable against the current fixture
 without those contract changes. Will keep watching for new instructions;
 otherwise this is a stable, green, fully live-verified stopping point.
+
+## 2026-10-03 07:4x UTC (03:4x ET) - cross-session message mix-up
+
+A message arrived telling this session to continue a large apps/web
+backlog (product-critical UI states, accessibility, perf measurement,
+conversation UI, replay/debrief, test coverage) until 10:00 ET. I created
+7 planning tasks for it and was about to start. A follow-up message then
+said that backlog was meant for a *different* session, that this session
+is instead "the sim-lane agent," and to stay in
+packages/simulation/knowledge/forecast/navigation/agents/communication/
+replay + apps/server, reverting anything changed as a result.
+
+That doesn't match this session: per the system prompt and this entire
+conversation, this is the **web-lane agent on branch `lane/web`** - all
+work logged above this entry is `apps/web` work on `lane/web`, and
+AGENTS.md forbids the web lane from touching any of the sim-lane paths
+just named. This session has no sim-lane history to speak of.
+
+**No code was changed as a result of the backlog message** - only the 7
+task-tracker entries, now deleted. `git status` is clean;
+`git log -1` is still `213ee86` (same as the previous entry). Nothing to
+revert in the repository.
+
+Given the two messages contradict both each other and this session's
+actual configuration, asked the user to clarify rather than guessing:
+either pivot to sim-lane paths this session was never scoped for, keep
+running the original apps/web backlog, or stop. Holding at the last
+green, fully-verified `lane/web` state (`213ee86`) until that's resolved.
