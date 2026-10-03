@@ -172,3 +172,25 @@ ignored an agent held past its planned departure; the metrics counted a mission 
 returned; unreachable `SimulationAPI` claims. Dead code removed. Gaps remaining: the speed-up work to forecasts relies
 on the incremental-fit assumption that evidence is append-only per source (out-of-order evidence falls back to a full
 rebuild, tested); the `ScriptedInterpreter` is a keyword parser, not a language model.
+
+## Final summary (sim lane)
+
+State: `lane/sim` and `claude/sim-lane-agent-implementation-w9svb5` are identical and pushed. Last full local run:
+typecheck and lint clean, 27 test files, 268 tests passing. CI was green on every pushed commit checked, up to the
+push-to-talk fix and the log updates; the last code commit (replay step constant, no behavior change) was still
+running when this was written.
+
+Done: Slices 1 to 4 exit gates that do not need real map data or provider keys; Slice 5 conversation layer with the
+scripted interpreter and recording speech sink; Slice 7 replay, scripted coordinator policy, evaluation harness and
+failure injection; scenario validation and executable geometry gates with a checker CLI.
+
+Late review fixes (each with a test that failed first): callsign regex escaping, WebSocket message cap, arrival-order
+independence of knowledge beliefs, replay final frame, push-to-talk clock mix-up.
+
+Not done / honest limits:
+- Slice 0 items needing xAI keys, a microphone or real map data; the synthetic scenario stands in for a real crop.
+- The scout showed no benefit on the synthetic scenario, and the dispatch baseline does more protection work than the
+  forecast planner at the cost of lost crews. Both are reported as measured, not tuned away.
+- No backpressure for a slow WebSocket client (loopback demo server only).
+- The `ScriptedInterpreter` is a keyword parser, not a language model.
+- `apps/web` was not touched; a web-lane message sent here by mistake was withdrawn and ignored.
