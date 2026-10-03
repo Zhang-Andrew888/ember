@@ -1755,3 +1755,10 @@ Authorised by Andrew to edit sim-lane content where needed, without changing arc
 - **#47**: top bar says "simulated" and "real time left" with a line that incident time runs 5x faster (`TIME_COMPRESSION`, derived from 25 min over the 5 min wall limit); end overlay shows simulated and real time and maps other end reasons through `endReasonDisplayText`; "time expired" now reads as the real-time limit; scene forecast labels say "simulated time".
 - Check: top bar fits at 1440 and 1024 (Playwright). Gate: typecheck, lint, 763 tests pass.
 - Judgement call: scout points have no names in the map, so the agents package says "survey point N"; the server still has its own POINT_NAMES for speech.
+
+## feat/web-scene: briefing roster and site age wording (branch fix/web-site-age-and-briefing)
+
+- **Briefing**: in a live run the briefing now lists the scenario's public roster (sites and callsigns: Crew 1, Crew 2, Crew 3, Scout) instead of the authored three-callsign list, matching docs/FRONTEND.md ("four callsigns") and the game that starts. The mock demo keeps its authored list. `ScenarioFile` gains an optional `agents` roster (callsign only); the snapshot carries it; `briefingContent` falls back per field if a scenario has none. Tests added.
+- **Age wording**: "seen 3:34 ago" is now "last seen 3:34 ago", and site labels no longer say "(stale, ...)". The 30 sim-second stale rule from docs/SIMULATION.md is unchanged, as is the dashed/italic/fade styling. Wording only.
+- Not done: saying "briefed" rather than "last seen" needs the view to say which observation came from the briefing (a domain change; not made).
+- Checked in the browser: live briefing lists 4 callsigns, mock lists 3, labels read "(last seen 1:10 ago)". Gate: typecheck, lint, 810 tests.

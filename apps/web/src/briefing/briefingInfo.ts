@@ -18,5 +18,30 @@ export const briefingSites: BriefingSite[] = [
 
 export const briefingCallsigns: string[] = ["Crew 1", "Crew 2", "Scout"];
 
+export interface BriefingContent {
+  readonly sites: readonly BriefingSite[];
+  readonly callsigns: readonly string[];
+}
+
+/** The authored list, which matches the mock demo exactly. */
+export const mockBriefing: BriefingContent = { sites: briefingSites, callsigns: briefingCallsigns };
+
+/**
+ * What the briefing promises. The mock demo keeps its authored list; a live run uses the scenario's
+ * public roster (docs/FRONTEND.md: three sites, four callsigns) so the briefing matches the game
+ * that starts. A scenario with no roster falls back to the authored list per field.
+ */
+export function briefingContent(
+  scenario: { readonly briefing: BriefingContent },
+  mock: boolean,
+): BriefingContent {
+  if (mock) return mockBriefing;
+  const { sites, callsigns } = scenario.briefing;
+  return {
+    sites: sites.length > 0 ? sites : briefingSites,
+    callsigns: callsigns.length > 0 ? callsigns : briefingCallsigns,
+  };
+}
+
 export const briefingIncidentLabel =
   "Fictional incident - Ember Line training scenario. No real wildfire, location, or agency is depicted.";

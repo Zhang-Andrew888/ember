@@ -15,7 +15,7 @@ export interface Freshness {
   readonly stale: boolean;
   /** 1 while fresh, easing down to MIN_OPACITY by FULL_FADE_MS. */
   readonly opacity: number;
-  /** "seen 0:45 ago" (incident clock) or null when fresh. */
+  /** "last seen 0:45 ago" (incident clock) or null when fresh. */
   readonly ageLabel: string | null;
 }
 
@@ -31,7 +31,7 @@ export function freshness(ageMs: number | null, serverStale = false): Freshness 
   return {
     stale: true,
     opacity: 1 - (1 - MIN_OPACITY) * t,
-    ageLabel: `seen ${formatIncidentClock(age)} ago`,
+    ageLabel: `last seen ${formatIncidentClock(age)} ago`,
   };
 }
 
