@@ -86,7 +86,8 @@ export class CrewController implements AgentController {
   protected readonly evidence: EvidenceTracker;
   protected active: ActivePlan | null = null;
   protected objective: Objective | null = null;
-  protected pendingObjective: Objective | null = null;
+  /** Distinct objectives received since the last tick, in arrival order. */
+  private readonly pendingObjectives: Objective[] = [];
   protected holding = false;
   protected stranded = false;
   /** Edges the coordinator asked this crew to avoid until resume or a new objective. */
@@ -139,12 +140,12 @@ export class CrewController implements AgentController {
   receiveObjective(objective: Objective): void {
     if (objective.recipientId !== this.agentId || this.seenObjectives.has(objective.id)) return;
     this.seenObjectives.add(objective.id);
-    this.pendingObjective = objective;
+    this.pendingObjectives.push(objective);
   }
 
   resumeAutonomous(): void {
     this.objective = null;
-    this.pendingObjective = null;
+    this.pendingObjectives.length = 0;
     this.holding = false;
     this.avoidCorridorEdges.clear();
     this.evalDirty = true;
@@ -191,8 +192,7 @@ export class CrewController implements AgentController {
       this.replanForReservation(proj, ctx, out);
     }
 
-    if (this.pendingObjective !== null) this.handleObjective(this.pendingObjective, proj, ctx, out);
-    this.pendingObjective = null;
+    for (const next of this.pendingObjectives.splice(0)) this.handleObjective(next, proj, ctx, out);
 
     if (this.active !== null) {
       this.monitor(proj, ctx, out);
