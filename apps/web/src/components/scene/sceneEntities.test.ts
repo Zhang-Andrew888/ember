@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { fixtureCoordinatorView as rawFixture } from "../../../../../tests/fixtures/coordinator-view.fixture.js";
 import { adaptToScenarioIds } from "../../net/mockBase.js";
 import { scenarioMap } from "../../map/activeScenario.js";
-import { buildSceneEntities, listRefugeNodes } from "./sceneEntities.js";
+import { buildSceneEntities, listRefugeNodes, NODE_CLEARANCE } from "./sceneEntities.js";
 
 // The frozen fixture uses placeholder ids; the adapter maps it onto the real scenario.
 const fixtureCoordinatorView = adaptToScenarioIds(rawFixture);
@@ -104,5 +104,33 @@ describe("components/scene/sceneEntities - buildSceneEntities", () => {
     expect(result.agents).toHaveLength(0);
     expect(result.sites).toHaveLength(0);
     expect(result.fireCells).toHaveLength(0);
+  });
+});
+
+describe("components/scene/sceneEntities - agents sharing a node", () => {
+  const refuge = scenarioMap.nodes.get("n-rw")!;
+  const atRefuge = (id: string, callsign: string) => ({
+    ...fixtureCoordinatorView.agents[1]!, // crew-2, idle at the refuge
+    id: id as never,
+    callsign,
+  });
+
+  it("fans agents out beside the node instead of stacking them on the model", () => {
+    const view = { ...fixtureCoordinatorView, agents: [atRefuge("a", "Crew A"), atRefuge("b", "Crew B")] };
+    const { agents } = buildSceneEntities(view, scenarioMap);
+    expect(agents).toHaveLength(2);
+    const [a, b] = agents;
+    expect(Math.hypot(a!.position.x - b!.position.x, a!.position.z - b!.position.z)).toBeGreaterThan(20);
+    for (const agent of agents) {
+      expect(Math.hypot(agent.position.x - refuge.x, agent.position.z - refuge.z)).toBeCloseTo(NODE_CLEARANCE);
+    }
+  });
+
+  it("does not move agents that are on a road", () => {
+    const { agents } = buildSceneEntities(fixtureCoordinatorView, scenarioMap);
+    const crew1 = agents.find((a) => a.id === "crew-1")!;
+    expect(crew1.heading).not.toBeNull();
+    const direct = buildSceneEntities({ ...fixtureCoordinatorView, agents: [fixtureCoordinatorView.agents[0]!] }, scenarioMap);
+    expect(direct.agents[0]!.position).toEqual(crew1.position);
   });
 });

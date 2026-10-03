@@ -1,6 +1,13 @@
-# Crew log (feat/crew)
+Running log for the crew increments. Newest last.
 
-Running log for the crew increments. Newest last. (Each branch adds its own section; expect trivial add/add merges on this file.)
+## Setup
+- pnpm 12.8.1 shim from corepack was broken in the container; used `corepack prepare pnpm@10.34.6 --activate`.
+- PR review at start: #4 closed unmerged but superseded by merged #6 (same head); #8 is the web lane's. No crew PRs yet.
+
+## Increment 1: typed roles and capabilities (feat/crew-1-roles), reworked after review
+- Review rejected the first version (engine / hand_crew kinds, fatigue, carrying capacity are not in the docs; new zod dependency not justified). Reworked to the subset the spec supports: per-role typed `speedMps` and `workRate` equal to the documented defaults (SIMULATION.md; NAVIGATION_AGENTS.md "the crew's own work rate"), over the existing wire roles. No new dependency, no behaviour change at defaults.
+- The full first version is preserved on branch `feat/crew-1-roles-full` in case Andrew amends the spec to add crew kinds.
+- Kinds engine / hand_crew, fatigue and carrying capacity need a spec change first (`docs/**` is human-authored); not resubmitted.
 
 ## Increment 5: scout value of information (feat/crew-5-scout-voi, from main)
 - `voi.ts`: pure `scoreObservationPoint`. Decision score stays the documented ranking input (disagreement 4p(1-p) times public site-access importance, divided by time by the planner), so behaviour is unchanged. Information bits (binary entropy) are reported alongside as the measurable quantity.
@@ -14,3 +21,10 @@ Running log for the crew increments. Newest last. (Each branch adds its own sect
 - Behaviour-preserving: the controller now asks the policy, with the same reason codes and the same announcement wording as before. All pre-existing controller tests pass unchanged.
 - Safety check caught in review of my own cut: a crew on its normal return phase must still withdraw when its route closes, so only withdrawing/retreating crews are exempt.
 - return/hold/avoid/resume are always accepted: they only reduce exposure. Survival reasons are ordered: observation, certifier, forecast reliability.
+
+## Increment 4: knowledge (feat/crew-4-knowledge, from main, independent of #10/#11/#13)
+- `packages/knowledge`: `contradictions()` (clear overturned by later fire; equal-time conflict, order independent, deduped), `contradictedCells()`, `staleBeliefs(now)`, `ageMs`, `isSuperseded`, and `selectRelay` with `DEFAULT_RELAY_POLICY`.
+- Recovery is conservative: a contradicted cell stays closed, an older clear never revives it, and relayed old clears that arrive late are history not contradictions.
+- Relay rules: only observations the recipient lacks, still the source's current word on something, lapsed clear-only sightings dropped after 120 s, fire never lapses, original source and observed time preserved, stale ones flagged not refreshed. Only observations travel: never forecasts, plans or world parameters.
+- Regression `packages/agents/src/isolation.test.ts`: a scout observation held only by the coordinator leaves the crew's knowledge hash and committed plans identical to a run without it, plus a positive control that an explicit relay does change the hash. Increment 7 strengthens this over many seeds.
+- Not done: wiring `contradictedCells` into forecast rebuild triggers (the forecast package owns its own `needsRebuild`; crews consume projections, not stores).

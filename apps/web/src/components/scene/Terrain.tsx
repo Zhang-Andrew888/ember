@@ -1,8 +1,9 @@
 import { useEffect, useMemo } from "react";
-import { BufferGeometry, Float32BufferAttribute, Uint32BufferAttribute } from "three";
+import { BufferGeometry, Float32BufferAttribute, MeshStandardMaterial, Uint32BufferAttribute } from "three";
 import { sceneTerrain, waterCells, waterLevel } from "./terrain/sceneTerrain.js";
 import { fuelDensity, terrainColor } from "./terrain/terrainColor.js";
 import { SCENE_SIZE } from "../../map/worldScale.js";
+import { applyFireLight } from "./fire/fireLight.js";
 
 /**
  * Low-poly ground from the scenario's public height and fuel layers
@@ -49,11 +50,17 @@ export function Terrain() {
     return geo;
   }, []);
   useEffect(() => () => geometry.dispose(), [geometry]);
+  const groundMaterial = useMemo(() => {
+    const material = new MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 1, metalness: 0 });
+    applyFireLight(material, false, true);
+    return material;
+  }, []);
+  useEffect(() => () => groundMaterial.dispose(), [groundMaterial]);
 
   return (
     <>
       <mesh geometry={geometry} receiveShadow>
-        <meshStandardMaterial vertexColors flatShading roughness={1} metalness={0} />
+        <primitive object={groundMaterial} attach="material" />
       </mesh>
       <Water />
     </>
