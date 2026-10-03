@@ -264,7 +264,7 @@ export class CommandGateway {
     for (const q of env.evidenceQueries) {
       const found = this.resolveEvidence(q);
       if (found.kind !== "ok") {
-        return this.ask(message, seq, env, found.question);
+        return this.ask(message, seq, env, found.question, actions);
       }
       const r = found.report;
       evidence.push({
@@ -306,6 +306,7 @@ export class CommandGateway {
               seq,
               env,
               o.kind === "protect" ? "Which site should it protect?" : o.kind === "observe" ? "Which point should it observe?" : "Which corridor should it avoid?",
+              actions,
             );
           }
           const m = matchName(o.targetName, pool);
@@ -317,6 +318,7 @@ export class CommandGateway {
               m.kind === "ambiguous"
                 ? `Which one: ${m.ids.join(" or ")}?`
                 : `I don't know a ${o.kind === "protect" ? "site" : o.kind === "observe" ? "point" : "corridor"} called ${o.targetName}.`,
+              actions,
             );
           }
           targetId = m.id;
@@ -356,7 +358,7 @@ export class CommandGateway {
       );
     }
     if (env.objective === undefined && relayed.length === 0 && env.kind !== "relay") {
-      return this.ask(message, seq, env, "I could not tell what you want done. Which action should I send?");
+      return this.ask(message, seq, env, "I could not tell what you want done. Which action should I send?", actions);
     }
     const parts: string[] = [];
     if (relayed.length > 0) parts.push(`Passed ${relayed.join(" and ")} to ${agent.callsign}.`);
@@ -367,9 +369,12 @@ export class CommandGateway {
     return this.finish(message, seq, status, recipientId, actions, parts.join(" "), evidence, notes, now);
   }
 
-  private ask(message: IncomingMessage, seq: number, env: IntentEnvelope, question: string): GatewayOutcome {
+  private ask(message: IncomingMessage, seq: number, env: IntentEnvelope, question: string, actions: readonly GatewayAction[] = []): GatewayOutcome {
     this.clarification = { question, envelope: env };
-    return this.finish(message, seq, "clarification_required", null, [], question, [], ["clarification"]);
+    // `this.active` has already moved when the message named a crew; the incident must see that
+    // switch too, or the next command to the same crew (now "already active") never emits one.
+    const keep = actions.filter((a) => a.kind === "set_recipient");
+    return this.finish(message, seq, "clarification_required", null, keep, question, [], ["clarification"]);
   }
 
   private resolveEvidence(

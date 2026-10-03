@@ -101,6 +101,20 @@ describe("recipient addressing", () => {
     expect(out.outcomes[0]?.actions[0]).toMatchObject({ kind: "set_recipient", recipientId: "crew-1" });
   });
 
+  it("still reports the recipient switch when a newly addressed message needs clarification", () => {
+    // Found live: "Crew 2, hold" then "Crew 1 stop" (not understood) then "Crew 1, protect Waterworks"
+    // left the coordinator view addressing Crew 2 because the switch to Crew 1 was never emitted.
+    const { gw, say } = makeGateway();
+    say("Crew 2, hold");
+    const unclear = say("Crew 1 stop");
+    expect(unclear.outcomes[0]?.receipt.status).toBe("clarification_required");
+    expect(gw.activeRecipientId).toBe("crew-1");
+    expect(unclear.outcomes[0]?.actions).toEqual([{ kind: "set_recipient", recipientId: "crew-1" }]);
+    const follow = say("Crew 1, protect Waterworks");
+    expect(follow.outcomes[0]?.receipt.status).toBe("accepted");
+    expect(follow.outcomes[0]?.receipt.recipientId).toBe("crew-1");
+  });
+
   it("asks which crew when there is no recipient yet, and for two named crews", () => {
     const { gw, say } = makeGateway();
     const none = say("protect the lodge");
