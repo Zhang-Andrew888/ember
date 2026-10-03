@@ -31,6 +31,9 @@ declare const process: {
   exitCode?: number;
   env: Record<string, string | undefined>;
   stdout: { write(s: string): void };
+  stderr: { write(s: string): void };
+  on(event: "SIGINT" | "SIGTERM", cb: () => void): void;
+  exit(code?: number): never;
 };
 declare const console: { log(message?: string): void };
 declare class Blob {
