@@ -15,3 +15,4 @@ export {
 } from "./world.js";
 export * from "./record.js";
 export { canonicalJson, hashText, hashValue } from "./model/index.js";
+export { SIM_DEFAULTS } from "./model/index.js";

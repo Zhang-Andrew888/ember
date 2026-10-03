@@ -2,3 +2,4 @@
 // Must not: re-run LLM calls or query live providers
 export type { ReplayReader } from "./types.js";
 export { parseRunRecord, serializeRunRecord, verifyRunRecord, type VerifiedRun } from "./record-io.js";
+export { revealFire, type FireFrame, type FireReveal } from "./reveal.js";

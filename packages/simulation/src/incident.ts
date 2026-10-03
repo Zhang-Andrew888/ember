@@ -162,11 +162,11 @@ export class Incident {
     for (const input of pending) {
       this.applied.push({ appliedAtMs, ordinal: this.ordinal, input });
       this.ordinal += 1;
-      this.applyInput(input);
+      this.applyInput(input, appliedAtMs);
     }
   }
 
-  private applyInput(input: SimInput): void {
+  private applyInput(input: SimInput, appliedAtMs: number): void {
     switch (input.kind) {
       case "commit_plan": {
         const store = this.agentStores.get(input.agentId);
@@ -187,7 +187,7 @@ export class Incident {
         this.reports.push(
           CoordinatorReportEntry.parse({
             sequence: SequenceNumber.parse(this.reports.length),
-            simTimeMs: SimTimeMs.parse(this.world.timeMs),
+            simTimeMs: SimTimeMs.parse(appliedAtMs),
             agentId: input.agentId,
             text: input.text,
             urgent: input.urgent,
@@ -199,7 +199,7 @@ export class Incident {
         const source = this.coordinator.observations().find((o) => o.id === input.observationId);
         const target = this.world.agents.find((a) => a.id === input.toAgentId);
         if (store === undefined || source === undefined || target === undefined || target.state === "lost") return;
-        store.ingestRelay(source, SimTimeMs.parse(this.world.timeMs));
+        store.ingestRelay(source, SimTimeMs.parse(appliedAtMs));
         return;
       }
       case "set_active_recipient":

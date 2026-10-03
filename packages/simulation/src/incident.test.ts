@@ -167,3 +167,52 @@ describe("information boundary", () => {
     expect(a.truth().cellState).not.toEqual(b.truth().cellState);
   });
 });
+
+describe("knowledge scoping and relay", () => {
+  function scoutScenario(): SimScenario {
+    const base = buildSyntheticScenario({ agents: ["crew-1", "scout"], sites: ["site-a"] });
+    const scout = base.agents.find((a) => a.id === "scout")!;
+    return {
+      ...base,
+      agents: base.agents.map((a) => (a.id === "scout" ? { ...scout, startNodeId: NodeId.parse("n-j1") } : a)),
+      map: { ...base.map, initialFireCells: [cellIndexOf(450, 850)!] },
+    };
+  }
+
+  it("keeps a scout observation with the coordinator until it is relayed to one crew", () => {
+    const inc = new Incident({ scenario: scoutScenario(), seed: "k", overrides: { spreadMultiplier: 1, windShiftMs: 1e9, initialWindRad: 0 } });
+    const crewHashBefore = inc.projectAgent(crew1).inputHash;
+    inc.advanceTo(90_000);
+    const scoutObs = inc.coordinator
+      .observations()
+      .filter((o) => o.sourceAgentId === "scout" && o.observedFields.some((f) => f.kind === "cell" && f.burnState === "burning"))
+      .at(-1);
+    expect(scoutObs).toBeDefined();
+    const burningCell = scoutObs!.observedFields.find((f) => f.kind === "cell" && f.burnState === "burning");
+    const cell = burningCell && burningCell.kind === "cell" ? burningCell.cellIndex : -1;
+    // Coordinator knows; the crew does not and its planning input is unchanged.
+    expect(inc.coordinator.cellBelief(cell)?.state).toBe("burning");
+    expect(inc.agentStores.get(crew1)?.cellBelief(cell)).toBeUndefined();
+    expect(inc.projectAgent(crew1).inputHash).toBe(crewHashBefore);
+
+    inc.submit({ kind: "relay", observationId: scoutObs!.id, toAgentId: crew1 });
+    inc.advanceTo(95_000);
+    const belief = inc.agentStores.get(crew1)?.cellBelief(cell);
+    expect(belief?.state).toBe("burning");
+    expect(belief?.provenance).toBe("relay");
+    expect(belief?.sourceAgentId).toBe("scout");
+    expect(belief?.observedAt).toBe(scoutObs!.observedAt);
+    expect(belief?.receivedAt).toBe(91_000);
+    expect(inc.projectAgent(crew1).inputHash).not.toBe(crewHashBefore);
+    // Other agents stay unchanged by a targeted relay.
+    expect(inc.projectAgent(AgentId.parse("scout")).knowledge.observations.every((o) => o.sourceAgentId !== "crew-1")).toBe(true);
+  });
+
+  it("does not create a fabricated observation for an unknown relay id", () => {
+    const inc = new Incident({ scenario: scoutScenario(), seed: "k", overrides: { spreadMultiplier: 1, windShiftMs: 1e9, initialWindRad: 0 } });
+    const before = inc.projectAgent(crew1).knowledge.observations.length;
+    inc.submit({ kind: "relay", observationId: "obs:does-not-exist", toAgentId: crew1 });
+    inc.advanceTo(2000);
+    expect(inc.projectAgent(crew1).knowledge.observations.length).toBe(before);
+  });
+});
