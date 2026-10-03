@@ -213,9 +213,10 @@ describe("forecast service", () => {
     const base = { ...inPrior, initialProgress: 0, windShiftMs: Infinity };
     const wet = rolloutIgnition(ctx, { ...base, moistureMultiplier: 1.3 }, 600_000, 5000);
     const dry = rolloutIgnition(ctx, { ...base, moistureMultiplier: 0.7 }, 600_000, 5000);
+    const unspotted = rolloutIgnition(ctx, base, 600_000, 5000);
     const spotted = rolloutIgnition(ctx, { ...base, spotDistanceCells: 8, spotTimeMs: 200_000 }, 600_000, 5000);
     expect(dry.some((t, i) => t < wet[i]!)).toBe(true);
-    expect(spotted.some((t, i) => t < wet[i]!)).toBe(true);
+    expect(spotted.some((t, i) => t < unspotted[i]!)).toBe(true);
   });
 });
 
