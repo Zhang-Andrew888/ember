@@ -6,7 +6,15 @@
   --color-refuge: #70d6d1;
   --color-rejected: #c1443b;
   --color-stale: #5b6a6d;
-  --color-border: #2a3a3f;
+  /*
+   * WCAG 1.4.11 (non-text contrast) needs >=3:1 against adjacent
+   * backgrounds for a border that's the only way to see a control's
+   * boundary (inputs, cards, buttons). The original #2a3a3f measured
+   * 1.51:1 against --color-background - checked with a standalone WCAG
+   * relative-luminance script, not eyeballed. This passes against both
+   * --color-background (3.99:1) and --color-panel (3.43:1).
+   */
+  --color-border: #647b83;
 }
 
 * {
