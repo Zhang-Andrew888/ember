@@ -2,6 +2,12 @@ import { useEffect, useRef } from "react";
 import type { Camera } from "three";
 import { Vector3 } from "three";
 import { projectToScreen } from "./projectToScreen.js";
+import { resolveLabelCollisions, type SizedLabelPoint } from "./stackLabels.js";
+
+const LABEL_HEIGHT_PX = 20;
+/** Rough glyph width estimate so two co-located labels don't overlap; not pixel-exact. */
+const CHAR_WIDTH_PX = 6.5;
+const LABEL_PADDING_PX = 16;
 
 export interface LabelDescriptor {
   readonly id: string;
@@ -35,13 +41,25 @@ export function SceneLabelLayer({ camera, canvasElement, labels }: SceneLabelLay
     const tick = () => {
       if (camera && canvasElement) {
         const rect = canvasElement.getBoundingClientRect();
-        for (const label of labels) {
-          const element = elementsRef.current.get(label.id);
-          if (!element) continue;
+        const sized: SizedLabelPoint[] = labels.map((label) => {
           worldPoint.current.set(label.x, label.y, label.z);
           const screen = projectToScreen(camera, worldPoint.current, rect.width, rect.height);
-          element.style.display = screen.visible ? "block" : "none";
-          element.style.transform = `translate(${screen.x}px, ${screen.y}px) translate(-50%, -140%)`;
+          return {
+            id: label.id,
+            x: screen.x,
+            y: screen.y,
+            visible: screen.visible,
+            width: label.text.length * CHAR_WIDTH_PX + LABEL_PADDING_PX,
+            height: LABEL_HEIGHT_PX,
+          };
+        });
+        const placed = resolveLabelCollisions(sized);
+
+        for (const point of placed) {
+          const element = elementsRef.current.get(point.id);
+          if (!element) continue;
+          element.style.display = point.visible ? "block" : "none";
+          element.style.transform = `translate(${point.x}px, ${point.y}px) translate(-50%, -140%)`;
         }
       }
       frameId = requestAnimationFrame(tick);

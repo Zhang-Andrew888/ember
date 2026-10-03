@@ -5,7 +5,8 @@ import type { FireCellMarker } from "./sceneEntities.js";
 import { colors } from "../../styles/colors.js";
 
 const CELL_SIZE = 14;
-const CELL_Y = 3;
+/** Box half-height is CELL_SIZE*0.6/2 (~4.2); must clear the terrain's max bump (~2.4). */
+const CELL_Y = 9;
 
 /**
  * Instanced fire cells (docs/FRONTEND.md recommends instancing for

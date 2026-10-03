@@ -1,7 +1,8 @@
 import type { ThreeEvent } from "@react-three/fiber";
 import type { AgentMarker } from "./sceneEntities.js";
 
-const MARKER_Y = 6;
+/** Cone/octahedron half-height is ~7; this must clear the terrain's max bump (~2.4) by a margin. */
+const MARKER_Y = 12;
 
 /** Distinct per-slot colors so identity is never color-only (callsign label always accompanies it). */
 const CREW_COLORS = ["#4FA7E0", "#D98C3D", "#8BBF6B", "#C97BC2"];

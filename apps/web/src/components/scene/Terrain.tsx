@@ -23,11 +23,14 @@ export function Terrain() {
       for (let ix = 0; ix < verticesPerSide; ix++) {
         const x = (ix / SEGMENTS - 0.5) * SIZE;
         const z = (iz / SEGMENTS - 0.5) * SIZE;
+        // Kept subtle (max ~2.4) - markers/roads/fire cells sit at fixed
+        // heights above this and must always clear it (found via a
+        // Playwright smoke check: fire cells were sinking into taller bumps).
         const elevation =
-          Math.sin(x / 260) * 10 + Math.cos(z / 300) * 8 + Math.sin((x + z) / 180) * 6;
+          (Math.sin(x / 260) * 10 + Math.cos(z / 300) * 8 + Math.sin((x + z) / 180) * 6) * 0.1;
         positions.push(x, elevation, z);
 
-        const t = Math.max(0, Math.min(1, (elevation + 24) / 48));
+        const t = Math.max(0, Math.min(1, (elevation + 2.4) / 4.8));
         const mixed = sage.clone().lerp(ochre, t);
         colorValues.push(mixed.r, mixed.g, mixed.b);
       }

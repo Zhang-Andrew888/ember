@@ -47,7 +47,7 @@ export function SceneView({ entities, selectedAgentId, onInspectAgent, reducedMo
     const refugeLabels = listRefugeNodes(scenarioMap).map((refuge) => ({
       id: `refuge:${refuge.id}`,
       x: refuge.x,
-      y: 10,
+      y: 14,
       z: refuge.z,
       text: refuge.label ?? "Refuge",
       variant: "refuge" as const,
@@ -55,7 +55,7 @@ export function SceneView({ entities, selectedAgentId, onInspectAgent, reducedMo
     const siteLabels = entities.sites.map((site) => ({
       id: `site:${site.id}`,
       x: site.position.x,
-      y: 15,
+      y: 18,
       z: site.position.z,
       text: site.name,
       variant: "site" as const,
@@ -63,7 +63,7 @@ export function SceneView({ entities, selectedAgentId, onInspectAgent, reducedMo
     const agentLabels = entities.agents.map((agent) => ({
       id: `agent:${agent.id}`,
       x: agent.position.x,
-      y: 16,
+      y: 22,
       z: agent.position.z,
       text: agent.callsign,
       variant: "agent" as const,

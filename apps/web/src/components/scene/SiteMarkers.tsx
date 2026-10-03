@@ -3,7 +3,8 @@ import type { SiteMarker } from "./sceneEntities.js";
 import type { SceneNode } from "../../map/scenarioMap.js";
 import { colors } from "../../styles/colors.js";
 
-const MARKER_Y = 4;
+/** Comfortably clears the terrain's max bump height (~2.4) plus marker half-height. */
+const MARKER_Y = 10;
 
 const PROTECTION_COLOR: Record<SiteMarker["protectionStatus"], string> = {
   unobserved: "#6B7678",

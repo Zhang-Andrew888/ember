@@ -4,8 +4,8 @@ import { colors } from "../../styles/colors.js";
 
 const ROAD_WIDTH = 6;
 const ROAD_HEIGHT = 1;
-/** Constant road elevation; the terrain's own procedural bumps are purely decorative. */
-const ROAD_Y = 2;
+/** Constant road elevation, well above the terrain's max bump height (~2.4). */
+const ROAD_Y = 6;
 
 interface RoadSegment {
   readonly key: string;
