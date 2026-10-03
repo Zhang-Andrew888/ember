@@ -164,3 +164,48 @@ export function extremeIds(members: readonly ForecastMember[]): Set<string> {
   }
   return out;
 }
+
+/**
+ * A cap may discard redundant members, but it must not make any cell look safe for longer.
+ * Keep supported boundary cases and parameter extremes, then add a member for each earliest
+ * ignition that is not yet represented. The caps are soft when safety needs more members.
+ */
+export function capSupportedMembers(
+  members: readonly ForecastMember[],
+  memberCount: number,
+  maxMembers: number,
+): ForecastMember[] {
+  const target = Math.max(0, Math.min(memberCount, maxMembers));
+  if (members.length <= target) return [...members];
+
+  const ids = extremeIds(members);
+  for (const member of members) if (member.kind === "boundary") ids.add(member.id);
+
+  const cells = members[0]?.ignitionMs.length ?? 0;
+  const allEarliest = new Float64Array(cells).fill(Infinity);
+  const keptEarliest = new Float64Array(cells).fill(Infinity);
+  for (const member of members) {
+    for (let cell = 0; cell < cells; cell++) {
+      const time = member.ignitionMs[cell]!;
+      if (time < allEarliest[cell]!) allEarliest[cell] = time;
+      if (ids.has(member.id) && time < keptEarliest[cell]!) keptEarliest[cell] = time;
+    }
+  }
+
+  for (let cell = 0; cell < cells; cell++) {
+    if (keptEarliest[cell]! <= allEarliest[cell]!) continue;
+    const member = members.find((m) => m.ignitionMs[cell] === allEarliest[cell]);
+    if (member === undefined) continue;
+    ids.add(member.id);
+    for (let i = 0; i < cells; i++) {
+      const time = member.ignitionMs[i]!;
+      if (time < keptEarliest[i]!) keptEarliest[i] = time;
+    }
+  }
+
+  const others = members.filter((m) => !ids.has(m.id));
+  const room = Math.max(0, target - ids.size);
+  const stride = others.length / Math.max(1, room);
+  for (let i = 0; i < room && i * stride < others.length; i++) ids.add(others[Math.floor(i * stride)]!.id);
+  return members.filter((m) => ids.has(m.id));
+}
