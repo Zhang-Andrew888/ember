@@ -1,7 +1,13 @@
 import { useSyncExternalStore } from "react";
 import type { SpeechPlaybackSnapshot, SpeechPlaybackStub } from "./speechPlaybackStub.js";
 
-const IDLE_SNAPSHOT: SpeechPlaybackSnapshot = { state: "idle", text: null, urgent: false };
+const IDLE_SNAPSHOT: SpeechPlaybackSnapshot = {
+  state: "idle",
+  text: null,
+  urgent: false,
+  queuedUrgent: false,
+  queuedRoutineCount: 0,
+};
 
 /** Subscribes a component tree to a SpeechPlaybackStub instance (see App.tsx for lifecycle ownership). */
 export function useSpeechPlaybackStub(stub: SpeechPlaybackStub | null): SpeechPlaybackSnapshot {

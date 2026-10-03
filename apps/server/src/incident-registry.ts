@@ -2,6 +2,8 @@ import { randomBytes } from "node:crypto";
 import type { CoordinatorView, IncidentEnd } from "@ember/domain";
 import { buildSyntheticScenario, type SimScenario } from "@ember/simulation";
 import { ConversationBridge } from "./conversation.js";
+import { grokVoiceEnabled } from "./xai/env.js";
+import { SpeechAudioStore } from "./xai/speech-audio-store.js";
 import { LiveRun, SessionHub } from "./hub.js";
 import { IncidentSession, type SessionOptions } from "./session.js";
 import type { MonotonicClock } from "./runner.js";
@@ -16,6 +18,7 @@ export interface IncidentRecord {
   readonly scenario: SimScenario;
   readonly seed: string;
   started: boolean;
+  readonly speechStore: SpeechAudioStore;
 }
 
 export interface CreateIncidentBody {
@@ -37,10 +40,12 @@ export class IncidentRegistry {
     const scenario = body.scenario ?? buildSyntheticScenario();
     const seed = body.seed ?? `incident-${id}`;
     const session = new IncidentSession({ scenario, seed, ...body.session });
-    const bridge = new ConversationBridge(session);
+    const speechStore = new SpeechAudioStore();
+    const grokTts = grokVoiceEnabled();
+    const bridge = new ConversationBridge(session, { speechStore, grokTts });
     const hub = new SessionHub(session, bridge);
     const live = new LiveRun(session, bridge, hub, clock);
-    const record: IncidentRecord = { id, token, session, bridge, hub, live, scenario, seed, started: false };
+    const record: IncidentRecord = { id, token, session, bridge, hub, live, scenario, seed, started: false, speechStore };
     this.records.set(id, record);
     this.byToken.set(token, id);
     return record;

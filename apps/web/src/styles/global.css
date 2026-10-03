@@ -72,6 +72,30 @@ input {
   font-variant-numeric: tabular-nums;
 }
 
+.connection-banner,
+.demo-banner {
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.connection-banner {
+  background: #2a2220;
+}
+
+.connection-banner--connecting {
+  background: #252a2e;
+}
+
+.demo-banner {
+  background: #1f2a33;
+}
+
+.top-bar__audio {
+  font-size: 0.85rem;
+  color: #c5d0c8;
+}
+
 .top-bar__status {
   margin-left: auto;
   padding: 0.2rem 0.6rem;
@@ -316,6 +340,28 @@ input {
 
 .conversation-panel__report-agent {
   font-weight: 600;
+}
+
+.conversation-panel__line {
+  font-size: 0.9rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.conversation-panel__line--clarification {
+  border-left: 3px solid #e8b84a;
+  padding-left: 0.5rem;
+}
+
+.conversation-panel__line--rejection {
+  border-left: 3px solid var(--color-rejected);
+  padding-left: 0.5rem;
+}
+
+.conversation-panel__tag {
+  font-size: 0.75rem;
+  font-weight: 600;
+  opacity: 0.85;
 }
 
 .conversation-panel__composer {

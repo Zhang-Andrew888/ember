@@ -1,59 +1,116 @@
 import { useRef, useState } from "react";
 import type { FormEvent, KeyboardEvent, PointerEvent } from "react";
-import type { CoordinatorReportEntry } from "@ember/domain";
+import type { TranscriptLine } from "../conversation/transcript.js";
 import { formatIncidentClock } from "../format/time.js";
-import { createMockVoiceAdapter, type CaptureState } from "../net/mockVoiceAdapter.js";
+import { createBrowserVoiceCapture, type BrowserVoiceCapture } from "../net/browserVoiceCapture.js";
+import { createVoiceCapture, type MicPermissionState, type VoiceCaptureAdapter } from "../net/voiceCapture.js";
 import type { SpeechPlaybackSnapshot } from "../state/speechPlaybackStub.js";
 
 export interface ConversationPanelProps {
-  readonly reports: CoordinatorReportEntry[];
+  readonly transcript: readonly TranscriptLine[];
   readonly activeRecipientCallsign: string | null;
   readonly onSendMessage: (text: string) => void;
-  /** Drives the routine (non-urgent) outgoing-acknowledgement indicator; urgent playback shows in UrgentStrip instead. */
+  readonly onPttBegin: () => void;
+  readonly onPttRelease: (text: string) => void;
+  readonly onPttCancel: () => void;
+  readonly composerDisabled: boolean;
+  readonly demoMode: boolean;
   readonly speechSnapshot: SpeechPlaybackSnapshot;
+  /** When set, push-to-talk records mic audio and transcribes via the server (xAI STT). */
+  readonly grokStt?: (audio: Blob) => Promise<string | null>;
 }
 
+const LINE_CLASS: Record<TranscriptLine["kind"], string> = {
+  agent_report: "conversation-panel__report",
+  coordinator: "conversation-panel__line conversation-panel__line--coordinator",
+  control: "conversation-panel__line conversation-panel__line--control",
+  system: "conversation-panel__line conversation-panel__line--system",
+  command_outcome: "conversation-panel__line conversation-panel__line--outcome",
+  clarification: "conversation-panel__line conversation-panel__line--clarification",
+  rejection: "conversation-panel__line conversation-panel__line--rejection",
+};
+
 /**
- * Right panel: conversation transcript, text input, push-to-talk
- * (docs/FRONTEND.md). Push-to-talk is a mock capture adapter (backlog
- * item 4) - real Grok Voice is Slice 5/out of scope and unreachable from
- * this sandbox anyway; text input stays the always-working fallback
- * regardless, and the status text says plainly that this is a demo
- * capture, not real speech recognition.
+ * Right panel: unified transcript, text input, push-to-talk (docs/FRONTEND.md).
  */
 export function ConversationPanel({
-  reports,
+  transcript,
   activeRecipientCallsign,
   onSendMessage,
+  onPttBegin,
+  onPttRelease,
+  onPttCancel,
+  composerDisabled,
+  demoMode,
   speechSnapshot,
+  grokStt,
 }: ConversationPanelProps) {
   const [draft, setDraft] = useState("");
-  const [captureState, setCaptureState] = useState<CaptureState>("idle");
-  const adapterRef = useRef(createMockVoiceAdapter());
-  const latest = reports[reports.length - 1] ?? null;
+  const [captureState, setCaptureState] = useState<"idle" | "recording">("idle");
+  const browserCaptureRef = useRef<BrowserVoiceCapture | null>(null);
+  const adapterRef = useRef<VoiceCaptureAdapter>(
+    createVoiceCapture(
+      demoMode
+        ? { preferMicrophone: false, transcripts: DEMO_TRANSCRIPTS }
+        : { preferMicrophone: true },
+    ),
+  );
+  const latest = transcript[transcript.length - 1] ?? null;
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const text = draft.trim();
-    if (!text) return;
+    if (!text || composerDisabled) return;
     onSendMessage(text);
     setDraft("");
   };
 
   const startCapture = () => {
-    adapterRef.current.start();
+    if (composerDisabled) return;
+    onPttBegin();
+    if (grokStt !== undefined) {
+      browserCaptureRef.current = createBrowserVoiceCapture();
+      void browserCaptureRef.current.start().catch(() => {
+        browserCaptureRef.current = null;
+        setCaptureState("idle");
+        onPttCancel();
+      });
+    } else {
+      adapterRef.current.start();
+    }
     setCaptureState("recording");
   };
 
   const commitCapture = () => {
-    const result = adapterRef.current.commit();
+    if (captureState !== "recording") return;
     setCaptureState("idle");
-    if (result) onSendMessage(result.text);
+    if (grokStt !== undefined && browserCaptureRef.current !== null) {
+      const capture = browserCaptureRef.current;
+      browserCaptureRef.current = null;
+      void capture.stop().then(async (blob) => {
+        if (blob === null) {
+          onPttCancel();
+          return;
+        }
+        const text = await grokStt(blob);
+        if (text) onPttRelease(text);
+        else onPttCancel();
+      });
+      return;
+    }
+    const result = adapterRef.current.commit();
+    if (result) onPttRelease(result.text);
+    else onPttCancel();
   };
 
   const cancelCapture = () => {
-    adapterRef.current.cancel();
-    setCaptureState("idle");
+    if (captureState === "recording") {
+      browserCaptureRef.current?.cancel();
+      browserCaptureRef.current = null;
+      adapterRef.current.cancel();
+      setCaptureState("idle");
+      onPttCancel();
+    }
   };
 
   const handlePointerDown = (event: PointerEvent<HTMLButtonElement>) => {
@@ -62,12 +119,6 @@ export function ConversationPanel({
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
-    // docs/FRONTEND.md: "release/cancel/lost-focus always ends capture
-    // safely." Pointer hold gets all three for free (pointerup/
-    // pointercancel/blur); keyboard hold only had release (keyup) and
-    // lost-focus (blur) - a keyboard user had no way to abort a hold
-    // without either committing it or tabbing focus away. Escape is the
-    // conventional keyboard "cancel" and fills that gap.
     if (event.code === "Escape") {
       if (captureState === "recording") {
         event.preventDefault();
@@ -76,7 +127,7 @@ export function ConversationPanel({
       return;
     }
     if (event.code !== "Space" || event.repeat) return;
-    event.preventDefault(); // suppress the native click-on-keyup-space activation
+    event.preventDefault();
     startCapture();
   };
 
@@ -87,6 +138,7 @@ export function ConversationPanel({
   };
 
   const showOutgoingAck = speechSnapshot.state !== "idle" && !speechSnapshot.urgent;
+  const micState: MicPermissionState = adapterRef.current.micPermission;
 
   return (
     <section className="conversation-panel" aria-label="Conversation">
@@ -94,17 +146,23 @@ export function ConversationPanel({
         {activeRecipientCallsign ? `Addressing: ${activeRecipientCallsign}` : "No recipient addressed yet"}
       </div>
 
-      <ol className="conversation-panel__transcript" aria-label="Report transcript">
-        {reports.map((report) => (
-          <li key={report.sequence as number} className="conversation-panel__report">
-            <span className="conversation-panel__report-time">{formatIncidentClock(report.simTimeMs)}</span>
-            <span className="conversation-panel__report-agent">{report.agentId}</span>
-            <span className="conversation-panel__report-text">{report.text}</span>
+      <ol className="conversation-panel__transcript" aria-label="Conversation transcript">
+        {transcript.map((line) => (
+          <li key={line.id} className={LINE_CLASS[line.kind]}>
+            <span className="conversation-panel__report-time">{formatIncidentClock(line.simTimeMs)}</span>
+            <span className="conversation-panel__report-agent">{line.speaker}</span>
+            <span className="conversation-panel__report-text">{line.text}</span>
+            {line.kind === "clarification" ? (
+              <span className="conversation-panel__tag">Clarification required</span>
+            ) : null}
+            {line.kind === "rejection" ? (
+              <span className="conversation-panel__tag">Objective rejected</span>
+            ) : null}
           </li>
         ))}
       </ol>
       <div aria-live="polite" className="sr-only">
-        {latest ? `${latest.agentId}: ${latest.text}` : ""}
+        {latest ? `${latest.speaker}: ${latest.text}` : ""}
       </div>
 
       <form className="conversation-panel__composer" onSubmit={handleSubmit}>
@@ -116,10 +174,11 @@ export function ConversationPanel({
           type="text"
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
-          placeholder="Type a message…"
+          placeholder={composerDisabled ? "Waiting for connection…" : "Type a message…"}
           autoComplete="off"
+          disabled={composerDisabled}
         />
-        <button type="submit" disabled={draft.trim().length === 0}>
+        <button type="submit" disabled={composerDisabled || draft.trim().length === 0}>
           Send
         </button>
         <button
@@ -127,6 +186,7 @@ export function ConversationPanel({
           aria-describedby="push-to-talk-status"
           aria-pressed={captureState === "recording"}
           className="conversation-panel__push-to-talk"
+          disabled={composerDisabled}
           onPointerDown={handlePointerDown}
           onPointerUp={commitCapture}
           onPointerCancel={cancelCapture}
@@ -137,12 +197,24 @@ export function ConversationPanel({
           {captureState === "recording" ? "Recording… release to send" : "Push to talk"}
         </button>
         <span id="push-to-talk-status" className="conversation-panel__mic-status">
-          Demo capture: hold to simulate a voice message (no real microphone or speech recognition).
+          {grokStt !== undefined
+            ? "Grok STT: hold to record from your microphone; release to transcribe on the server."
+            : demoMode
+              ? "Demo capture: hold for a canned voice line (no live speech recognition)."
+              : `Capture: ${micState}. Hold to send; release commits.`}
         </span>
         <div aria-live="polite" className="conversation-panel__speech-ack">
           {showOutgoingAck ? `🔊 ${speechSnapshot.text}` : ""}
+          {speechSnapshot.queuedUrgent ? " — urgent audio queued" : ""}
+          {speechSnapshot.queuedRoutineCount > 0 ? ` — ${speechSnapshot.queuedRoutineCount} routine queued` : ""}
         </div>
       </form>
     </section>
   );
 }
+
+const DEMO_TRANSCRIPTS: readonly string[] = [
+  "Crew 2, status report.",
+  "Scout, relay fire on the north road.",
+  "Crew 1, protect Ridge Cabins.",
+];

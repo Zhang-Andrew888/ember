@@ -108,6 +108,8 @@ export const authoredSnapshots: CoordinatorView[] = [
 export interface MockIncidentSocket extends WebSocketLike {
   /** Begins emitting authored snapshots. No-op once already started. */
   start(): void;
+  /** Delivers an extra wire frame (receipts/transcripts) during mock runs. */
+  deliver(raw: string): void;
 }
 
 export interface MockIncidentSocketOptions {
@@ -169,6 +171,10 @@ export function createMockIncidentSocket(options: MockIncidentSocketOptions = {}
       readyState = CLOSED;
       for (const timer of timers) clearTimeout(timer);
       socket.onclose?.();
+    },
+    deliver(raw) {
+      if (readyState !== OPEN) return;
+      socket.onmessage?.({ data: raw });
     },
   };
 
