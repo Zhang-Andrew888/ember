@@ -1,11 +1,17 @@
 import { forwardRef } from "react";
 import { colors } from "../../styles/colors.js";
 import { formatIncidentClock } from "../../format/time.js";
+import type { ForecastLayer } from "./sceneLayers.js";
 import type { FireCellMarker } from "./sceneEntities.js";
 
 export interface SceneLegendProps {
   readonly showFireCells: boolean;
   readonly onToggleFireCells: () => void;
+  readonly showRoutes: boolean;
+  readonly onToggleRoutes: () => void;
+  readonly showForecast: boolean;
+  readonly onToggleForecast: () => void;
+  readonly forecast: ForecastLayer | null;
   readonly onResetCamera: () => void;
   readonly fireCells: FireCellMarker[];
   readonly onInspectCell: (cell: FireCellMarker) => void;
@@ -19,7 +25,7 @@ export interface SceneLegendProps {
  * scene labels from rendering underneath it.
  */
 export const SceneLegend = forwardRef<HTMLDivElement, SceneLegendProps>(function SceneLegend(
-  { showFireCells, onToggleFireCells, onResetCamera, fireCells, onInspectCell },
+  { showFireCells, onToggleFireCells, showRoutes, onToggleRoutes, showForecast, onToggleForecast, forecast, onResetCamera, fireCells, onInspectCell },
   ref,
 ) {
   return (
@@ -34,6 +40,14 @@ export const SceneLegend = forwardRef<HTMLDivElement, SceneLegendProps>(function
           Stale observation
         </li>
         <li>
+          <span className="scene-legend__swatch scene-legend__swatch--hatch" />
+          Forecast envelope (hatched, incident time)
+        </li>
+        <li>
+          <span className="scene-legend__swatch scene-legend__swatch--route" />
+          Route: &gt;&gt; approach · solid work · dashed return
+        </li>
+        <li>
           <span className="scene-legend__swatch" style={{ background: colors.refuge }} />
           Refuge
         </li>
@@ -43,6 +57,18 @@ export const SceneLegend = forwardRef<HTMLDivElement, SceneLegendProps>(function
           <input type="checkbox" checked={showFireCells} onChange={onToggleFireCells} />
           Show fire observations
         </label>
+        <label className="scene-legend__toggle">
+          <input type="checkbox" checked={showRoutes} onChange={onToggleRoutes} />
+          Show planned routes
+        </label>
+        <label className="scene-legend__toggle">
+          <input type="checkbox" checked={showForecast} onChange={onToggleForecast} />
+          Show forecast
+        </label>
+        <p className="scene-legend__forecast" role="status" data-reliability={forecast?.reliability ?? "none"}>
+          {forecast ? forecast.headline : "Forecast: not yet built"}
+          {forecast?.explanation ? ` — ${forecast.explanation}` : ""}
+        </p>
         <button type="button" onClick={onResetCamera}>
           Reset camera
         </button>

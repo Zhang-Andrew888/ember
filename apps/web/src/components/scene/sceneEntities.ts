@@ -8,6 +8,7 @@ import {
   type SceneHeading,
   type SceneVector,
 } from "../../map/positions.js";
+import { buildForecastLayer, buildRouteLines, type ForecastLayer, type RouteLine } from "./sceneLayers.js";
 import { siteProtectionStatus, type SiteProtectionStatus } from "../../format/reports.js";
 
 export interface AgentMarker {
@@ -42,6 +43,10 @@ export interface SceneEntities {
   readonly agents: AgentMarker[];
   readonly sites: SiteMarker[];
   readonly fireCells: FireCellMarker[];
+  /** Reportable plans (route emphasis); selection is applied at render time. */
+  readonly routes: RouteLine[];
+  /** Coordinator forecast envelope; null before the first build. */
+  readonly forecast: ForecastLayer | null;
 }
 
 /** Every refuge node the local scenario map knows about (public, static). */
@@ -90,7 +95,13 @@ export function buildSceneEntities(view: CoordinatorView, map: ScenarioMap): Sce
 
   const fireCells = resolveFireCells(view, map);
 
-  return { agents, sites, fireCells };
+  return {
+    agents,
+    sites,
+    fireCells,
+    routes: buildRouteLines(view, map, null),
+    forecast: buildForecastLayer(view, map),
+  };
 }
 
 /**

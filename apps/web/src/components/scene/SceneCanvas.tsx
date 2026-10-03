@@ -1,9 +1,11 @@
-import { forwardRef } from "react";
+import { forwardRef, useMemo } from "react";
 import { Canvas, type RootState } from "@react-three/fiber";
 import { Terrain } from "./Terrain.js";
 import { Roads } from "./Roads.js";
 import { FireCells } from "./FireCells.js";
 import { SiteMarkers, RefugeMarkers } from "./SiteMarkers.js";
+import { RouteLayer } from "./RouteLayer.js";
+import { ForecastLayer } from "./ForecastLayer.js";
 import { AgentMarkers } from "./AgentMarkers.js";
 import { CameraControls, type CameraControlsHandle } from "./CameraControls.js";
 import { listRefugeNodes } from "./sceneEntities.js";
@@ -17,6 +19,8 @@ const INITIAL_CAMERA_POSITION: [number, number, number] = [0, 520, 440];
 export interface SceneCanvasProps {
   readonly entities: SceneEntities;
   readonly showFireCells: boolean;
+  readonly showRoutes: boolean;
+  readonly showForecast: boolean;
   readonly selectedAgentId: string | null;
   readonly onInspectAgent: (agentId: string) => void;
   readonly onInspectCell: (cell: FireCellMarker) => void;
@@ -25,10 +29,14 @@ export interface SceneCanvasProps {
 }
 
 export const SceneCanvas = forwardRef<CameraControlsHandle, SceneCanvasProps>(function SceneCanvas(
-  { entities, showFireCells, selectedAgentId, onInspectAgent, onInspectCell, onReady, reducedMotion },
+  { entities, showFireCells, showRoutes, showForecast, selectedAgentId, onInspectAgent, onInspectCell, onReady, reducedMotion },
   controlsRef,
 ) {
   const refuges = listRefugeNodes(scenarioMap);
+  const routeLines = useMemo(
+    () => entities.routes.map((line) => ({ ...line, selected: line.agentId === selectedAgentId })),
+    [entities.routes, selectedAgentId],
+  );
 
   return (
     <Canvas
@@ -46,11 +54,13 @@ export const SceneCanvas = forwardRef<CameraControlsHandle, SceneCanvasProps>(fu
       <directionalLight position={[300, 500, 200]} intensity={0.9} />
       <Terrain />
       <Roads />
+      {showForecast && entities.forecast ? <ForecastLayer layer={entities.forecast} /> : null}
       <RefugeMarkers refuges={refuges} />
       <SiteMarkers sites={entities.sites} />
       {showFireCells ? (
         <FireCells cells={entities.fireCells} reducedMotion={reducedMotion} onInspectCell={onInspectCell} />
       ) : null}
+      {showRoutes ? <RouteLayer lines={routeLines} /> : null}
       <AgentMarkers
         agents={entities.agents}
         selectedAgentId={selectedAgentId}

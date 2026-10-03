@@ -48,6 +48,27 @@ export function resolveEdgePoint(
   };
 }
 
+/**
+ * Ordered scene points along an edge, in travel order for the given direction.
+ * Null when the edge or either endpoint is unknown to this scenario map.
+ */
+export function resolveEdgePolyline(
+  map: ScenarioMap,
+  edgeId: string,
+  direction: "forward" | "reverse" = "forward",
+): SceneVector[] | null {
+  const edge = map.edges.get(edgeId);
+  if (!edge) return null;
+  const from = map.nodes.get(edge.fromNodeId);
+  const to = map.nodes.get(edge.toNodeId);
+  if (!from || !to) return null;
+  const points = [
+    { x: from.x, z: from.z },
+    { x: to.x, z: to.z },
+  ];
+  return direction === "forward" ? points : points.reverse();
+}
+
 /** Heading along an edge, flipped for the "reverse" travel direction. */
 export function resolveEdgeHeading(
   map: ScenarioMap,

@@ -6,6 +6,7 @@ import { SceneCanvas } from "./SceneCanvas.js";
 import { SceneLabelLayer, type LabelDescriptor } from "./SceneLabelLayer.js";
 import { SceneLegend } from "./SceneLegend.js";
 import type { CameraControlsHandle } from "./CameraControls.js";
+import { polylineMidpoint } from "./sceneLayers.js";
 import { listRefugeNodes, type FireCellMarker, type SceneEntities } from "./sceneEntities.js";
 import { scenarioMap } from "../../map/scenarioMap.js";
 import { siteProtectionStatusLabel, siteDamageLabel } from "../../format/reports.js";
@@ -35,6 +36,8 @@ export function SceneView({
 }: SceneViewProps) {
   const [renderContext, setRenderContext] = useState<RenderContext | null>(null);
   const [showFireCells, setShowFireCells] = useState(true);
+  const [showRoutes, setShowRoutes] = useState(true);
+  const [showForecast, setShowForecast] = useState(true);
   const [inspectedCell, setInspectedCell] = useState<FireCellMarker | null>(null);
   const controlsRef = useRef<CameraControlsHandle>(null);
   const legendRef = useRef<HTMLDivElement>(null);
@@ -91,7 +94,29 @@ export function SceneView({
       text: agent.callsign,
       variant: "agent" as const,
     }));
-    return [...refugeLabels, ...siteLabels, ...agentLabels];
+    const routeLabels = entities.routes.map((line) => {
+      const mid = polylineMidpoint(line.points);
+      return {
+        id: `route:${line.key}`,
+        x: mid.x,
+        y: 10,
+        z: mid.z,
+        text: line.limitingReason ? `${line.label} — ${line.limitingReason}` : line.label,
+        variant: "route" as const,
+      };
+    });
+    const forecastLabels = (entities.forecast?.bands ?? []).map((band) => {
+      const mid = polylineMidpoint(band.points);
+      return {
+        id: `forecast:${band.key}`,
+        x: mid.x,
+        y: 9,
+        z: mid.z,
+        text: entities.forecast?.trusted ? band.label : `${band.label} (unreliable)`,
+        variant: "forecast" as const,
+      };
+    });
+    return [...refugeLabels, ...siteLabels, ...agentLabels, ...routeLabels, ...forecastLabels];
   }, [entities]);
 
   return (
@@ -100,6 +125,8 @@ export function SceneView({
         ref={controlsRef}
         entities={entities}
         showFireCells={showFireCells}
+        showRoutes={showRoutes}
+        showForecast={showForecast}
         selectedAgentId={selectedAgentId}
         onInspectAgent={onInspectAgent}
         onInspectCell={setInspectedCell}
@@ -116,6 +143,11 @@ export function SceneView({
         ref={legendRef}
         showFireCells={showFireCells}
         onToggleFireCells={() => setShowFireCells((value) => !value)}
+        showRoutes={showRoutes}
+        onToggleRoutes={() => setShowRoutes((value) => !value)}
+        showForecast={showForecast}
+        onToggleForecast={() => setShowForecast((value) => !value)}
+        forecast={entities.forecast}
         onResetCamera={() => controlsRef.current?.reset()}
         fireCells={entities.fireCells}
         onInspectCell={setInspectedCell}

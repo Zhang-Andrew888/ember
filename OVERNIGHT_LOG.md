@@ -1425,3 +1425,14 @@ will also show those main commits. Andrew authorised this branch explicitly (AGE
 
 ### Commit 1: art direction file
 Changed: added `apps/web/ART_DIRECTION.md`. Blocked: nothing. Next: item 1 (route + forecast layers).
+
+### Commit 2: item 1 - route emphasis + forecast layers (real domain fields)
+Changed: `sceneLayers.ts` (pure builders from `agentPlans` / `coordinatorForecast`), `ribbon.ts` (polyline ribbon
+geometry), `patternTextures.ts`, `RouteLayer.tsx`, `ForecastLayer.tsx`, legend toggles + reliability line, labels.
+Phase is carried by pattern (chevrons = approach, solid = work, dashes = return) plus label text. Forecast is amber
+hatching, ribbon width encodes arrival-time spread, labels give incident-time windows; unreliable/rebuilding is dimmed
+and labelled. No "pending contract" shim was needed: `packages/domain` already has both fields.
+Self-critique (screenshots 1440x900 + 1024x720): first render's forecast ribbon swamped the route -> narrowed band
+(6-16), thickened route (4.5/8). Still off: at 1024x720 the legend covers the route start; fire cells sit far from
+roads because the hand-authored map and the 64x64 fire grid use different coordinate frames (item 2 fixes this).
+Blocked: nothing. Next: open PR; item 2 (scenario loader).
