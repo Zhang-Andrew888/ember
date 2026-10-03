@@ -69,6 +69,8 @@ export interface BridgeOptions {
   /** When set with `grokTts`, outgoing speech is synthesized before playback is marked ready. */
   readonly speechStore?: SpeechAudioStore;
   readonly grokTts?: boolean;
+  /** Wall-clock cap for one clip when the browser never acknowledges it. Not simulated time. */
+  readonly playbackAckBudgetMs?: (text: string) => number;
 }
 
 /**
@@ -89,6 +91,8 @@ export class ConversationBridge {
   private readonly phrasing: Phrasing;
   private readonly speechStore: SpeechAudioStore | undefined;
   private readonly grokTts: boolean;
+  /** Browsers currently connected that can play and acknowledge speech. */
+  private speechAudience = 0;
 
   constructor(
     private readonly session: IncidentSession,
@@ -120,7 +124,38 @@ export class ConversationBridge {
       sink: this.sink,
       currentPlanRevision: (agent) => (inc.scenario.agents.some((a) => a.id === agent) ? inc.projectAgent(agent as AgentId).planRevision : 0),
       onEvent: (e) => this.events.push(e),
+      ...(options.playbackAckBudgetMs === undefined ? {} : { ackBudgetMs: options.playbackAckBudgetMs }),
     });
+    // Prepared clips wait for a browser. Otherwise the first line occupies the playing slot forever.
+    if (this.grokTts) this.scheduler.suspendPlayback();
+  }
+
+  /**
+   * The browser finished or failed a clip. Either way the playing slot clears so the next line can start.
+   * A report for a clip that is no longer current is ignored.
+   */
+  acknowledgePlayback(itemId: string, outcome: "ended" | "failed"): void {
+    if (outcome === "failed") this.scheduler.playbackFailed(itemId);
+    else this.scheduler.finished(itemId);
+  }
+
+  /**
+   * How many sockets can hear speech right now. With Grok playback, the last listener leaving releases
+   * the current clip and holds the rest until someone reconnects, so the queue cannot stall.
+   */
+  setSpeechAudience(count: number): void {
+    if (!this.grokTts) return;
+    const previous = this.speechAudience;
+    this.speechAudience = count;
+    if (count === 0) {
+      if (previous > 0) {
+        this.scheduler.suspendPlayback();
+        const playing = this.scheduler.nowPlaying;
+        if (playing !== null) this.scheduler.finished(playing.id);
+      }
+      return;
+    }
+    if (previous === 0) this.scheduler.resumePlayback();
   }
 
   /** What the coordinator has actually received: sensor observations that show fire. */
@@ -151,8 +186,9 @@ export class ConversationBridge {
     return [...ticket.outcomes];
   }
 
-  /** Advance provider timeouts in real time. */
+  /** Advance provider timeouts and the speech acknowledgement budget in wall time. */
   pollWall(wallMs: number): GatewayOutcome[] {
+    this.scheduler.pollPlayback(wallMs);
     const outs = this.gateway.poll(wallMs);
     for (const o of outs) this.apply(o, false);
     return outs;

@@ -36,7 +36,7 @@ import { EndOverlay } from "./components/EndOverlay.js";
 import { ReplayView, type ReplaySource } from "./components/ReplayView.js";
 import { ConnectionBanner } from "./components/ConnectionBanner.js";
 import { DemoBanner } from "./components/DemoBanner.js";
-import { playPreparedSpeech } from "./net/grokSpeechPlayback.js";
+import { acknowledgeAfterPlayback, playPreparedSpeech } from "./net/grokSpeechPlayback.js";
 import { transcribeViaServer } from "./net/grokStt.js";
 
 const INCIDENT_ID = import.meta.env.VITE_INCIDENT_ID ?? "demo";
@@ -112,7 +112,14 @@ export function App() {
     lastAudioCueCount.current = sideband.audioCues.length;
     for (const cue of cues) {
       if (cue.event !== "started") continue;
-      void playPreparedSpeech(REST_BASE_URL ?? "", session.incidentId, session.token, cue.itemId);
+      const itemId = cue.itemId;
+      void acknowledgeAfterPlayback(
+        itemId,
+        () => playPreparedSpeech(REST_BASE_URL ?? "", session.incidentId, session.token, itemId),
+        (id, outcome) => {
+          protocolSocketRef.current?.sendCommand({ type: "speech_playback", itemId: id, outcome });
+        },
+      );
     }
   }, [sideband.audioCues]);
 

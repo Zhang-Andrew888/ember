@@ -23,13 +23,18 @@ describe("net/protocolWebSocket", () => {
 
     const socket = createProtocolWebSocket("ws://example.test/events");
     socket.sendCommand({ type: "say", text: "hello", idempotencyKey: "k1" });
+    socket.sendCommand({ type: "speech_playback", itemId: "sp-1", outcome: "ended" });
 
-    expect(send).toHaveBeenCalledOnce();
-    const payload = JSON.parse(send.mock.calls[0]![0] as string) as {
+    expect(send).toHaveBeenCalledTimes(2);
+    const say = JSON.parse(send.mock.calls[0]![0] as string) as {
       protocolVersion: number;
       message: { type: string; text: string };
     };
-    expect(payload.protocolVersion).toBe(WIRE_PROTOCOL_VERSION);
-    expect(payload.message).toEqual({ type: "say", text: "hello", idempotencyKey: "k1" });
+    expect(say.protocolVersion).toBe(WIRE_PROTOCOL_VERSION);
+    expect(say.message).toEqual({ type: "say", text: "hello", idempotencyKey: "k1" });
+    const playback = JSON.parse(send.mock.calls[1]![0] as string) as {
+      message: { type: string; itemId: string; outcome: string };
+    };
+    expect(playback.message).toEqual({ type: "speech_playback", itemId: "sp-1", outcome: "ended" });
   });
 });

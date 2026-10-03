@@ -48,6 +48,7 @@ export class SessionHub {
     this.outboxes.set(id, []);
     this.ptt.set(id, new PushToTalk());
     this.emitView(this.session.coordinatorView(), id);
+    this.syncAudience();
     return id;
   }
 
@@ -55,12 +56,14 @@ export class SessionHub {
   disconnect(id: ClientId, wallMs: number, partialTranscript = ""): void {
     this.ptt.get(id)?.disconnect(wallMs, partialTranscript);
     this.outboxes.delete(id);
+    this.syncAudience();
   }
 
   /** A returning client keeps its capture state (including an unsent utterance) and gets a fresh view. */
   reconnect(id: ClientId): void {
     if (!this.ptt.has(id)) return;
     this.outboxes.set(id, []);
+    this.syncAudience();
     this.emitView(this.session.coordinatorView(), id);
     const unsent = this.ptt.get(id)?.unsentUtterance;
     if (unsent !== null && unsent !== undefined) {
@@ -93,6 +96,11 @@ export class SessionHub {
 
   private broadcast(message: ServerMessage): void {
     for (const id of [...this.outboxes.keys()]) this.send(id, message);
+  }
+
+  /** Grok playback only starts while a browser is connected to acknowledge it. */
+  private syncAudience(): void {
+    this.bridge.setSpeechAudience(this.outboxes.size);
   }
 
   /** Fixed-text notice: error details stay in the server log, never on the wire. */
@@ -142,6 +150,9 @@ export class SessionHub {
         submit(u.text, `resend-${id}-${u.releasedMs}`);
         return;
       }
+      case "speech_playback":
+        this.bridge.acknowledgePlayback(msg.itemId, msg.outcome);
+        return;
     }
   }
 
