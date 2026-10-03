@@ -1,0 +1,24 @@
+{
+  "_note": "Placeholder. Real scenario requires OSM extract from Oakland hills / Montclair as per SIMULATION.md. Node/edge IDs must be frozen here after Slice 0 map validation.",
+  "version": "v1",
+  "configurationHash": "PENDING",
+  "agents": [
+    { "id": "crew-1", "role": "protection_crew", "callsign": "Crew 1", "startNodeId": "PENDING-refuge-west" },
+    { "id": "crew-2", "role": "protection_crew", "callsign": "Crew 2", "startNodeId": "PENDING-refuge-west" },
+    { "id": "crew-3", "role": "protection_crew", "callsign": "Crew 3", "startNodeId": "PENDING-refuge-south" },
+    { "id": "scout",  "role": "scout",           "callsign": "Scout",  "startNodeId": "PENDING-refuge-south" }
+  ],
+  "sites": [
+    { "id": "site-a", "name": "Ridge Cabins",    "nodeId": "PENDING", "requiredWork": 300, "value": 1 },
+    { "id": "site-b", "name": "Waterworks",      "nodeId": "PENDING", "requiredWork": 450, "value": 1.5 },
+    { "id": "site-c", "name": "Community Lodge", "nodeId": "PENDING", "requiredWork": 600, "value": 2 }
+  ],
+  "refuges": [
+    { "id": "refuge-west",  "nodeId": "PENDING" },
+    { "id": "refuge-south", "nodeId": "PENDING" }
+  ],
+  "initialFirePatch": {
+    "cells": "PENDING",
+    "_note": "2x2 burning cells in upwind quadrant, >= 200 m from all agents and sites"
+  }
+}

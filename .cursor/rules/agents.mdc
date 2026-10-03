@@ -1,0 +1,15 @@
+---
+description: Ember Line multi-agent lane rules
+globs: ["**/*.ts", "**/*.tsx", "**/*.json"]
+alwaysApply: true
+---
+
+Read AGENTS.md at the repo root before any code change.
+
+Quick rules:
+- Never edit packages/domain - open a contract-change GitHub issue instead.
+- Never push to main or the other lane's branch.
+- Keep CI green (typecheck + lint + test) before merging to your lane branch.
+- Use Zod from @ember/domain to validate all cross-boundary data.
+- Distinguish simTimeMs from wallElapsedMs everywhere - they are different branded types.
+- Private world parameters must never appear in coordinator projections or WebSocket messages.

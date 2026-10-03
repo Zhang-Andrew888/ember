@@ -1,0 +1,12 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "paths": {
+      "@ember/domain": ["../packages/domain/src/index.ts"]
+    }
+  },
+  "include": ["fixtures/**/*.ts"]
+}
