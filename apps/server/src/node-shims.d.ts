@@ -85,8 +85,10 @@ declare module "ws" {
     readyState: number;
     send(data: string): void;
     close(code?: number, reason?: string): void;
+    /** Destroy the socket immediately. `close()` alone waits for a handshake. */
+    terminate(): void;
     on(event: "message", cb: (data: { toString(): string }) => void): void;
-    on(event: "close", cb: () => void): void;
+    on(event: "close", cb: (code: number) => void): void;
     on(event: "open", cb: () => void): void;
     on(event: "error", cb: (e: unknown) => void): void;
   }

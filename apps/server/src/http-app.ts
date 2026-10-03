@@ -12,6 +12,34 @@ import type { ClientId } from "./hub.js";
 
 const FLUSH_EVERY_MS = 200;
 const MAX_MESSAGE_BYTES = 64 * 1024;
+/** How long a peer may take to finish a close handshake before the socket is destroyed. */
+const SHUTDOWN_GRACE_MS = 1_000;
+
+/**
+ * `WebSocketServer.close()` in noServer mode does not drop clients; it waits until the set is empty.
+ * Ask each socket to close, then destroy anything still open so shutdown cannot wait forever.
+ */
+function closeWebSockets(wss: WebSocketServer, open: Iterable<WebSocket>): Promise<void> {
+  const tracked = [...open];
+  for (const ws of tracked) ws.close(1001, "shutdown");
+  return new Promise((resolve) => {
+    let settled = false;
+    const timers: unknown[] = [];
+    const finish = (): void => {
+      if (settled) return;
+      settled = true;
+      for (const timer of timers) clearTimeout(timer);
+      resolve();
+    };
+    timers.push(
+      setTimeout(() => {
+        for (const ws of tracked) ws.terminate();
+      }, SHUTDOWN_GRACE_MS),
+    );
+    timers.push(setTimeout(finish, SHUTDOWN_GRACE_MS * 2));
+    wss.close(() => finish());
+  });
+}
 
 export interface HttpAppHandle {
   readonly port: number;
@@ -47,6 +75,7 @@ export async function startHttpApp(options: { port?: number; clock?: MonotonicCl
   const fastify = Fastify({ logger: false });
   const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_MESSAGE_BYTES });
   const sockets = new Map<WebSocket, { clientId: ClientId; record: NonNullable<ReturnType<IncidentRegistry["get"]>> }>();
+  let closing = false;
 
   fastify.get("/health", async () => ({
     ok: true as const,
@@ -149,6 +178,10 @@ export async function startHttpApp(options: { port?: number; clock?: MonotonicCl
 
   fastify.server.on("upgrade", (request: IncomingMessage, socket: unknown, head: Uint8Array) => {
     const rawSocket = socket as { destroy(): void; write(data: string, cb?: () => void): void };
+    if (closing) {
+      rawSocket.destroy();
+      return;
+    }
     let route: ReturnType<typeof parseIncidentPath>;
     try {
       route = parseIncidentPath(request.url);
@@ -176,6 +209,9 @@ export async function startHttpApp(options: { port?: number; clock?: MonotonicCl
     wss.handleUpgrade(request, rawSocket, head, (ws) => {
       const clientId = record.hub.connect();
       sockets.set(ws, { clientId, record });
+      ws.on("error", () => {
+        // A protocol error or a destroyed socket closes the connection; "close" does the cleanup.
+      });
       ws.on("message", (data) => {
         try {
           record.hub.handle(clientId, data.toString(), record.live.wallElapsedMs);
@@ -211,9 +247,10 @@ export async function startHttpApp(options: { port?: number; clock?: MonotonicCl
     port,
     registry,
     close: async () => {
+      closing = true;
       clearInterval(timer);
       await stopReplayWorker();
-      await new Promise<void>((resolve) => wss.close(() => resolve()));
+      await closeWebSockets(wss, sockets.keys());
       await fastify.close();
     },
   };
