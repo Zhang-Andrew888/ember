@@ -129,7 +129,7 @@ export class CrewController implements AgentController {
     return capabilitiesOf(this.role);
   }
 
-  /** Fatigue, injury risk and morale: a crew-internal planning margin that only ever tightens feasibility. */
+  /** Fatigue and morale: a crew-internal planning margin that only ever tightens feasibility. */
   get memberState(): MemberState {
     return this.member;
   }

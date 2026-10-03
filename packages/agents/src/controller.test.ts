@@ -547,11 +547,11 @@ describe("member condition in the controller", () => {
     const scenario = scenarioWith({ fire: far, work: 60 });
     const inc = new Incident({ scenario, seed: "m1", overrides: calm });
     const c = crew(scenario);
-    expect(c.memberState).toEqual({ fatigue: 0, injuryRisk: 0, morale: 1 });
+    expect(c.memberState).toEqual({ fatigue: 0, morale: 1 });
     runControllers(inc, [c], 400_000);
     const m = c.memberState;
     expect(m.fatigue).toBeGreaterThan(0);
-    for (const v of [m.fatigue, m.injuryRisk, m.morale]) {
+    for (const v of [m.fatigue, m.morale]) {
       expect(v).toBeGreaterThanOrEqual(0);
       expect(v).toBeLessThanOrEqual(1);
     }

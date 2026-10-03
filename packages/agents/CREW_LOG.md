@@ -46,3 +46,7 @@ Running log for the crew increments. Newest last.
 - Reopened because the task lists it explicitly. #11 was rejected as outside the docs (SIMULATION.md line 90 "No injury meter"); that tension is unresolved and stated in the PR. Merge is Andrew's call.
 - Re-implemented fresh on current main with no zod and no crew kinds: plain `MemberState` + `parseMemberState`, per-role `FATIGUE_PER_MIN`, `advanceMemberState`, `tightenNav` (monotone, never loosens, onset deadband so rested crews plan exactly as before). Wired into planning and certification via `effectiveNav()`.
 - Dropped from #11: the member-driven refuse/withdraw thresholds (the autonomy policy in main stays keyed to spec triggers only).
+
+## Increment 2, second rework (#26 rejected again)
+- Rejection point 1 was concrete and fixable: `docs/SIMULATION.md` line 90 "No injury meter". Removed `injuryRisk` entirely (state, advance, onset, buffer term, tests); a test pins that only fatigue and morale exist and that extra fields are dropped by `parseMemberState`.
+- Points 2 and 3 (fatigue and morale are not in the docs; tightening is hand-tuned) are plan-level and cannot be fixed in code; `docs/**` is human-authored. Left for Andrew: amend the spec, or close.

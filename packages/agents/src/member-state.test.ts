@@ -9,8 +9,15 @@ describe("member state", () => {
     expect(parseMemberState(FRESH_MEMBER_STATE)).toEqual(FRESH_MEMBER_STATE);
     expect(() => parseMemberState({ ...FRESH_MEMBER_STATE, fatigue: 1.5 })).toThrow(RangeError);
     expect(() => parseMemberState({ ...FRESH_MEMBER_STATE, morale: -0.1 })).toThrow(RangeError);
-    expect(() => parseMemberState({ ...FRESH_MEMBER_STATE, injuryRisk: Number.NaN })).toThrow(RangeError);
+    expect(() => parseMemberState({ ...FRESH_MEMBER_STATE, fatigue: Number.NaN })).toThrow(RangeError);
     expect(() => parseMemberState(null)).toThrow(RangeError);
+  });
+
+  it("has no injury state: only fatigue and morale exist (docs/SIMULATION.md: no injury meter)", () => {
+    expect(Object.keys(FRESH_MEMBER_STATE).sort()).toEqual(["fatigue", "morale"]);
+    const hot = advanceMemberState(FRESH_MEMBER_STATE, attrs, { dtMs: 600_000, activity: "emergency" });
+    expect(Object.keys(hot).sort()).toEqual(["fatigue", "morale"]);
+    expect(Object.keys(parseMemberState({ fatigue: 0.1, morale: 0.9, injuryRisk: 0.5 })).sort()).toEqual(["fatigue", "morale"]);
   });
 
   it("fresh state leaves planning config unchanged", () => {
@@ -26,13 +33,14 @@ describe("member state", () => {
     expect(rested.fatigue).toBeLessThan(worked.fatigue);
   });
 
-  it("emergency exposure raises injury risk and lowers morale; rest never lowers injury risk", () => {
+  it("emergency exposure lowers morale and raises fatigue faster; rest recovers morale only slowly", () => {
     const hot = advanceMemberState(FRESH_MEMBER_STATE, attrs, { dtMs: 60_000, activity: "emergency" });
-    expect(hot.injuryRisk).toBeGreaterThan(0);
+    const moved = advanceMemberState(FRESH_MEMBER_STATE, attrs, { dtMs: 60_000, activity: "travelling" });
     expect(hot.morale).toBeLessThan(1);
-    const rested = advanceMemberState(hot, attrs, { dtMs: 600_000, activity: "resting" });
-    expect(rested.injuryRisk).toBeGreaterThanOrEqual(hot.injuryRisk);
+    expect(hot.fatigue).toBeGreaterThan(moved.fatigue);
+    const rested = advanceMemberState(hot, attrs, { dtMs: 60_000, activity: "resting" });
     expect(rested.morale).toBeGreaterThanOrEqual(hot.morale);
+    expect(1 - rested.morale).toBeGreaterThan(0.5 * (1 - hot.morale));
   });
 
   it("is deterministic and keeps every value inside [0, 1]", () => {
@@ -42,7 +50,7 @@ describe("member state", () => {
       const activity = (["working", "travelling", "emergency", "resting"] as const)[i % 4]!;
       a = advanceMemberState(a, attrs, { dtMs: 37_000, activity });
       b = advanceMemberState(b, attrs, { dtMs: 37_000, activity });
-      for (const v of [a.fatigue, a.injuryRisk, a.morale]) {
+      for (const v of [a.fatigue, a.morale]) {
         expect(v).toBeGreaterThanOrEqual(0);
         expect(v).toBeLessThanOrEqual(1);
       }
@@ -60,13 +68,11 @@ describe("feasibility tightening is monotone and never loosens", () => {
   const levels = [0, 0.25, 0.5, 0.75, 1];
   it("each factor alone only tightens", () => {
     for (const v of levels) {
-      for (const key of ["fatigue", "injuryRisk"] as const) {
-        const nav = tightenNav(DEFAULT_NAV_CONFIG, { ...FRESH_MEMBER_STATE, [key]: v });
-        expect(nav.bufferMs).toBeGreaterThanOrEqual(DEFAULT_NAV_CONFIG.bufferMs);
-        expect(nav.speedMps).toBeLessThanOrEqual(DEFAULT_NAV_CONFIG.speedMps);
-        expect(nav.crewWorkRate).toBeLessThanOrEqual(DEFAULT_NAV_CONFIG.crewWorkRate);
-        expect(nav.crewWorkRate).toBeGreaterThan(0);
-      }
+      const tired = tightenNav(DEFAULT_NAV_CONFIG, { ...FRESH_MEMBER_STATE, fatigue: v });
+      expect(tired.bufferMs).toBeGreaterThanOrEqual(DEFAULT_NAV_CONFIG.bufferMs);
+      expect(tired.speedMps).toBeLessThanOrEqual(DEFAULT_NAV_CONFIG.speedMps);
+      expect(tired.crewWorkRate).toBeLessThanOrEqual(DEFAULT_NAV_CONFIG.crewWorkRate);
+      expect(tired.crewWorkRate).toBeGreaterThan(0);
       const nav = tightenNav(DEFAULT_NAV_CONFIG, { ...FRESH_MEMBER_STATE, morale: 1 - v });
       expect(nav.bufferMs).toBeGreaterThanOrEqual(DEFAULT_NAV_CONFIG.bufferMs);
       expect(nav.speedMps).toBeLessThanOrEqual(DEFAULT_NAV_CONFIG.speedMps);
@@ -74,10 +80,10 @@ describe("feasibility tightening is monotone and never loosens", () => {
   });
 
   it("is monotone in every component over a grid", () => {
-    for (const f of levels) for (const i of levels) for (const m of levels) {
-      const s = { fatigue: f, injuryRisk: i, morale: m };
+    for (const f of levels) for (const m of levels) {
+      const s = { fatigue: f, morale: m };
       const base = tightenNav(DEFAULT_NAV_CONFIG, s);
-      for (const worse of [{ ...s, fatigue: Math.min(1, f + 0.25) }, { ...s, injuryRisk: Math.min(1, i + 0.25) }, { ...s, morale: Math.max(0, m - 0.25) }]) {
+      for (const worse of [{ ...s, fatigue: Math.min(1, f + 0.25) }, { ...s, morale: Math.max(0, m - 0.25) }]) {
         const w = tightenNav(DEFAULT_NAV_CONFIG, worse);
         expect(w.bufferMs).toBeGreaterThanOrEqual(base.bufferMs);
         expect(w.speedMps).toBeLessThanOrEqual(base.speedMps);
@@ -87,17 +93,16 @@ describe("feasibility tightening is monotone and never loosens", () => {
   });
 
   it("leaves a rested member's planning unchanged and tightens a strained one", () => {
-    expect(tightenNav(DEFAULT_NAV_CONFIG, { fatigue: 0.2, injuryRisk: 0, morale: 0.9 })).toEqual(DEFAULT_NAV_CONFIG);
-    const strained = tightenNav(DEFAULT_NAV_CONFIG, { fatigue: 0.9, injuryRisk: 0, morale: 1 });
+    expect(tightenNav(DEFAULT_NAV_CONFIG, { fatigue: 0.2, morale: 0.9 })).toEqual(DEFAULT_NAV_CONFIG);
+    const strained = tightenNav(DEFAULT_NAV_CONFIG, { fatigue: 0.9, morale: 1 });
     expect(strained.bufferMs).toBeGreaterThan(DEFAULT_NAV_CONFIG.bufferMs);
     expect(strained.speedMps).toBeLessThan(DEFAULT_NAV_CONFIG.speedMps);
-    expect(tightenNav(DEFAULT_NAV_CONFIG, { fatigue: 0, injuryRisk: 0.5, morale: 1 }).bufferMs).toBeGreaterThan(DEFAULT_NAV_CONFIG.bufferMs);
-    expect(tightenNav(DEFAULT_NAV_CONFIG, { fatigue: 0, injuryRisk: 0, morale: 0.2 }).bufferMs).toBeGreaterThan(DEFAULT_NAV_CONFIG.bufferMs);
+    expect(tightenNav(DEFAULT_NAV_CONFIG, { fatigue: 0, morale: 0.2 }).bufferMs).toBeGreaterThan(DEFAULT_NAV_CONFIG.bufferMs);
   });
 
   it("never loosens a larger base buffer or a slower base speed", () => {
     const base = { ...DEFAULT_NAV_CONFIG, bufferMs: 90_000, speedMps: 2 };
-    const nav = tightenNav(base, { fatigue: 0.9, injuryRisk: 0.3, morale: 0.5 });
+    const nav = tightenNav(base, { fatigue: 0.9, morale: 0.5 });
     expect(nav.bufferMs).toBeGreaterThanOrEqual(90_000);
     expect(nav.speedMps).toBeLessThanOrEqual(2);
   });
