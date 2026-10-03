@@ -1,8 +1,9 @@
 // This workspace has no @types/node; declare only the Node pieces the offline CLI uses.
 declare module "node:fs" {
   export function writeFileSync(path: string, data: string): void;
+  export function readFileSync(path: string, encoding: "utf8"): string;
 }
-declare const process: { argv: string[]; stdout: { write(s: string): void } };
+declare const process: { argv: string[]; exitCode?: number; stdout: { write(s: string): void } };
 declare function setInterval(handler: () => void, ms: number): unknown;
 declare function setTimeout(handler: (...args: never[]) => void, ms: number): unknown;
 declare function clearInterval(handle: unknown): void;
