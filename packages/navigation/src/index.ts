@@ -7,3 +7,13 @@ export { planMissions, planWithHazard, protectionTargets, workOptions } from "./
 export { certifyPlan, type CertifyFailure, type CertifyInput, type CertifyResult } from "./certify.js";
 export { planRetreat, planReturn, type ReturnPlan } from "./retreat.js";
 export { makeEnsemble, cellOnEdge, cellsOfEdge, type MemberSpec } from "./testing.js";
+export {
+  ReservationService,
+  type Conflict,
+  type Holding,
+  type Occupant,
+  type PriorityClass,
+  type ReserveResult,
+  type Window,
+  type YieldHandler,
+} from "./reservations.js";
