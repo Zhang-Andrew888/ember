@@ -49,6 +49,7 @@ export function ConversationPanel({
   const [draft, setDraft] = useState("");
   const [captureState, setCaptureState] = useState<"idle" | "recording">("idle");
   const browserCaptureRef = useRef<BrowserVoiceCapture | null>(null);
+  const captureStartRef = useRef<Promise<void> | null>(null);
   const adapterRef = useRef<VoiceCaptureAdapter>(
     createVoiceCapture(
       demoMode
@@ -74,13 +75,25 @@ export function ConversationPanel({
     setDraft("");
   };
 
+  const releaseBrowserCapture = (
+    capture: BrowserVoiceCapture,
+    pendingStart: Promise<void> | null,
+  ) => {
+    if (browserCaptureRef.current === capture) browserCaptureRef.current = null;
+    if (captureStartRef.current === pendingStart) captureStartRef.current = null;
+  };
+
   const startCapture = () => {
     if (composerDisabled) return;
     onPttBegin();
     if (grokStt !== undefined) {
-      browserCaptureRef.current = createBrowserVoiceCapture();
-      void browserCaptureRef.current.start().catch(() => {
-        browserCaptureRef.current = null;
+      const capture = createBrowserVoiceCapture();
+      browserCaptureRef.current = capture;
+      const pending = capture.start();
+      captureStartRef.current = pending;
+      void pending.catch(() => {
+        if (browserCaptureRef.current !== capture) return;
+        releaseBrowserCapture(capture, pending);
         setCaptureState("idle");
         onPttCancel();
       });
@@ -95,16 +108,21 @@ export function ConversationPanel({
     setCaptureState("idle");
     if (grokStt !== undefined && browserCaptureRef.current !== null) {
       const capture = browserCaptureRef.current;
-      browserCaptureRef.current = null;
-      void capture.stop().then(async (blob) => {
+      const pendingStart = captureStartRef.current;
+      void (async () => {
+        const blob = await capture.stop();
         if (blob === null) {
           onPttCancel();
+          // Permission may still be pending; hold this capture until tracks are stopped.
+          await pendingStart?.catch(() => undefined);
+          releaseBrowserCapture(capture, pendingStart);
           return;
         }
+        releaseBrowserCapture(capture, pendingStart);
         const text = await grokStt(blob);
         if (text) onPttRelease(text);
         else onPttCancel();
-      });
+      })();
       return;
     }
     const result = adapterRef.current.commit();
@@ -114,11 +132,17 @@ export function ConversationPanel({
 
   const cancelCapture = () => {
     if (captureState === "recording") {
-      browserCaptureRef.current?.cancel();
-      browserCaptureRef.current = null;
+      const capture = browserCaptureRef.current;
+      const pendingStart = captureStartRef.current;
+      capture?.cancel();
       adapterRef.current.cancel();
       setCaptureState("idle");
       onPttCancel();
+      void Promise.resolve(pendingStart)
+        .catch(() => undefined)
+        .finally(() => {
+          if (capture !== null) releaseBrowserCapture(capture, pendingStart);
+        });
     }
   };
 
