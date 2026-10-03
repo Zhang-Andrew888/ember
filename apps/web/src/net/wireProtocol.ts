@@ -27,6 +27,19 @@ export function parseCoordinatorViewFrame(raw: string): CoordinatorView | null {
   return null;
 }
 
+/** Outbound client commands the web app may send on the events socket. */
+export type OutboundClientMessage =
+  | { type: "say"; text: string; idempotencyKey: string }
+  | { type: "ptt_begin" }
+  | { type: "ptt_release"; transcript: string }
+  | { type: "ptt_lost_focus"; transcript: string }
+  | { type: "inspect"; agentId: string };
+
+export function encodeClient(message: OutboundClientMessage): string {
+  return JSON.stringify({ protocolVersion: WIRE_PROTOCOL_VERSION, message });
+}
+
+/** @deprecated Use encodeClient */
 export function encodeClientMessage(message: Record<string, unknown>): string {
   return JSON.stringify({ protocolVersion: WIRE_PROTOCOL_VERSION, message });
 }
