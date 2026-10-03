@@ -20,6 +20,7 @@ const REASONS: Record<string, string> = {
   no_known_passable_route: "No known passable route to refuge.",
   no_feasible_mission_in_model: "No safe mission found.",
   reservation_conflict: "The road slot changed.",
+  yielded_to_higher_priority: "Another crew needs the road first.",
   objective_accepted: "Coordinator objective accepted.",
   mission_admitted: "",
 };
@@ -48,8 +49,14 @@ export function replyForDecision(callsign: string, d: DecisionEvent, phrasing: P
     case "objective_rejected":
       text = phrasing === "radio" ? `${callsign}, cannot comply. ${reason || action}` : `${callsign} cannot do that and return with the required margin. ${reason}`;
       break;
-    case "mission_start":
     case "mission_update":
+      if (d.reasonCode === "yielded_to_higher_priority") {
+        text = phrasing === "radio" ? `${callsign}, yielding the road and replanning. ${reason}` : `${callsign} is yielding the road and replanning. ${reason}`;
+        break;
+      }
+      text = phrasing === "radio" ? `${callsign}, ${action}.` : `${callsign} is ${action}.`;
+      break;
+    case "mission_start":
       text = phrasing === "radio" ? `${callsign}, ${action}.` : `${callsign} is ${action}.`;
       break;
     case "idle":

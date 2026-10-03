@@ -10,7 +10,7 @@ import { DemoBanner } from "./DemoBanner.js";
 describe("components markup", () => {
   it("Briefing exposes start control and site list", () => {
     const html = renderToStaticMarkup(
-      createElement(Briefing, { onStart: () => {}, starting: false, demoMode: false }),
+      createElement(Briefing, { onStart: () => {}, starting: false, demoMode: false, transportMode: "live" }),
     );
     expect(html).toContain("Start incident");
     expect(html).toContain("Sites to protect");
@@ -19,6 +19,7 @@ describe("components markup", () => {
   it("TopBar shows connection and audio status", () => {
     const html = renderToStaticMarkup(
       createElement(TopBar, {
+        transportMode: "live",
         simTimeMs: 60_000,
         wallElapsedMs: 12_000,
         connectionStatus: "open",
@@ -33,6 +34,26 @@ describe("components markup", () => {
     );
     expect(html).toContain("Connected");
     expect(html).toContain("Audio idle");
+    expect(html).toContain("LIVE");
+  });
+
+  it("TopBar shows MOCK when transport is mock", () => {
+    const html = renderToStaticMarkup(
+      createElement(TopBar, {
+        transportMode: "mock",
+        simTimeMs: 60_000,
+        wallElapsedMs: 12_000,
+        connectionStatus: "open",
+        speechSnapshot: {
+          state: "idle",
+          text: null,
+          urgent: false,
+          queuedUrgent: false,
+          queuedRoutineCount: 0,
+        },
+      }),
+    );
+    expect(html).toContain("MOCK");
   });
 
   it("UrgentStrip uses callsign and alert role", () => {

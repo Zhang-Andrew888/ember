@@ -56,11 +56,12 @@ A full held-out run takes on the order of **16 minutes on four cores**. Recorded
 
 ### Measured outcomes (held-out batch, synthetic scenario)
 
-Reported after the “commits before relays within a step” fix; Linux container, Node 22, scenario hash `9c5ecd71…` (see JSON metadata).
+Reported from `heldout-20-seeds.json` (see `measuredAtCommit` / `measuredAt` in the file). Scenario hash `9c5ecd71…`.
+Re-run the held-out CLI on current main before quoting; older snapshots (e.g. **7b2832d**) differed on forecast work (~635 vs **600** now).
 
 | Metric (20 seeds, mean unless noted) | Dispatch | Forecast, no scout | Ember Line |
 |---|---:|---:|---:|
-| Protection work delivered | 802.5 | 634.8 | 633.3 |
+| Protection work delivered | 802.5 | 600 | 600 |
 | Sites protected and standing (of 3) | 1.45 | 1.00 | 1.00 |
 | Sites destroyed | 1.2 | 1.3 | 1.3 |
 | Crews lost (total over 20 runs) | 11 | 0 | 0 |
@@ -68,10 +69,10 @@ Reported after the “commits before relays within a step” fix; Linux containe
 Interpretation (honest):
 
 - The no-forecast baseline delivers more work and saves more sites but **loses crews**; forecast planning trades productivity for safety on this scenario.
-- **Scout showed no measurable benefit** here (633 vs 635 work): crews independently pick the same site at t=0, finish early, then often have no admissible mission; the scripted policy relays only and does not allocate.
-- Authoritative step p95 stayed under 1 ms in harness; replanning p95 ~218–228 ms for forecast variants (target &lt; 500 ms met). Contradiction rebuilds can take 1–4 s in single-threaded offline runs; production should keep heavy forecast work off the step thread.
+- **Scout showed no measurable benefit** here (600 vs 600 work): crews independently pick the same site at t=0, finish early, then often have no admissible mission; the scripted policy relays only and does not allocate.
+- Authoritative step **p95 is 0–1 ms** in the held-out harness (exact percentile, not “under 1 ms”); **max step 3 ms** in the latest run. Replanning p95 ~7–24 ms in that run (target &lt; 500 ms met). Contradiction rebuilds can take 1–4 s in single-threaded offline runs; production should keep heavy forecast work off the step thread.
 
-Performance and failure excerpts are also embedded in `heldout-20-seeds.json` (`failures`, timing fields).
+Performance and failure excerpts are also embedded in `heldout-20-seeds.json` (`failures`, timing fields). For the two-minute demo closing, run `scripts/demo.sh --comparison` — **do not** use `showcase-seed.json` for variant comparison (rehearsal seed only). Safety examples: dispatch crew losses on **heldout-15** (3 crews), **heldout-18** (2), **heldout-19** (2 + stranded).
 
 ## Scenario validation CLI
 

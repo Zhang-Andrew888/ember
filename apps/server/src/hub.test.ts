@@ -6,6 +6,7 @@ import { ConversationBridge } from "./conversation.js";
 import { LiveRun, SessionHub } from "./hub.js";
 import { parseServerWire } from "./protocol.js";
 import { IncidentSession } from "./session.js";
+import { ViewRecorder } from "./view-recorder.js";
 
 vi.setConfig({ testTimeout: 300_000 });
 
@@ -42,7 +43,7 @@ function setup(scenario?: SimScenario) {
   const sc = scenario ?? { ...base, map: { ...base.map, initialFireCells: patch(230, 1100) } };
   const session = new IncidentSession({ scenario: sc, seed: SECRET_SEED, overrides: { spreadMultiplier: 1.3737373, windShiftMs: 333_000, initialWindRad: 0.1234567 }, controllerConfig: { forecast: steady } });
   const bridge = new ConversationBridge(session);
-  const hub = new SessionHub(session, bridge);
+  const hub = new SessionHub(session, bridge, new ViewRecorder());
   const clock = new FakeClock();
   const live = new LiveRun(session, bridge, hub, clock);
   return { session, bridge, hub, clock, live };
@@ -163,22 +164,43 @@ describe("wire protocol and information boundary", () => {
     expect(bridge.scheduler.isRecording).toBe(false);
   });
 
-  it("retains a half-submitted utterance as unsent and only sends it on explicit resend", () => {
+  it("does not submit or retain a half-captured utterance when the socket closes", () => {
     const { hub, session } = setup();
     const id = hub.connect();
     hub.drain(id);
     hub.handle(id, JSON.stringify({ type: "ptt_begin" }), 1000);
     hub.disconnect(id, 2500, "Crew 2, protect the");
-    // Capture times are wall milliseconds throughout, never mixed with simulated time.
-    expect(hub.unsentUtterance(id)).toMatchObject({ startedMs: 1000, releasedMs: 2500 });
     expect(session.incident.inputLog).toHaveLength(0);
+    expect(hub.unsentUtterance(id)).toBeNull();
+    expect(hub.retainedClients()).toEqual({ capture: 0, outboxes: 0, backpressure: 0 });
     hub.reconnect(id);
-    const back = hub.drain(id).map(wire);
-    const unsentNotice = back.find((m) => m.type === "notice" && m.kind === "unsent_utterance");
-    expect(unsentNotice?.type === "notice" ? unsentNotice.detail : undefined).toBe("Crew 2, protect the");
+    expect(hub.drain(id)).toEqual([]);
     hub.handle(id, JSON.stringify({ type: "resend" }), 9000);
-    const after = hub.drain(id).map(wire);
-    expect(after.some((m) => m.type === "receipt")).toBe(true);
+    expect(hub.drain(id)).toEqual([]);
+    expect(session.incident.inputLog).toHaveLength(0);
+  });
+
+  it("releases capture and backpressure state across connect/disconnect churn", () => {
+    const { hub } = setup();
+    const bad = JSON.stringify({ type: "teleport" });
+    for (let i = 0; i < 100; i++) {
+      const id = hub.connect();
+      if (i === 0) {
+        hub.handle(id, JSON.stringify({ type: "ptt_begin" }), 1000);
+        hub.disconnect(id, 1500, "Crew 2, protect the");
+      } else if (i === 1) {
+        for (let n = 0; n < 4200; n++) hub.handle(id, bad, 0);
+        expect(hub.backpressureClosed.has(id)).toBe(true);
+        hub.disconnect(id, 2000);
+      } else {
+        hub.disconnect(id, 1000 + i);
+      }
+    }
+    expect(hub.retainedClients()).toEqual({ capture: 0, outboxes: 0, backpressure: 0 });
+    const live = hub.connect();
+    expect(hub.retainedClients()).toEqual({ capture: 1, outboxes: 1, backpressure: 0 });
+    hub.disconnect(live, 5000);
+    expect(hub.retainedClients()).toEqual({ capture: 0, outboxes: 0, backpressure: 0 });
   });
 });
 

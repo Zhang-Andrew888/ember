@@ -66,12 +66,22 @@ function reportLine(report: CoordinatorReportEntry, callsignFor: (agentId: strin
   };
 }
 
-function wireTranscriptLine(message: WireTranscript): TranscriptLine {
+/** Display name for a wire transcript author: the player's own words are "You", never "Coordinator". */
+const WIRE_SPEAKER: Record<WireTranscript["kind"], string> = {
+  coordinator: "You",
+  control: "Control",
+  agent: "Crew",
+  system: "System",
+};
+
+function wireTranscriptLine(message: WireTranscript, view: CoordinatorView | null): TranscriptLine {
+  const callsign =
+    message.kind === "agent" ? view?.agents.find((agent) => message.text.startsWith(agent.callsign))?.callsign : undefined;
   return {
     id: `wire-t:${message.simTimeMs}:${message.text.slice(0, 24)}`,
-    kind: transcriptKind(message.kind),
+    kind: message.kind === "agent" ? "agent_report" : transcriptKind(message.kind),
     simTimeMs: message.simTimeMs,
-    speaker: message.kind === "coordinator" ? "Coordinator" : message.kind,
+    speaker: callsign ?? WIRE_SPEAKER[message.kind],
     text: message.text,
     urgent: message.urgent,
   };
@@ -82,7 +92,7 @@ function receiptLine(receipt: WireReceipt, index: number, fallbackSimTimeMs: num
     id: `receipt:${receipt.receipt.commandId as string}:${index}`,
     kind: outcomeKind(receipt.receipt),
     simTimeMs: (receipt.receipt.appliedTick as number | null) ?? fallbackSimTimeMs,
-    speaker: "Coordinator",
+    speaker: "Control",
     text: receipt.reply || receipt.receipt.explanation,
     urgent: false,
   };
@@ -102,13 +112,19 @@ export function buildConversationTranscript(
       lines.push(reportLine(report, callsignFor));
     }
   }
-  for (const message of sideband.transcripts) {
-    lines.push(wireTranscriptLine(message));
-  }
   const fallbackSimTimeMs = view ? (view.simTimeMs as number) : 0;
-  sideband.receipts.forEach((receipt, index) => {
-    lines.push(receiptLine(receipt, index, fallbackSimTimeMs));
-  });
+  const receiptLines = sideband.receipts.map((receipt, index) => receiptLine(receipt, index, fallbackSimTimeMs));
+  const receiptTexts = new Set(receiptLines.map((line) => line.text));
+  for (const message of sideband.transcripts) {
+    // Routine agent lines repeat the agent's report (the view already carries it), and a control
+    // line repeats the matching receipt reply; keep the one that carries the richer state.
+    if (message.kind === "agent" && !message.urgent) continue;
+    if (message.kind === "control" && receiptTexts.has(message.text)) continue;
+    lines.push(wireTranscriptLine(message, view));
+  }
+  lines.push(...receiptLines);
 
-  return lines.sort((a, b) => a.simTimeMs - b.simTimeMs || a.id.localeCompare(b.id));
+  // At the same sim time the player's own message reads before the reply to it.
+  const rank = (line: TranscriptLine): number => (line.speaker === "You" ? 0 : 1);
+  return lines.sort((a, b) => a.simTimeMs - b.simTimeMs || rank(a) - rank(b) || a.id.localeCompare(b.id));
 }

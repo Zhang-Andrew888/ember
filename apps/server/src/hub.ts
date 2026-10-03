@@ -3,7 +3,9 @@ import { dueSimTimeMs, SIM_DEFAULTS } from "@ember/simulation";
 import type { ConversationBridge } from "./conversation.js";
 import { decode, encodeServer, type ServerMessage } from "./protocol.js";
 import type { MonotonicClock, TechnicalFailure } from "./runner.js";
+import type { CoordinatorView } from "@ember/domain";
 import type { IncidentSession } from "./session.js";
+import type { ViewRecorder } from "./view-recorder.js";
 
 export type ClientId = number;
 
@@ -13,6 +15,8 @@ export type ClientId = number;
  */
 /** Slow clients must reconnect after overflow; a reading client drains every flush (~200 ms). */
 const MAX_OUTBOX_MESSAGES = 4096;
+
+export const TECHNICAL_FAILURE_DETAIL = "A technical problem occurred on the server.";
 
 export class SessionHub {
   private readonly outboxes = new Map<ClientId, string[]>();
@@ -31,38 +35,60 @@ export class SessionHub {
   constructor(
     private readonly session: IncidentSession,
     private readonly bridge: ConversationBridge,
+    private readonly viewRecorder: ViewRecorder,
     private readonly viewEverySteps = 1,
   ) {}
+
+  private emitView(view: CoordinatorView, clientId?: ClientId): void {
+    this.viewRecorder.record(view);
+    if (clientId !== undefined) this.send(clientId, { type: "view", view });
+    else this.broadcast({ type: "view", view });
+  }
 
   connect(): ClientId {
     const id = this.nextClient++;
     this.outboxes.set(id, []);
     this.ptt.set(id, new PushToTalk());
-    this.send(id, { type: "view", view: this.session.coordinatorView() });
+    this.emitView(this.session.coordinatorView(), id);
     return id;
   }
 
-  /** A closed socket mid-capture keeps its transcript as unsent for explicit resend. */
+  /**
+   * Release a closed socket. A partial utterance is finished as unsent and then dropped with the
+   * rest of that client's capture state — production reconnects allocate a new id, so retaining
+   * it would keep every closed client for the life of the incident. Nothing is submitted.
+   */
   disconnect(id: ClientId, wallMs: number, partialTranscript = ""): void {
     const capture = this.ptt.get(id);
     const wasRecording = capture?.state === "recording";
     capture?.disconnect(wallMs, partialTranscript);
+    this.ptt.delete(id);
     if (wasRecording) this.noteCaptureEnded(id);
     this.outboxes.delete(id);
+    this.backpressureClosed.delete(id);
   }
 
-  /** A returning client keeps its capture state (including an unsent utterance) and gets a fresh view. */
+  /** Per-client records still held. Closed sockets must not remain in any of these. */
+  retainedClients(): { capture: number; outboxes: number; backpressure: number } {
+    return {
+      capture: this.ptt.size,
+      outboxes: this.outboxes.size,
+      backpressure: this.backpressureClosed.size,
+    };
+  }
+
+  /** A client that still has capture state gets a fresh view. A disconnected id has none. */
   reconnect(id: ClientId): void {
     if (!this.ptt.has(id)) return;
     this.outboxes.set(id, []);
-    this.send(id, { type: "view", view: this.session.coordinatorView() });
+    this.emitView(this.session.coordinatorView(), id);
     const unsent = this.ptt.get(id)?.unsentUtterance;
     if (unsent !== null && unsent !== undefined) {
       this.send(id, { type: "notice", kind: "unsent_utterance", detail: unsent.text });
     }
   }
 
-  /** The utterance a client left half-submitted, kept for explicit resend. */
+  /** Half-submitted utterance for a client that still has capture state; null after release. */
   unsentUtterance(id: ClientId): Utterance | null {
     return this.ptt.get(id)?.unsentUtterance ?? null;
   }
@@ -98,6 +124,11 @@ export class SessionHub {
   private noteCaptureEnded(id: ClientId): void {
     if (!this.recordingClients.delete(id)) return;
     if (this.recordingClients.size === 0) this.bridge.scheduler.stopRecording();
+  }
+
+  /** Fixed-text notice: error details stay in the server log, never on the wire. */
+  notifyTechnicalFailure(): void {
+    this.broadcast({ type: "notice", kind: "technical_failure", detail: TECHNICAL_FAILURE_DETAIL });
   }
 
   handle(id: ClientId, raw: string, wallMs: number): void {
@@ -152,7 +183,7 @@ export class SessionHub {
     const stepIndex = Math.floor(inc.simTimeMs / SIM_DEFAULTS.stepMs);
     if (stepIndex !== this.lastViewStep && stepIndex % this.viewEverySteps === 0) {
       this.lastViewStep = stepIndex;
-      this.broadcast({ type: "view", view: this.session.coordinatorView() });
+      this.emitView(this.session.coordinatorView());
     }
     for (; this.transcriptPointer < this.bridge.transcript.length; this.transcriptPointer++) {
       const t = this.bridge.transcript[this.transcriptPointer]!;
@@ -169,7 +200,7 @@ export class SessionHub {
     for (const n of this.bridge.gateway.takeNotices()) this.broadcast({ type: "notice", kind: n.kind, detail: n.commandId });
     if (inc.ended && !this.endSent && inc.end !== null) {
       this.endSent = true;
-      this.broadcast({ type: "view", view: this.session.coordinatorView() });
+      this.emitView(this.session.coordinatorView());
       this.broadcast({ type: "ended", end: inc.end });
     }
   }
@@ -183,6 +214,7 @@ export class SessionHub {
 export class LiveRun {
   readonly failures: TechnicalFailure[] = [];
   private startedAt: number | null = null;
+  private halted = false;
 
   constructor(
     readonly session: IncidentSession,
@@ -198,6 +230,31 @@ export class LiveRun {
 
   start(): void {
     if (this.startedAt === null) this.startedAt = this.clock.nowMs();
+  }
+
+  /** True once a pump threw; the incident is frozen and clients were told once. */
+  get isHalted(): boolean {
+    return this.halted;
+  }
+
+  /**
+   * Pump that never throws. The world is only advanced by `pump`, so after an exception its state
+   * can't be trusted: stop pumping this incident, tell clients once, and keep serving the process.
+   */
+  safePump(): void {
+    if (this.halted) return;
+    try {
+      this.pump();
+    } catch (error) {
+      this.halted = true;
+      this.failures.push({ kind: "internal_error", atWallMs: this.wallElapsedMs });
+      process.stderr.write(`ember-server: incident pump failed: ${error instanceof Error ? (error.stack ?? error.message) : String(error)}\n`);
+      try {
+        this.hub.notifyTechnicalFailure();
+      } catch {
+        // Notifying is best effort; the halt above already protects the process.
+      }
+    }
   }
 
   pump(): void {

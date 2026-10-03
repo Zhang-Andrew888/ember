@@ -1,8 +1,11 @@
 import type { ConnectionStatus } from "../net/CoordinatorViewClient.js";
+import type { TransportMode } from "../net/transportMode.js";
 import type { SpeechPlaybackSnapshot } from "../state/speechPlaybackStub.js";
-import { formatIncidentClock, formatRemainingWallTime } from "../format/time.js";
+import { TIME_COMPRESSION, formatIncidentClock, formatRemainingWallTime } from "../format/time.js";
+import { TransportModeBadge } from "./TransportModeBadge.js";
 
 export interface TopBarProps {
+  readonly transportMode: TransportMode;
   readonly simTimeMs: number | null;
   readonly wallElapsedMs: number | null;
   readonly connectionStatus: ConnectionStatus;
@@ -27,16 +30,22 @@ function audioStatusLabel(snapshot: SpeechPlaybackSnapshot): string {
   return "Audio active";
 }
 
-export function TopBar({ simTimeMs, wallElapsedMs, connectionStatus, speechSnapshot }: TopBarProps) {
+export function TopBar({ transportMode, simTimeMs, wallElapsedMs, connectionStatus, speechSnapshot }: TopBarProps) {
   return (
     <header className="top-bar">
       <span className="top-bar__title">EMBER LINE</span>
-      <span className="top-bar__clock" aria-label="Incident clock">
-        {simTimeMs === null ? "—:—" : formatIncidentClock(simTimeMs)}
+      <TransportModeBadge mode={transportMode} />
+      <span
+        className="top-bar__clock"
+        aria-label="Simulated incident time"
+        title={`Incident time runs ${TIME_COMPRESSION}x faster than the clock on the wall`}
+      >
+        {simTimeMs === null ? "—:—" : formatIncidentClock(simTimeMs)} simulated
       </span>
       <span className="top-bar__remaining" aria-label="Remaining real time">
-        {wallElapsedMs === null ? "5:00 remaining" : `${formatRemainingWallTime(wallElapsedMs)} remaining`}
+        {wallElapsedMs === null ? "5:00 real time left" : `${formatRemainingWallTime(wallElapsedMs)} real time left`}
       </span>
+      <span className="top-bar__compression">Incident time runs {TIME_COMPRESSION}× faster than real time</span>
       <span className={`top-bar__status top-bar__status--${connectionStatus}`} role="status">
         {CONNECTION_LABEL[connectionStatus]}
       </span>

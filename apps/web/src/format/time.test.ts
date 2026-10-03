@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { formatIncidentClock, formatRemainingWallTime } from "./time.js";
+import { TIME_COMPRESSION, formatElapsedWallTime, formatIncidentClock, formatRemainingWallTime } from "./time.js";
 
 describe("format/time - formatIncidentClock", () => {
   it("formats zero as 0:00", () => {
@@ -26,5 +26,14 @@ describe("format/time - formatRemainingWallTime", () => {
 
   it("never goes negative past the deadline", () => {
     expect(formatRemainingWallTime(10 * 60 * 1000)).toBe("0:00");
+  });
+
+  it("compresses 25 simulated minutes into the five-minute wall limit (5x)", () => {
+    expect(TIME_COMPRESSION).toBe(5);
+  });
+
+  it("formats elapsed real time from wallElapsedMs", () => {
+    expect(formatElapsedWallTime(300_000)).toBe("5:00");
+    expect(formatElapsedWallTime(61_000)).toBe("1:01");
   });
 });

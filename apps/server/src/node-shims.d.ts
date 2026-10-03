@@ -13,6 +13,17 @@ declare module "node:path" {
 declare module "node:url" {
   export function fileURLToPath(url: string | URL): string;
 }
+declare module "node:worker_threads" {
+  export class Worker {
+    constructor(filename: URL | string);
+    postMessage(value: unknown): void;
+    on(event: "message", listener: (value: unknown) => void): void;
+    on(event: "error", listener: (error: Error) => void): void;
+    on(event: "exit", listener: (code: number) => void): void;
+    terminate(): Promise<number>;
+    unref(): void;
+  }
+}
 declare module "node:http" {
   export interface IncomingMessage {
     url?: string;
@@ -45,6 +56,17 @@ declare class FormData {
 declare function setInterval(handler: () => void, ms: number): unknown;
 declare function setTimeout(handler: (...args: never[]) => void, ms: number): unknown;
 declare function clearInterval(handle: unknown): void;
+declare function clearTimeout(handle: unknown): void;
+declare module "node:net" {
+  export interface Socket {
+    write(data: string): void;
+    destroy(): void;
+    on(event: "data", cb: (chunk: { toString(): string }) => void): void;
+    on(event: "close", cb: () => void): void;
+    on(event: "error", cb: (err: unknown) => void): void;
+  }
+  export function connect(port: number, host: string, listener?: () => void): Socket;
+}
 declare const performance: { now(): number };
 declare const fetch: (
   input: string,

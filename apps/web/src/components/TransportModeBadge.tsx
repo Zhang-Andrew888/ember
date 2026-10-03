@@ -1,0 +1,19 @@
+import type { TransportMode } from "../net/transportMode.js";
+
+export interface TransportModeBadgeProps {
+  readonly mode: TransportMode;
+}
+
+/** Always-visible LIVE vs MOCK so a stale mock dev server is obvious at a glance. */
+export function TransportModeBadge({ mode }: TransportModeBadgeProps) {
+  const label = mode === "live" ? "LIVE" : "MOCK";
+  return (
+    <span
+      className={`transport-mode transport-mode--${mode}`}
+      role="status"
+      aria-label={mode === "live" ? "Live server transport" : "In-browser mock transport"}
+    >
+      {label}
+    </span>
+  );
+}

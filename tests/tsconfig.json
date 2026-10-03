@@ -8,5 +8,5 @@
       "@ember/domain": ["../packages/domain/src/index.ts"]
     }
   },
-  "include": ["fixtures/**/*.ts"]
+  "include": ["fixtures/**/*.ts", "scripts/**/*.test.ts"]
 }

@@ -12,8 +12,15 @@ function portFromEnv(): number {
   return parsed;
 }
 
+/** Optional operator seed for a rehearsed, reproducible fire. Never accepted from a request body. */
+function seedFromEnv(): string | undefined {
+  const raw = process.env["DEMO_SEED"];
+  return raw === undefined || raw === "" ? undefined : raw;
+}
+
 async function main(): Promise<void> {
-  const app = await startHttpApp({ port: portFromEnv() });
+  const seed = seedFromEnv();
+  const app = await startHttpApp({ port: portFromEnv(), ...(seed === undefined ? {} : { seed }) });
   // The web dev server (apps/web/vite.config.ts) proxies /incidents and /health to this address.
   process.stdout.write(`ember-server listening on http://127.0.0.1:${app.port}\n`);
 

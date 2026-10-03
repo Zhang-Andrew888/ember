@@ -53,11 +53,11 @@ describe("buildForecastLayer", () => {
     expect(buildForecastLayer({ ...view, coordinatorForecast: null }, scenarioMap)).toBeNull();
   });
 
-  it("labels arrival windows in incident time and encodes spread as width", () => {
+  it("labels arrival windows in simulated time and encodes spread as width", () => {
     const layer = buildForecastLayer(view, scenarioMap)!;
     expect(layer.trusted).toBe(true);
     const band = layer.bands[0]!;
-    expect(band.label).toBe("fire may reach 2:30–5:30 (incident time)");
+    expect(band.label).toBe("fire may reach 2:30–5:30 (simulated time)");
     expect(band.spreadMs).toBe(180_000);
     expect(band.widthUnits).toBe(bandWidthForSpread(180_000));
   });

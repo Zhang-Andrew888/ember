@@ -1,0 +1,50 @@
+{
+  "label": "MacBook Pro 16-inch 2023, Apple M2 Pro, macOS <version>",
+  "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Pro, Unspecified Version)",
+  "softwareRendering": false,
+  "targetFps": 30,
+  "secondsPerTier": 6,
+  "date": "2026-10-03T20:32:07.675Z",
+  "node": "v24.8.0",
+  "results": [
+    {
+      "viewport": "1440x900",
+      "tier": "low",
+      "frames": 721,
+      "meanMs": 8.32,
+      "p50Ms": 8.3,
+      "p95Ms": 9.3,
+      "p99Ms": 9.4,
+      "maxMs": 17.6,
+      "fps": 120.17,
+      "over33msShare": 0,
+      "meetsTarget": true
+    },
+    {
+      "viewport": "1440x900",
+      "tier": "medium",
+      "frames": 719,
+      "meanMs": 8.34,
+      "p50Ms": 8.3,
+      "p95Ms": 9.3,
+      "p99Ms": 9.4,
+      "maxMs": 17.5,
+      "fps": 119.84,
+      "over33msShare": 0,
+      "meetsTarget": true
+    },
+    {
+      "viewport": "1440x900",
+      "tier": "high",
+      "frames": 719,
+      "meanMs": 8.34,
+      "p50Ms": 8.3,
+      "p95Ms": 9.3,
+      "p99Ms": 9.4,
+      "maxMs": 16.7,
+      "fps": 119.92,
+      "over33msShare": 0,
+      "meetsTarget": true
+    }
+  ]
+}

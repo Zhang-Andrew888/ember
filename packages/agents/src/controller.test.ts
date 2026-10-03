@@ -72,6 +72,10 @@ describe("autonomous mission selection", () => {
     expect(starts.length).toBeGreaterThanOrEqual(2);
     expect(new Set(starts.map((s) => s.event.actualAction.split(" (")[0])).size).toBe(2);
     for (const s of inc.truth().sites) expect(s.completedWork).toBeLessThanOrEqual(45);
+    // Player-facing text names refuges and sites, never raw map node ids (issue #45).
+    const nodeIds = scenario.map.nodes.map((n) => n.id as string);
+    for (const d of log.decisions) for (const id of nodeIds) expect(d.event.actualAction).not.toContain(id);
+    expect(starts[0]?.event.actualAction).toMatch(/return to Refuge/);
   });
 
   it("holds without falsely resolving sites when no mission has a safe return", () => {

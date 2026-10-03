@@ -92,6 +92,19 @@ With `XAI_INTENT=1` on the server, typed and STT-transcribed commands are interp
 
 **Mic / browser:** allow microphone when prompted; use HTTPS or localhost. If Grok is off, the UI falls back to mock/stub playback where implemented.
 
+## Demo launcher and pitch numbers
+
+```sh
+scripts/demo.sh                 # live server + web (see scripts/demo.sh --help)
+scripts/demo.sh --comparison    # held-out variant table for VALIDATION.md beat 6 (no server)
+```
+
+Use **held-out** aggregates only for the comparison pitch; `showcase-1` is rehearsal-only. Re-run held-out on current main before updating docs:
+
+```sh
+pnpm --filter ember-server exec tsx src/evaluate-cli.ts heldout evaluation-results/heldout-20-seeds.json
+```
+
 ## Offline evaluation and navigation calibration
 
 No server or API keys. Scripted coordinator policy only. Read caveats in [docs/SERVER_AND_EVALUATION.md](docs/SERVER_AND_EVALUATION.md) before citing metrics.
@@ -120,6 +133,8 @@ Presets: `packages/navigation/src/calibration-grid.ts` ([packages/navigation/REA
 | `grokVoice: false` in `/health` | `XAI_API_KEY` exported in the server process |
 | Commands behave like keywords only | `XAI_INTENT=1` on server; restart `dev-http.ts` after env changes |
 | WS errors | Token on incident create; proxy ws enabled (default Vite config) |
+| Clock frozen ~1:40, commands canned | Likely **mock** Vite on `[::1]:5173` while live demo runs on `127.0.0.1`. Use **http://127.0.0.1:5173/** or stop stale listeners: `lsof -iTCP:5173 -sTCP:LISTEN`. Top bar must show **LIVE**, not MOCK. |
+| `scripts/demo.sh` refuses to start | Port already in use (IPv4 or IPv6). Kill the listed PID or change `WEB_PORT` / `PORT`. |
 
 ## Package entry points
 

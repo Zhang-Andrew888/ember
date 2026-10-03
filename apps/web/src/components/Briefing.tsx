@@ -4,6 +4,8 @@ import { colors } from "../styles/colors.js";
 import { MicCheck } from "./MicCheck.js";
 import { createVoiceCapture } from "../net/voiceCapture.js";
 import { DemoBanner } from "./DemoBanner.js";
+import { TransportModeBadge } from "./TransportModeBadge.js";
+import type { TransportMode } from "../net/transportMode.js";
 
 export interface BriefingProps {
   readonly onStart: () => void;
@@ -11,6 +13,7 @@ export interface BriefingProps {
   /** Why the last Start attempt failed, if it did; shown so Start never fails silently. */
   readonly error?: string | null;
   readonly demoMode: boolean;
+  readonly transportMode: TransportMode;
 }
 
 /**
@@ -20,13 +23,16 @@ export interface BriefingProps {
  * pressed - App.tsx only begins snapshot playback / calls the start
  * endpoint from onStart.
  */
-export function Briefing({ onStart, starting, demoMode, error = null }: BriefingProps) {
+export function Briefing({ onStart, starting, demoMode, transportMode, error = null }: BriefingProps) {
   const probeMic = useCallback(() => createVoiceCapture({ preferMicrophone: true }).probeMicrophone(), []);
 
   return (
     <div className="briefing">
       {demoMode ? <DemoBanner /> : null}
-      <h1 className="briefing__title">EMBER LINE</h1>
+      <div className="briefing__header">
+        <h1 className="briefing__title">EMBER LINE</h1>
+        <TransportModeBadge mode={transportMode} />
+      </div>
       <p className="briefing__incident-label">{briefingIncidentLabel}</p>
 
       <section aria-labelledby="briefing-sites-heading">

@@ -142,7 +142,7 @@ Different policies may end at different times when sites resolve. Final health i
 | 0:40–1:00 | Scout discovers a change; use push-to-talk to relay its evidence to one crew |
 | 1:00–1:25 | Show independent replanning, urgent withdrawal, and automatic safe yielding |
 | 1:25–1:45 | Show retained protection, actual crew state, and an ending condition |
-| 1:45–2:00 | Replay full fire and present measured comparison outcomes with caveats |
+| 1:45–2:00 | Replay full fire; run `scripts/demo.sh --comparison` for **held-out** aggregates and caveats (not `showcase-1`). For safety contrast, cite **heldout-15**, **heldout-18**, or **heldout-19** (dispatch losses vs zero forecast losses). |
 
 Use recorded/condensed portions of a five-minute-capable run where necessary; do not imply that the two-minute presentation is the entire interaction duration. Rehearse a showcase seed separately from evaluation seeds. The system should still run live, and the presentation must not fabricate its outcomes.
 
