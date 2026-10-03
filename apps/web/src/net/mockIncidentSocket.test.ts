@@ -80,4 +80,56 @@ describe("net/mockIncidentSocket - createMockIncidentSocket", () => {
     expect(onmessage).not.toHaveBeenCalled();
     expect(socket.readyState).toBe(3);
   });
+
+  it("failToOpen fires onerror then onclose, never onopen", () => {
+    const socket = createMockIncidentSocket({ failToOpen: true });
+    const onopen = vi.fn();
+    const onerror = vi.fn();
+    const onclose = vi.fn();
+    socket.onopen = onopen;
+    socket.onerror = onerror;
+    socket.onclose = onclose;
+
+    vi.advanceTimersByTime(0);
+
+    expect(onopen).not.toHaveBeenCalled();
+    expect(onerror).toHaveBeenCalledTimes(1);
+    expect(onclose).toHaveBeenCalledTimes(1);
+    expect(socket.readyState).toBe(3);
+  });
+
+  it("disconnectAfterMs opens normally, delivers snapshots, then self-closes", () => {
+    const socket = createMockIncidentSocket({ intervalMs: 100, disconnectAfterMs: 500 });
+    const onopen = vi.fn();
+    const onclose = vi.fn();
+    const received: unknown[] = [];
+    socket.onopen = onopen;
+    socket.onclose = onclose;
+    socket.onmessage = (event) => received.push(JSON.parse(event.data));
+
+    vi.advanceTimersByTime(0);
+    expect(onopen).toHaveBeenCalledTimes(1);
+    expect(socket.readyState).toBe(1);
+
+    socket.start();
+    vi.advanceTimersByTime(100 * authoredSnapshots.length);
+    expect(received.length).toBeGreaterThan(0);
+    expect(onclose).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(500);
+    expect(onclose).toHaveBeenCalledTimes(1);
+    expect(socket.readyState).toBe(3);
+  });
+
+  it("disconnectAfterMs does not fire a second close if close() was already called", () => {
+    const socket = createMockIncidentSocket({ disconnectAfterMs: 200 });
+    const onclose = vi.fn();
+    socket.onclose = onclose;
+
+    vi.advanceTimersByTime(0);
+    socket.close();
+    vi.advanceTimersByTime(200);
+
+    expect(onclose).toHaveBeenCalledTimes(1);
+  });
 });

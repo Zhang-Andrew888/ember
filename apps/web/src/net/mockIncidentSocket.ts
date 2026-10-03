@@ -112,8 +112,21 @@ export interface MockIncidentSocket extends WebSocketLike {
 export interface MockIncidentSocketOptions {
   readonly snapshots?: CoordinatorView[];
   readonly intervalMs?: number;
+  /**
+   * Simulates a connection that fails before ever opening (e.g. server
+   * unreachable) - fires onerror then onclose instead of onopen. For the
+   * dev/test "connection error" scenario.
+   */
+  readonly failToOpen?: boolean;
+  /**
+   * Simulates the server dropping an otherwise-healthy connection this many
+   * ms after opening (CoordinatorViewClient's own reconnect logic takes it
+   * from there). For the dev/test "disconnected and reconnecting" scenario.
+   */
+  readonly disconnectAfterMs?: number;
 }
 
+const CONNECTING = 0;
 const OPEN = 1;
 const CLOSED = 3;
 
@@ -126,7 +139,7 @@ export function createMockIncidentSocket(options: MockIncidentSocketOptions = {}
   const snapshots = options.snapshots ?? authoredSnapshots;
   const intervalMs = options.intervalMs ?? 2000;
 
-  let readyState = 0;
+  let readyState = CONNECTING;
   let started = false;
   const timers: Array<ReturnType<typeof setTimeout>> = [];
 
@@ -158,10 +171,31 @@ export function createMockIncidentSocket(options: MockIncidentSocketOptions = {}
     },
   };
 
+  if (options.failToOpen) {
+    timers.push(
+      setTimeout(() => {
+        readyState = CLOSED;
+        socket.onerror?.();
+        socket.onclose?.();
+      }, 0),
+    );
+    return socket;
+  }
+
   timers.push(
     setTimeout(() => {
       readyState = OPEN;
       socket.onopen?.();
+
+      if (options.disconnectAfterMs !== undefined) {
+        timers.push(
+          setTimeout(() => {
+            if (readyState !== OPEN) return;
+            readyState = CLOSED;
+            socket.onclose?.();
+          }, options.disconnectAfterMs),
+        );
+      }
     }, 0),
   );
 
