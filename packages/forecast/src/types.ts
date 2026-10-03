@@ -6,10 +6,22 @@ export type ForecastReliability = "reliable" | "unreliable" | "rebuilding";
 
 export type MemberKind = "boundary" | "no_shift" | "sampled" | "replenished" | "rebuilt";
 
+/** Forecast-only uncertainties; the simulator's private truth is never an input. */
+export interface ForecastParams extends FireParams {
+  /** Larger values slow local spread. */
+  readonly moistureMultiplier?: number;
+  /** A deterministic downwind ember jump, in grid cells. Zero disables spotting. */
+  readonly spotDistanceCells?: number;
+  readonly spotTimeMs?: number;
+}
+
 export interface ForecastMember {
   readonly id: string;
   readonly kind: MemberKind;
-  readonly params: FireParams;
+  readonly params: ForecastParams;
+  /** Positive support weight after assimilating this version's observations. */
+  readonly weight?: number;
+  readonly parentMemberId?: string;
   /** First ignition time per flat grid cell in ms; Infinity if it does not ignite in the rollout. */
   readonly ignitionMs: Float64Array;
   /** The rollout is only trustworthy up to this time. */
@@ -26,11 +38,19 @@ export interface ParameterRanges {
   readonly windOffsetDeg: ParameterRange;
   readonly shiftTimeMs: ParameterRange;
   readonly postShiftDeg: ParameterRange;
+  readonly moistureMultiplier?: ParameterRange;
+  readonly spotDistanceCells?: ParameterRange;
+  readonly spotTimeMs?: ParameterRange;
 }
+
+export type ForecastParameterRanges = ParameterRanges & Required<Pick<ParameterRanges,
+  "moistureMultiplier" | "spotDistanceCells" | "spotTimeMs"
+>>;
 
 export interface ForecastEnsemble {
   /** Monotonically increasing for each newly published state of one forecast service. */
   readonly version: number;
+  readonly parentVersion?: number | null;
   readonly inputHash: string;
   readonly knowledgeRevision: number;
   /** Supported members. Empty whenever the forecast is unreliable. */
@@ -44,10 +64,12 @@ export interface ForecastEnsemble {
   readonly builtAtMs: SimTimeMs;
   /** Forecast support ends here; later times are unknown, not safe. */
   readonly horizonEndMs: number;
+  readonly arrivalPaddingMs?: number;
   /** 1 for the prior range, 2/4/8 after widening rounds. */
   readonly widenFactor: number;
   readonly ranges: ParameterRanges;
   readonly sourceSnapshot: AgentKnowledgeSnapshot;
+  readonly observationIds?: readonly string[];
 }
 
 export type ForecastEvent =

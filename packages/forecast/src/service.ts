@@ -1,7 +1,7 @@
 import { SimTimeMs, type AgentId } from "@ember/domain";
 import { hashValue, type AgentKnowledgeSnapshot } from "@ember/knowledge";
 import { FireField, streamRng, type PublicMap } from "@ember/simulation/model";
-import { DEFAULT_FORECAST_CONFIG, widenRanges, type ForecastConfig } from "./config.js";
+import { DEFAULT_FORECAST_CONFIG, physicalRanges, widenRanges, type ForecastConfig } from "./config.js";
 import { FitAccumulator, fitMember, type FitObservation } from "./fit.js";
 import {
   boundaryCandidates,
@@ -14,6 +14,7 @@ import {
   type Candidate,
 } from "./members.js";
 import { rolloutContext, type RolloutContext } from "./rollout.js";
+import { forecastStep } from "./dynamics.js";
 import type { ForecastEnsemble, ForecastEvent, ForecastMember, ParameterRanges } from "./types.js";
 
 /** Hash of exactly what a decision-maker has received, independent of arrival order. */
@@ -30,6 +31,7 @@ export class ForecastService {
   readonly events: ForecastEvent[] = [];
   private ensemble: ForecastEnsemble | null = null;
   private version = 0;
+  private readonly versions: ForecastEnsemble[] = [];
   private readonly ctx: RolloutContext;
   private contradictedHash: string | null = null;
   private lastRebuildHash: string | null = null;
@@ -47,6 +49,27 @@ export class ForecastService {
 
   get current(): ForecastEnsemble | null {
     return this.ensemble;
+  }
+
+  get history(): readonly ForecastEnsemble[] { return [...this.versions]; }
+
+  getVersion(version: number): ForecastEnsemble | null { return this.versions[version - 1] ?? null; }
+
+  private publish(ensemble: ForecastEnsemble): ForecastEnsemble {
+    this.ensemble = ensemble;
+    this.versions.push(ensemble);
+    return ensemble;
+  }
+
+  private assimilate(members: readonly ForecastMember[], fitObs: readonly FitObservation[]): ForecastMember[] {
+    // A small positive floor keeps every supported hazard in the ensemble regardless of weight.
+    const scores = members.map((member) => Math.max(0.01, Math.exp(-10 * fitMember(member, fitObs, this.config.disagreementTolerance).disagreement)));
+    const total = scores.reduce((sum, score) => sum + score, 0);
+    return members.map((member, i) => ({
+      ...member,
+      weight: scores[i]! / total,
+      ...(member.kind === "replenished" ? { parentMemberId: member.id.slice(0, member.id.lastIndexOf("~")) } : {}),
+    }));
   }
 
   /** True when a contradiction left no supported member and no rebuild ran for this evidence. */
@@ -80,7 +103,7 @@ export class ForecastService {
     const survivors = this.supported(pool, fitObs, horizonEndMs);
     if (survivors.members.length === 0) {
       const failed = survivors.firstFailure;
-      this.ensemble = this.unreliable(snapshot, hash, nowMs, horizonEndMs, widenRanges(this.config, 8));
+      const unreliable = this.publish(this.unreliable(snapshot, hash, nowMs, horizonEndMs, widenRanges(this.config, 8)));
       if (this.contradictedHash !== hash) {
         this.contradictedHash = hash;
         this.events.push({
@@ -94,25 +117,27 @@ export class ForecastService {
             `; forecast reliability is UNRELIABLE and a broader rebuild is needed.`,
         });
       }
-      return this.ensemble;
+      return unreliable;
     }
 
     const kept = capSupportedMembers(survivors.members, this.config.memberCount, this.config.maxMembers);
     const members = this.replenish(kept, fitObs, horizonEndMs, hash);
-    this.ensemble = {
+    return this.publish({
       version: ++this.version,
+      parentVersion: cur?.version ?? null,
       inputHash: hash,
       knowledgeRevision: snapshot.revision,
-      members,
+      members: this.assimilate(members, fitObs),
       provisional: [],
       reliability: "reliable",
       builtAtMs: SimTimeMs.parse(nowMs),
       horizonEndMs,
+      arrivalPaddingMs: this.config.arrivalPaddingMs,
       widenFactor: cur?.reliability === "reliable" ? cur.widenFactor : 1,
       ranges: cur?.reliability === "reliable" ? cur.ranges : this.config.prior,
       sourceSnapshot: snapshot,
-    };
-    return this.ensemble;
+      observationIds: fitObs.map((o) => o.id),
+    });
   }
 
   /**
@@ -140,19 +165,22 @@ export class ForecastService {
       if (supported.length >= this.config.minSupportedForRecovery) {
         const kept = capSupportedMembers(supported, this.config.memberCount, this.config.maxMembers);
         const members = this.replenish(kept, fitObs, horizonEndMs, `${hash}:${factor}`);
-        this.ensemble = {
+        const rebuilt = this.publish({
           version: ++this.version,
+          parentVersion: this.ensemble?.version ?? null,
           inputHash: hash,
           knowledgeRevision: snapshot.revision,
-          members,
+          members: this.assimilate(members, fitObs),
           provisional: [],
           reliability: "reliable",
           builtAtMs: SimTimeMs.parse(nowMs),
           horizonEndMs,
+          arrivalPaddingMs: this.config.arrivalPaddingMs,
           widenFactor: factor,
           ranges,
           sourceSnapshot: snapshot,
-        };
+          observationIds,
+        });
         this.events.push({
           kind: "rebuild_complete",
           agentId: this.agentId,
@@ -163,10 +191,10 @@ export class ForecastService {
           supportedCount: supported.length,
           explanation: `Forecast rebuilt with ranges widened ${factor}x; ${supported.length} supported candidates, reliability restored.`,
         });
-        return this.ensemble;
+        return rebuilt;
       }
     }
-    this.ensemble = this.unreliable(snapshot, hash, nowMs, horizonEndMs, lastRanges);
+    const failed = this.publish(this.unreliable(snapshot, hash, nowMs, horizonEndMs, lastRanges));
     this.events.push({
       kind: "rebuild_failed",
       agentId: this.agentId,
@@ -175,7 +203,7 @@ export class ForecastService {
       observationIds,
       explanation: `No widening round up to 8x produced ${this.config.minSupportedForRecovery} supported candidates; forecast stays UNRELIABLE.`,
     });
-    return this.ensemble;
+    return failed;
   }
 
   private unreliable(
@@ -190,6 +218,7 @@ export class ForecastService {
     );
     return {
       version: ++this.version,
+      parentVersion: this.ensemble?.version ?? null,
       inputHash: hash,
       knowledgeRevision: snapshot.revision,
       members: [],
@@ -197,9 +226,11 @@ export class ForecastService {
       reliability: "unreliable",
       builtAtMs: SimTimeMs.parse(nowMs),
       horizonEndMs,
+      arrivalPaddingMs: this.config.arrivalPaddingMs,
       widenFactor: this.config.widenFactors[this.config.widenFactors.length - 1] ?? 8,
       ranges,
       sourceSnapshot: snapshot,
+      observationIds: snapshot.observations.map((o) => o.id),
     };
   }
 
@@ -256,7 +287,7 @@ export class ForecastService {
       // Include the step after `time`: its cells are recorded as igniting at the start of that step.
       while (t < time + step) {
         t += step;
-        field.step(t, step, c.params);
+        forecastStep(field, t, step, c.params);
       }
       // Same convention as full rollouts: ignition is recorded at the start of its step.
       const ign = new Float64Array(field.ignitedAtMs.length);
@@ -282,7 +313,7 @@ export class ForecastService {
     const target = Math.min(this.config.memberCount, this.config.maxMembers);
     if (members.length >= target || members.length === 0) return members;
     const rng = streamRng(seed, "forecast-replenish");
-    const bounds = this.config.physicalBounds;
+    const bounds = physicalRanges(this.config);
     let attempts = 0;
     const maxAttempts = (target - members.length) * 8;
     while (members.length < target && attempts < maxAttempts) {
