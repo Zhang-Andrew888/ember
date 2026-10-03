@@ -16,6 +16,7 @@ import { newCommandId } from "./net/commandId.js";
 import { planStart, START_FAILED_MESSAGE } from "./net/startPlan.js";
 import { transportModeFromStartPlan } from "./net/transportMode.js";
 import { createProtocolWebSocket, type ProtocolWebSocket } from "./net/protocolWebSocket.js";
+import { dispatchPttRelease } from "./net/pttRelease.js";
 import { mockWireRepliesForSay } from "./net/mockCommandSimulator.js";
 import { useCoordinatorView } from "./state/useCoordinatorView.js";
 import { useReducedMotion } from "./state/useReducedMotion.js";
@@ -249,8 +250,12 @@ export function App() {
   const handlePttRelease = useCallback(
     (text: string) => {
       speechStubRef.current.setRecording(false);
-      protocolSocketRef.current?.sendCommand({ type: "ptt_release", transcript: text });
-      dispatchSay(text);
+      dispatchPttRelease({
+        transcript: text,
+        live: protocolSocketRef.current,
+        mockMode: IS_MOCK_MODE,
+        dispatchSay,
+      });
     },
     [dispatchSay],
   );
