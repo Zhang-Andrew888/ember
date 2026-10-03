@@ -128,6 +128,9 @@ describe("forecast service", () => {
     expect(e.provisional.length).toBeGreaterThan(0);
     expect(admitsProtection(e)).toBe(false);
     expect(ensembleValidity(e)).toBe("contradicted");
+    const empty = { ...e, reliability: "reliable" as const, members: [] };
+    expect(ensembleValidity(empty)).toBe("empty");
+    expect(admitsProtection(empty)).toBe(false);
     expect(admitsProtection(null)).toBe(false);
     expect(ensembleValidity(null)).toBe("empty");
     const event = service.events.find((x) => x.kind === "contradiction");
