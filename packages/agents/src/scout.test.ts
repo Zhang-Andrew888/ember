@@ -54,6 +54,37 @@ describe("information-driven scout choice", () => {
     expect(result.best?.plan.workInterval.endMs).toBe(result.best!.plan.workInterval.startMs + 10_000);
   });
 
+  it("exposes a measurable value-of-information score for every point it considered, best first", () => {
+    const ensemble = makeEnsemble(map, [member("a", ["e-s-h"], 60_000), member("b", [], 0), member("c", ["e-s-h"], 60_000), member("d", [], 0)]);
+    const s = scout();
+    const result = s.candidateSearch(ctxWith(ensemble), null);
+    const ranking = s.voiRanking;
+    expect(ranking.length).toBe(map.scoutPoints.length);
+    for (let i = 1; i < ranking.length; i++) expect(ranking[i - 1]!.score.total).toBeGreaterThanOrEqual(ranking[i]!.score.total);
+    // An even split on the most important corridor yields positive bits; the chosen point sees it.
+    const top = ranking[0]!;
+    expect(top.score.total).toBeGreaterThan(0);
+    expect(top.score.edges.some((e) => e.edgeId === "e-s-h" && e.infoBits === 1)).toBe(true);
+    expect(result.best).not.toBeNull();
+  });
+
+  it("scores zero everywhere when the retained futures all agree, so travel time decides", () => {
+    const ensemble = makeEnsemble(map, [member("a", [], 0), member("b", [], 0)]);
+    const s = scout();
+    s.candidateSearch(ctxWith(ensemble), null);
+    for (const r of s.voiRanking) expect(r.score.total).toBe(0);
+  });
+
+  it("stops valuing a corridor the scout has already seen closed", () => {
+    const ensemble = makeEnsemble(map, [member("a", ["e-s-h"], 60_000), member("b", [], 0)]);
+    const s = scout();
+    s.candidateSearch(ctxWith(ensemble), null);
+    const before = s.voiRanking[0]!.score.total;
+    const closed = new Set(cellsOfEdge(road, "e-s-h"));
+    s.candidateSearch({ ...ctxWith(ensemble), closedCells: closed }, null);
+    expect(s.voiRanking[0]!.score.total).toBeLessThan(before);
+  });
+
   it("ignores disagreement about a corridor that matters little for site access", () => {
     const split = makeEnsemble(map, [member("a", ["e-n-h"], 60_000), member("b", [], 0)]);
     const calm = makeEnsemble(map, [member("a", [], 0), member("b", [], 0)]);
