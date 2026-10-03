@@ -64,6 +64,17 @@ export interface ControllerEnvironment {
   readonly reservations?: ReservationHooks;
 }
 
+/** What an agent can reportably say about itself: only its own knowledge and committed decisions. */
+export interface ReportableStatus {
+  readonly callsign: string;
+  readonly currentAction: string | null;
+  readonly objective: string | null;
+  readonly returnEstimateSec: number | null;
+  readonly lastRejection: string | null;
+  readonly knownConditions: string | null;
+  readonly lastReport: string | null;
+}
+
 /**
  * An independent decision-maker. It sees only its own projection (position, state, own
  * knowledge) plus the public map; never the world seed, remote fire or other agents' knowledge.
@@ -80,4 +91,5 @@ export interface AgentController {
    */
   proposeYield(nowMs: number): MissionPlan | null;
   adoptRevision(plan: MissionPlan): void;
+  status(projection: AgentProjection): ReportableStatus;
 }

@@ -118,6 +118,9 @@ importers:
       '@ember/domain':
         specifier: workspace:*
         version: link:../domain
+      zod:
+        specifier: 3.24.2
+        version: 3.24.2
 
   packages/domain:
     dependencies:

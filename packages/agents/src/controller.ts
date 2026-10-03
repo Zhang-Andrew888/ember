@@ -38,6 +38,7 @@ import {
   type ControllerEnvironment,
   type ControllerState,
   type CoordinatorReport,
+  type ReportableStatus,
   type TickOutput,
 } from "./types.js";
 
@@ -93,6 +94,8 @@ export class CrewController implements AgentController {
   private seenObjectives = new Set<string>();
   private lastIdleReason: string | null = null;
   private autonomousForced = false;
+  private lastRejectionText: string | null = null;
+  private lastReportText: string | null = null;
   private lastProj: AgentProjection | null = null;
   private lastEnv: ControllerEnvironment = {};
   private pendingRevision: MissionPlanT | null = null;
@@ -629,6 +632,7 @@ export class CrewController implements AgentController {
   }
 
   protected decide(out: TickOutput, proj: AgentProjection, type: DecisionType, reasonCode: string, actualAction: string): void {
+    if (type === "objective_rejected") this.lastRejectionText = `${reasonCode}: ${actualAction}`;
     out.decisions.push(
       DecisionEvent.parse({
         sequence: SequenceNumber.parse(this.seq++),
@@ -643,8 +647,35 @@ export class CrewController implements AgentController {
   }
 
   protected report(out: TickOutput, text: string, urgent: boolean): void {
+    this.lastReportText = text;
     const entry: CoordinatorReport = { text, urgent };
     out.reports.push(entry);
+  }
+
+  status(proj: AgentProjection): ReportableStatus {
+    const a = this.active;
+    const verbs: Record<ControllerState, string | null> = {
+      HOLDING: "holding at refuge",
+      PLANNING: "planning",
+      APPROACHING: "approaching its work site",
+      WORKING: "working",
+      RETURNING: "returning to refuge",
+      WITHDRAWING: "withdrawing to refuge",
+      RETREATING: "retreating to refuge",
+      STRANDED: "stranded with no known passable route",
+      LOST: null,
+    };
+    const last = a === null ? null : a.plan.timedLegs[a.plan.timedLegs.length - 1];
+    const targetName = a?.targetId == null ? null : this.siteName(a.targetId);
+    return {
+      callsign: this.callsign,
+      currentAction: verbs[this.computeState(proj)] === null ? null : `${verbs[this.computeState(proj)]}${targetName !== null && this.computeState(proj) !== "HOLDING" ? ` (${targetName})` : ""}`,
+      objective: this.objective === null ? null : `${this.objective.kind}${this.objective.targetId === null ? "" : ` ${this.objective.targetId}`}`,
+      returnEstimateSec: last === undefined || last === null ? null : Math.max(0, (last.arriveMs - proj.simTimeMs) / 1000),
+      lastRejection: this.lastRejectionText,
+      knownConditions: this.evidence.closed.size === 0 ? null : `${this.evidence.closed.size} cells observed burning or burned`,
+      lastReport: this.lastReportText,
+    };
   }
 
   private computeState(proj: AgentProjection): ControllerState {
