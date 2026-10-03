@@ -660,3 +660,59 @@ didn't regress anything already shipped.
 **Next:** backlog item 6, component/unit tests for any logic still
 lacking coverage; then, if the backlog is exhausted before 10:00 ET,
 review the diff for bugs/dead code/missing tests instead of adding scope.
+
+## 2026-10-03 08:3x UTC (04:3x ET) - backlog item 6: fill remaining test coverage gaps
+
+Audited every `apps/web/src` file for a missing `.test.ts`/`.test.tsx`
+sibling before writing anything, rather than adding tests reflexively.
+Found three categories:
+
+1. **Pure authored constants with no behavior**
+   (`briefing/briefingInfo.ts`, `styles/colors.ts`) - nothing to assert
+   beyond "the object literal equals itself." Left untested.
+2. **React components** (TopBar, AgentRail, UrgentStrip, Briefing,
+   ConversationPanel, EndOverlay, ReplayView, every scene component,
+   App.tsx, main.tsx) - on inspection, every one is a thin presentational
+   or orchestration layer around logic that already has its own direct
+   unit tests (`mockVoiceAdapter.ts`, `speechPlaybackStub.ts`,
+   `CoordinatorViewClient.ts`, `sceneEntities.ts`, `stackLabels.ts`,
+   `endReason.ts`, etc.) - and has additionally been exercised live via
+   Playwright repeatedly across every backlog item this session (8+
+   scenarios, full keyboard walks, the replay flow, performance
+   measurement). Component-level unit tests here would mostly re-assert
+   what live verification already proved, at the cost of a real new
+   dependency (`@testing-library/react` + a jsdom test environment) and -
+   since the jsdom environment setting lives in the *root* `vitest.config.ts`,
+   shared across every lane, not an apps/web-local file - a shared-
+   infrastructure change for other lanes to review, which is
+   disproportionate to what's being tested. Documented this call rather
+   than silently skipping it.
+3. **The one real gap: `map/scenarioMap.ts`.** Hand-authored topology
+   data (node/edge ids, lengths, cell counts) with zero tests protecting
+   its referential integrity - exactly the class of file that caused two
+   real bugs earlier this session (the label-overlap bug, the dropped
+   site-observation continuity bug) by being silently wrong rather than
+   failing loudly. Added `scenarioMap.test.ts` (commit `aab63c1`): no
+   duplicate node/edge ids, every edge's endpoints reference nodes that
+   actually exist, no self-loop edges, positive lengths, integer cell
+   counts, refuge/site nodes carry a label while junctions don't.
+
+Also reviewed the three `useSyncExternalStore`-based hooks
+(`useCoordinatorView`, `useSpeechPlaybackStub`, `useReducedMotion`)
+specifically, since hooks are exactly the kind of "logic" the backlog
+item means and are easy to wave past as "just components." Each one's
+only real logic is a single null-fallback ternary (what to pass
+`useSyncExternalStore` when the underlying client/stub/window is
+unavailable) - the store objects themselves are each already fully unit
+tested. Judged this not worth the same disproportionate RTL/jsdom
+infrastructure cost for three ternaries, same reasoning as point 2.
+
+**Verified:** typecheck/lint/`pnpm vitest run apps/web/src` all green
+(120 tests, 17 files, up from 114/16).
+
+**Status:** CI green on `aab63c1` (verified via the GitHub Actions API).
+
+**Next:** the 6-item backlog is now exhausted. Per the governing
+instruction, will review the full session diff for bugs, dead code, and
+missing tests rather than inventing new scope, and keep watching for
+further instructions until 10:00 ET.
