@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   createCoordinatorViewClient,
   type CoordinatorViewClient,
@@ -9,6 +9,8 @@ import { resolveScenario } from "./net/scenarioSelection.js";
 import { startIncident } from "./net/incidentRestClient.js";
 import { useCoordinatorView } from "./state/useCoordinatorView.js";
 import { useReducedMotion } from "./state/useReducedMotion.js";
+import { createSpeechPlaybackStub } from "./state/speechPlaybackStub.js";
+import { useSpeechPlaybackStub } from "./state/useSpeechPlaybackStub.js";
 import { buildSceneEntities } from "./components/scene/sceneEntities.js";
 import { scenarioMap } from "./map/scenarioMap.js";
 import { routineReports, latestUrgentReport } from "./format/reports.js";
@@ -38,6 +40,25 @@ export function App() {
   const reducedMotion = useReducedMotion();
 
   const { status: connectionStatus, view } = useCoordinatorView(client);
+
+  // Exact-text speech-playback stub (backlog item 4): drives UrgentStrip's
+  // audioState and the composer's outgoing-acknowledgement indicator from
+  // one shared single-channel stub, so an urgent report genuinely
+  // interrupts a routine acknowledgement rather than playing both at once.
+  const speechStubRef = useRef(createSpeechPlaybackStub());
+  useEffect(() => () => speechStubRef.current.dispose(), []);
+  const speechSnapshot = useSpeechPlaybackStub(speechStubRef.current);
+
+  const lastSpokenUrgentSequence = useRef<number | null>(null);
+  useEffect(() => {
+    if (!view) return;
+    const urgent = latestUrgentReport(view);
+    if (!urgent) return;
+    const sequence = urgent.sequence as number;
+    if (lastSpokenUrgentSequence.current === sequence) return;
+    lastSpokenUrgentSequence.current = sequence;
+    speechStubRef.current.speak(urgent.text, { urgent: true });
+  }, [view]);
 
   const openSocket = useCallback(() => {
     if (IS_MOCK_MODE) {
@@ -71,19 +92,22 @@ export function App() {
     window.location.reload();
   }, []);
 
-  const handleSendMessage = useCallback(
-    (text: string) => {
-      if (IS_MOCK_MODE || !REST_BASE_URL) return;
-      void fetch(`${REST_BASE_URL}/incidents/${encodeURIComponent(INCIDENT_ID)}/messages`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
-      }).catch(() => {
-        // Best-effort: the server is authoritative, a failed send just leaves no receipt.
-      });
-    },
-    [],
-  );
+  const handleSendMessage = useCallback((text: string) => {
+    // "Received: ..." (not "accepted"/applied) deliberately mirrors
+    // CommandReceipt's own "received" status - this stub only ever claims
+    // the message was received, never that a command was actually acted
+    // on, since there's no real backend behind it to make that true.
+    speechStubRef.current.speak(`Received: ${text}`, { urgent: false });
+
+    if (IS_MOCK_MODE || !REST_BASE_URL) return;
+    void fetch(`${REST_BASE_URL}/incidents/${encodeURIComponent(INCIDENT_ID)}/messages`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    }).catch(() => {
+      // Best-effort: the server is authoritative, a failed send just leaves no receipt.
+    });
+  }, []);
 
   const entities = useMemo(
     () => (view ? buildSceneEntities(view, scenarioMap) : EMPTY_ENTITIES),
@@ -129,9 +153,13 @@ export function App() {
             reports={view ? routineReports(view) : []}
             activeRecipientCallsign={activeRecipientCallsign}
             onSendMessage={handleSendMessage}
+            speechSnapshot={speechSnapshot}
           />
         </div>
-        <UrgentStrip report={view ? latestUrgentReport(view) : null} audioState="idle" />
+        <UrgentStrip
+          report={view ? latestUrgentReport(view) : null}
+          audioState={speechSnapshot.urgent ? speechSnapshot.state : "idle"}
+        />
         <AgentRail
           agents={view?.agents ?? []}
           selectedAgentId={selectedAgentId}

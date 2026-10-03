@@ -335,6 +335,18 @@ input {
   margin: 0;
 }
 
+.conversation-panel__push-to-talk[aria-pressed="true"] {
+  border-color: var(--color-refuge);
+  background: var(--color-refuge);
+  color: var(--color-background);
+}
+
+.conversation-panel__speech-ack {
+  flex-basis: 100%;
+  font-size: 0.75rem;
+  min-height: 1.1em;
+}
+
 /* ---------- Urgent strip ---------- */
 
 .urgent-strip {

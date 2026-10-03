@@ -1,23 +1,35 @@
-import { useState } from "react";
-import type { FormEvent } from "react";
+import { useRef, useState } from "react";
+import type { FormEvent, KeyboardEvent, PointerEvent } from "react";
 import type { CoordinatorReportEntry } from "@ember/domain";
 import { formatIncidentClock } from "../format/time.js";
+import { createMockVoiceAdapter, type CaptureState } from "../net/mockVoiceAdapter.js";
+import type { SpeechPlaybackSnapshot } from "../state/speechPlaybackStub.js";
 
 export interface ConversationPanelProps {
   readonly reports: CoordinatorReportEntry[];
   readonly activeRecipientCallsign: string | null;
   readonly onSendMessage: (text: string) => void;
+  /** Drives the routine (non-urgent) outgoing-acknowledgement indicator; urgent playback shows in UrgentStrip instead. */
+  readonly speechSnapshot: SpeechPlaybackSnapshot;
 }
 
 /**
  * Right panel: conversation transcript, text input, push-to-talk
- * (docs/FRONTEND.md). Voice capture (Grok push-to-talk) is Slice 5 scope
- * and not wired up here; the microphone control is a real, accessible,
- * clearly-disabled control rather than something that looks functional
- * but silently does nothing - text input is always the working fallback.
+ * (docs/FRONTEND.md). Push-to-talk is a mock capture adapter (backlog
+ * item 4) - real Grok Voice is Slice 5/out of scope and unreachable from
+ * this sandbox anyway; text input stays the always-working fallback
+ * regardless, and the status text says plainly that this is a demo
+ * capture, not real speech recognition.
  */
-export function ConversationPanel({ reports, activeRecipientCallsign, onSendMessage }: ConversationPanelProps) {
+export function ConversationPanel({
+  reports,
+  activeRecipientCallsign,
+  onSendMessage,
+  speechSnapshot,
+}: ConversationPanelProps) {
   const [draft, setDraft] = useState("");
+  const [captureState, setCaptureState] = useState<CaptureState>("idle");
+  const adapterRef = useRef(createMockVoiceAdapter());
   const latest = reports[reports.length - 1] ?? null;
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -27,6 +39,41 @@ export function ConversationPanel({ reports, activeRecipientCallsign, onSendMess
     onSendMessage(text);
     setDraft("");
   };
+
+  const startCapture = () => {
+    adapterRef.current.start();
+    setCaptureState("recording");
+  };
+
+  const commitCapture = () => {
+    const result = adapterRef.current.commit();
+    setCaptureState("idle");
+    if (result) onSendMessage(result.text);
+  };
+
+  const cancelCapture = () => {
+    adapterRef.current.cancel();
+    setCaptureState("idle");
+  };
+
+  const handlePointerDown = (event: PointerEvent<HTMLButtonElement>) => {
+    event.currentTarget.setPointerCapture(event.pointerId);
+    startCapture();
+  };
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
+    if (event.code !== "Space" || event.repeat) return;
+    event.preventDefault(); // suppress the native click-on-keyup-space activation
+    startCapture();
+  };
+
+  const handleKeyUp = (event: KeyboardEvent<HTMLButtonElement>) => {
+    if (event.code !== "Space") return;
+    event.preventDefault();
+    commitCapture();
+  };
+
+  const showOutgoingAck = speechSnapshot.state !== "idle" && !speechSnapshot.urgent;
 
   return (
     <section className="conversation-panel" aria-label="Conversation">
@@ -65,14 +112,23 @@ export function ConversationPanel({ reports, activeRecipientCallsign, onSendMess
         <button
           type="button"
           aria-describedby="push-to-talk-status"
-          disabled
+          aria-pressed={captureState === "recording"}
           className="conversation-panel__push-to-talk"
+          onPointerDown={handlePointerDown}
+          onPointerUp={commitCapture}
+          onPointerCancel={cancelCapture}
+          onKeyDown={handleKeyDown}
+          onKeyUp={handleKeyUp}
+          onBlur={cancelCapture}
         >
-          Push to talk
+          {captureState === "recording" ? "Recording… release to send" : "Push to talk"}
         </button>
         <span id="push-to-talk-status" className="conversation-panel__mic-status">
-          Microphone not connected in this build — use text.
+          Demo capture: hold to simulate a voice message (no real microphone or speech recognition).
         </span>
+        <div aria-live="polite" className="conversation-panel__speech-ack">
+          {showOutgoingAck ? `🔊 ${speechSnapshot.text}` : ""}
+        </div>
       </form>
     </section>
   );
