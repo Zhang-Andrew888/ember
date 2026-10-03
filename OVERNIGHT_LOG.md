@@ -78,7 +78,12 @@ real Oakland extract.
   `ConversationBridge`, `ScriptedCoordinatorPolicy` (v2), evaluation harness (`runVariant`, `runEvaluation`), offline
   CLIs (`evaluate-cli.ts`, `sensitivity-cli.ts`), failure injection (sensor blackout, relay delay, relay drop).
 - `packages/replay`: run records, bundles, `BundleReplayReader`, `revealFire`, run metrics.
-- Not done: the real Grok adapter and WebSocket transport (need provider access / Slice 0); the two-minute
+- `apps/server` also has a validated wire protocol (`protocol.ts`), `SessionHub`, `LiveRun` (monotonic due-time loop)
+  and a loopback WebSocket server (`ws-server.ts`) with a real-socket test; a run-length test scans every outbound
+  message for the seed, private parameters and truth fire state.
+- `packages/simulation/src/fuzz.test.ts`: random orders for six seeds; physical invariants (single-capacity
+  exclusivity, work caps, monotone damage, permanent closures, lost agents frozen) and exact replay hold.
+- Not done: the real Grok adapter (needs provider access / Slice 0); the two-minute
   presentation and screenshots (web lane); agent-loss injection.
 
 ## Evaluation results (actual numbers, 4-core Linux container, Node 22.22.0, scenario hash 9c5ecd71...)

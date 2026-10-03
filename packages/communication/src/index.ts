@@ -1,6 +1,5 @@
 // packages/communication - owns: recipient resolution, evidence references, command validation, audio priority
 // Must not: override feasibility checks
-export type { IncomingMessage as LegacyIncomingMessage, InterpretedCommand } from "./types.js";
 export * from "./intent.js";
 export * from "./interpreter.js";
 export {
