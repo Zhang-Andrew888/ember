@@ -4,6 +4,7 @@ import { Incident, buildSyntheticScenario, type AgentProjection, type SimScenari
 import { RoadIndex, cellIndexOf } from "@ember/simulation/model";
 import { GRID_EDGE, KnowledgeStore } from "@ember/knowledge";
 import { briefingObservation } from "@ember/forecast";
+import { planMissions, protectionTargets } from "@ember/navigation";
 import { cellsOfEdge } from "@ember/navigation";
 import { DEFAULT_FORECAST_CONFIG } from "@ember/forecast";
 import { CrewController, runControllers } from "./index.js";
@@ -351,5 +352,84 @@ describe("end-to-end survival against a surprise", () => {
     expect(inc.projectAgent(crew1).state).not.toBe("lost");
     expect(inc.notices.some((n) => n.kind === "agent_lost")).toBe(false);
     expect(log.forecastEvents.some((e) => e.kind === "contradiction" || e.kind === "rebuild_complete")).toBe(true);
+  });
+});
+
+describe("optional mission switching hysteresis", () => {
+  const scenario = scenarioWith({ fire: patch(1500, 100), sites: ["site-a", "site-b", "site-c"] });
+  const steady = {
+    ...DEFAULT_FORECAST_CONFIG,
+    prior: {
+      spreadMultiplier: { min: 0.6, max: 0.8 },
+      windOffsetDeg: { min: -5, max: 5 },
+      shiftTimeMs: { min: 1_300_000, max: 1_400_000 },
+      postShiftDeg: { min: 45, max: 100 },
+    },
+  };
+
+  /** Lets the test decide how valuable each site looks, so scores are exact and controlled. */
+  class Valued extends CrewController {
+    values: Record<string, number> = { "site-a": 1, "site-b": 0.01, "site-c": 0.01 };
+    override candidateSearch(ctx: Parameters<CrewController["candidateSearch"]>[0], allowed: Parameters<CrewController["candidateSearch"]>[1]) {
+      const sites = scenario.map.sites.map((s) => ({
+        siteId: s.id,
+        nodeId: s.nodeId,
+        value: this.values[s.id] ?? 1,
+        requiredWork: s.requiredWork,
+        knownCompletedWork: 0,
+        knownResolved: false,
+      }));
+      return planMissions(ctx, protectionTargets(sites, 1, allowed));
+    }
+  }
+
+  function setup() {
+    const c = new Valued({ agentId: crew1, callsign: "Crew 1", role: "protection_crew", map: scenario.map, config: { forecast: steady } });
+    const store = new KnowledgeStore(crew1);
+    store.ingest(briefingObservation(scenario.map, scenario.map.sites.map((s) => s.id)));
+    const at = (now: number, position: AgentPosition, legIndex: number | null): AgentProjection => ({
+      agentId: crew1,
+      simTimeMs: now,
+      role: "protection_crew",
+      callsign: "Crew 1",
+      position,
+      state: legIndex === null ? "idle" : "approaching",
+      objectiveRevision: 0,
+      planRevision: 1,
+      knowledgeRevision: store.revision,
+      commitment: legIndex === null ? null : { planId: c.activePlanId ?? "p", legIndex, legCount: 7, mode: "normal", working: false },
+      knowledge: store.snapshot(SimTimeMs.parse(now)),
+      inputHash: store.inputHash(),
+    });
+    return { c, at };
+  }
+
+  const enRoute = (d: number): AgentPosition => ({
+    kind: "edge",
+    edgeId: "e-rw-j1" as never,
+    distanceAlongPolyline: d as never,
+    direction: "forward",
+    turnaroundTimeRemaining: 0 as never,
+  });
+
+  it("switches only for a clearly better mission, and not twice inside the cooldown", () => {
+    const { c, at } = setup();
+    const start = c.tick(at(0, { kind: "node", nodeId: NodeId.parse("n-rw") }, null));
+    expect(start.decisions[0]?.type).toBe("mission_start");
+    const first = c.activePlanId;
+    // A modestly better alternative (below the 20% margin) never causes a switch.
+    c.values = { "site-a": 1, "site-b": 1.05, "site-c": 0.01 };
+    expect(c.tick(at(30_000, enRoute(120), 0)).decisions).toHaveLength(0);
+    expect(c.activePlanId).toBe(first);
+    // A much better one does, once an evaluation is due.
+    c.values = { "site-a": 1, "site-b": 0.01, "site-c": 50 };
+    expect(c.tick(at(40_000, enRoute(160), 0)).decisions).toHaveLength(0); // evaluated 10 s ago: not yet due
+    const switched = c.tick(at(60_000, enRoute(240), 0));
+    expect(switched.decisions.map((d) => d.reasonCode)).toEqual(["better_mission_found"]);
+    expect(c.activePlanId).not.toBe(first);
+    // An even better one within 30 s of the switch is ignored: no thrashing.
+    c.values = { "site-a": 1000, "site-b": 0.01, "site-c": 0.01 };
+    expect(c.tick(at(75_000, enRoute(300), 0)).decisions).toHaveLength(0);
+    expect(c.tick(at(90_000, enRoute(100), 0)).decisions.map((d) => d.reasonCode)).toEqual(["better_mission_found"]);
   });
 });
