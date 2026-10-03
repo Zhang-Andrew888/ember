@@ -62,6 +62,19 @@ export function ConversationPanel({
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
+    // docs/FRONTEND.md: "release/cancel/lost-focus always ends capture
+    // safely." Pointer hold gets all three for free (pointerup/
+    // pointercancel/blur); keyboard hold only had release (keyup) and
+    // lost-focus (blur) - a keyboard user had no way to abort a hold
+    // without either committing it or tabbing focus away. Escape is the
+    // conventional keyboard "cancel" and fills that gap.
+    if (event.code === "Escape") {
+      if (captureState === "recording") {
+        event.preventDefault();
+        cancelCapture();
+      }
+      return;
+    }
     if (event.code !== "Space" || event.repeat) return;
     event.preventDefault(); // suppress the native click-on-keyup-space activation
     startCapture();
