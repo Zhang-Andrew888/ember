@@ -65,7 +65,7 @@ export const SceneLegend = forwardRef<HTMLDivElement, SceneLegendProps>(function
         {showUnseenKey ? (
           <li>
             <span className="scene-legend__swatch scene-legend__swatch--unseen" />
-            Dashed frame: fire the coordinator never saw (replay only)
+            Dashed frame: fire the coordinator has not observed (replay only)
           </li>
         ) : null}
         <li>
@@ -113,7 +113,7 @@ export const SceneLegend = forwardRef<HTMLDivElement, SceneLegendProps>(function
         <details className="scene-legend__cells">
           <summary>
             {unseenCount > 0
-              ? `Fire cells (${fireCells.length - unseenCount} observed, ${unseenCount} never observed — replay only)`
+              ? `Fire cells (${fireCells.length - unseenCount} observed, ${unseenCount} not observed — replay only)`
               : `Observed cells (${fireCells.length})`}
           </summary>
           <ul>
@@ -122,7 +122,7 @@ export const SceneLegend = forwardRef<HTMLDivElement, SceneLegendProps>(function
                 <button type="button" onClick={() => onInspectCell(cell)}>
                   Cell {cell.gridCellIndex} — {cell.burnState}
                   {cell.unseen
-                    ? ", never observed by the coordinator"
+                    ? ", not observed by the coordinator"
                     : `${cell.stale ? ", stale" : ""}, last observed ${formatIncidentClock(cell.lastObservedAt)}`}
                 </button>
               </li>

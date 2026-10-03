@@ -51,7 +51,7 @@ export function ReplayView({ onExit }: ReplayViewProps) {
     frame: truthFrameAt(mockRecording.truthFrames, view.simTimeMs as number),
   });
   const entities = useMemo(
-    () => (truth ? { ...baseEntities, fireCells: mergeTruthCells(baseEntities.fireCells, truth) } : baseEntities),
+    () => (truth ? { ...baseEntities, fireCells: mergeTruthCells(baseEntities.fireCells, truth, scenarioMap) } : baseEntities),
     [baseEntities, truth],
   );
 
@@ -64,7 +64,7 @@ export function ReplayView({ onExit }: ReplayViewProps) {
         <span>
           Commands disabled.{" "}
           {showFullFire
-            ? "Showing the full simulated fire, including fire the coordinator never saw (dashed frames)."
+            ? "Showing the full simulated fire, including fire the coordinator has not observed (dashed frames)."
             : "Showing the coordinator\u2019s own recorded knowledge only."}
         </span>
         <label className="replay-banner__toggle">

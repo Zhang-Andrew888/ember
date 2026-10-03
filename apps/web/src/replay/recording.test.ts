@@ -59,25 +59,30 @@ describe("mergeTruthCells", () => {
   const frame = { timeMs: 60_000, burning: [10, 11], burned: [12] };
 
   it("marks truth cells the coordinator never observed as unseen", () => {
-    const merged = mergeTruthCells([], frame);
+    const merged = mergeTruthCells([], frame, scenarioMap);
     expect(merged).toHaveLength(3);
     expect(merged.every((cell) => cell.unseen === true)).toBe(true);
   });
 
   it("keeps a current, matching observation as the observed entry (not unseen)", () => {
-    const merged = mergeTruthCells([observed(10, "burning")], frame);
+    const merged = mergeTruthCells([observed(10, "burning")], frame, scenarioMap);
     const cell = merged.find((c) => c.gridCellIndex === 10)!;
     expect(cell.unseen).toBeUndefined();
     expect(cell.key).toBe("c10");
   });
 
-  it("a stale observation is replaced by the truth, which was never observed afresh", () => {
-    const merged = mergeTruthCells([observed(10, "burning", true)], frame);
-    expect(merged.find((c) => c.gridCellIndex === 10)).toMatchObject({ stale: false, unseen: false });
+  it("a stale observation is replaced by the truth, flagged unseen so it never reads as an observation with an age", () => {
+    const merged = mergeTruthCells([observed(10, "burning", true)], frame, scenarioMap);
+    expect(merged.find((c) => c.gridCellIndex === 10)).toMatchObject({ stale: false, unseen: true });
+  });
+
+  it("an observation of a different state is replaced too (burning observed, truth says burned)", () => {
+    const merged = mergeTruthCells([observed(12, "burning")], frame, scenarioMap);
+    expect(merged.find((c) => c.gridCellIndex === 12)).toMatchObject({ burnState: "burned", unseen: true });
   });
 
   it("observed cells the truth does not list survive (a false report stays visible as reported)", () => {
-    const merged = mergeTruthCells([observed(40, "burning")], frame);
+    const merged = mergeTruthCells([observed(40, "burning")], frame, scenarioMap);
     expect(merged.some((c) => c.gridCellIndex === 40)).toBe(true);
   });
 });

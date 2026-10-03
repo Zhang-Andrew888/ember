@@ -78,13 +78,29 @@ describe("tween helpers", () => {
 });
 
 describe("isPanGesture", () => {
-  const base = { button: 0, shiftKey: false, ctrlKey: false, metaKey: false };
-  it("plain left-drag (orbit) does not pause follow; right/middle/modifier drags do", () => {
-    expect(isPanGesture(base)).toBe(false);
-    expect(isPanGesture({ ...base, button: 2 })).toBe(true);
-    expect(isPanGesture({ ...base, button: 1 })).toBe(true);
-    expect(isPanGesture({ ...base, shiftKey: true })).toBe(true);
-    expect(isPanGesture({ ...base, ctrlKey: true })).toBe(true);
-    expect(isPanGesture({ ...base, metaKey: true })).toBe(true);
+  const mouse = { button: 0, shiftKey: false, ctrlKey: false, metaKey: false, pointerType: "mouse", touchCount: 0 };
+  const touch = { ...mouse, pointerType: "touch" };
+
+  it("a plain left-drag (orbit) does not pause follow", () => {
+    expect(isPanGesture(mouse)).toBe(false);
+  });
+
+  it("right-drag and modifier+left-drag are pans, as in OrbitControls", () => {
+    expect(isPanGesture({ ...mouse, button: 2 })).toBe(true);
+    for (const key of ["shiftKey", "ctrlKey", "metaKey"] as const) expect(isPanGesture({ ...mouse, [key]: true })).toBe(true);
+  });
+
+  it("the middle button is zoom in OrbitControls, so it does not pause follow", () => {
+    expect(isPanGesture({ ...mouse, button: 1 })).toBe(false);
+  });
+
+  it("one finger rotates; two fingers pan (and pinch) so they pause follow", () => {
+    expect(isPanGesture({ ...touch, touchCount: 1 })).toBe(false);
+    expect(isPanGesture({ ...touch, touchCount: 2 })).toBe(true);
+    expect(isPanGesture({ ...touch, touchCount: 3 })).toBe(true);
+  });
+
+  it("a touch pointer ignores mouse-button numbering", () => {
+    expect(isPanGesture({ ...touch, button: 2, touchCount: 1 })).toBe(false);
   });
 });
