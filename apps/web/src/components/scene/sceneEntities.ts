@@ -61,28 +61,7 @@ export function listRefugeNodes(map: ScenarioMap): SceneNode[] {
  * a gap here is a map/data problem, not something to paper over visually.
  */
 export function buildSceneEntities(view: CoordinatorView, map: ScenarioMap): SceneEntities {
-  const agents: AgentMarker[] = [];
-  for (const agent of view.agents) {
-    const position = resolveAgentPosition(map, agent.position);
-    if (!position) continue;
-    const heading =
-      agent.position.kind === "edge"
-        ? resolveEdgeHeading(
-            map,
-            agent.position.edgeId,
-            agent.position.direction,
-            agent.position.distanceAlongPolyline,
-          )
-        : null;
-    agents.push({
-      id: agent.id,
-      callsign: agent.callsign,
-      role: agent.role,
-      state: agent.state,
-      position,
-      heading,
-    });
-  }
+  const agents = fanOutAtNodes(resolveAgents(view, map), view, map);
 
   const sites: SiteMarker[] = [];
   for (const site of view.sites) {
@@ -107,6 +86,71 @@ export function buildSceneEntities(view: CoordinatorView, map: ScenarioMap): Sce
     routes: buildRouteLines(view, map, null),
     forecast: buildForecastLayer(view, map),
   };
+}
+
+function resolveAgents(view: CoordinatorView, map: ScenarioMap): AgentMarker[] {
+  const agents: AgentMarker[] = [];
+  for (const agent of view.agents) {
+    const position = resolveAgentPosition(map, agent.position);
+    if (!position) continue;
+    const heading =
+      agent.position.kind === "edge"
+        ? resolveEdgeHeading(
+            map,
+            agent.position.edgeId,
+            agent.position.direction,
+            agent.position.distanceAlongPolyline,
+          )
+        : null;
+    agents.push({
+      id: agent.id,
+      callsign: agent.callsign,
+      role: agent.role,
+      state: agent.state,
+      position,
+      heading,
+    });
+  }
+  return agents;
+}
+
+/** Distance from a site/refuge node's centre at which agents standing there are drawn (clears the model). */
+export const NODE_CLEARANCE = 92;
+/** Spacing used when several agents share an ordinary junction. */
+export const JUNCTION_SPREAD = 30;
+
+/**
+ * Agents standing at a node would sit exactly on top of a site/refuge model
+ * (or on each other). Fan them out south of the node (toward the viewer) so
+ * every marker stays visible; positions are display-only and never feed back
+ * into anything else.
+ */
+export function fanOutAtNodes(agents: AgentMarker[], view: CoordinatorView, map: ScenarioMap): AgentMarker[] {
+  const byNode = new Map<string, number[]>();
+  for (const agent of view.agents) {
+    if (agent.position.kind !== "node") continue;
+    const resolvedIndex = agents.findIndex((marker) => marker.id === agent.id);
+    if (resolvedIndex < 0) continue;
+    const list = byNode.get(agent.position.nodeId) ?? [];
+    list.push(resolvedIndex);
+    byNode.set(agent.position.nodeId, list);
+  }
+  const result = [...agents];
+  for (const [nodeId, indices] of byNode) {
+    const node = map.nodes.get(nodeId);
+    if (!node) continue;
+    const radius = node.kind === "junction" ? (indices.length > 1 ? JUNCTION_SPREAD : 0) : NODE_CLEARANCE;
+    if (radius === 0) continue;
+    indices.forEach((markerIndex, slot) => {
+      const angle = Math.PI / 2 + (slot - (indices.length - 1) / 2) * 0.85;
+      const marker = result[markerIndex]!;
+      result[markerIndex] = {
+        ...marker,
+        position: { x: node.x + Math.cos(angle) * radius, z: node.z + Math.sin(angle) * radius },
+      };
+    });
+  }
+  return result;
 }
 
 /**

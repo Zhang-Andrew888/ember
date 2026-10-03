@@ -7,6 +7,7 @@ import { SceneLabelLayer, type LabelDescriptor } from "./SceneLabelLayer.js";
 import { SceneLegend } from "./SceneLegend.js";
 import type { CameraControlsHandle } from "./CameraControls.js";
 import { sceneTerrain } from "./terrain/sceneTerrain.js";
+import { agentLabelText } from "./models/markerCues.js";
 import { polylineMidpoint } from "./sceneLayers.js";
 import { listRefugeNodes, type FireCellMarker, type SceneEntities } from "./sceneEntities.js";
 import { scenarioMap } from "../../map/activeScenario.js";
@@ -73,7 +74,7 @@ export function SceneView({
     const refugeLabels = listRefugeNodes(scenarioMap).map((refuge) => ({
       id: `refuge:${refuge.id}`,
       x: refuge.x,
-      y: sceneTerrain.groundY(refuge.x, refuge.z) + 14,
+      y: sceneTerrain.groundY(refuge.x, refuge.z) + 30,
       z: refuge.z,
       text: refuge.label ?? "Refuge",
       variant: "refuge" as const,
@@ -88,7 +89,7 @@ export function SceneView({
       return {
         id: `site:${site.id}`,
         x: site.position.x,
-        y: sceneTerrain.groundY(site.position.x, site.position.z) + 18,
+        y: sceneTerrain.groundY(site.position.x, site.position.z) + 40,
         z: site.position.z,
         text: `${site.name} — ${siteProtectionStatusLabel(site.protectionStatus)}${damageLabel ? `, ${damageLabel}` : ""}${site.stale ? " (stale)" : ""}`,
         variant: "site" as const,
@@ -97,9 +98,9 @@ export function SceneView({
     const agentLabels = entities.agents.map((agent) => ({
       id: `agent:${agent.id}`,
       x: agent.position.x,
-      y: sceneTerrain.groundY(agent.position.x, agent.position.z) + 22,
+      y: sceneTerrain.groundY(agent.position.x, agent.position.z) + 44,
       z: agent.position.z,
-      text: agent.callsign,
+      text: agentLabelText(agent.callsign, agent.state),
       variant: "agent" as const,
     }));
     const routeLabels = entities.routes.map((line) => {

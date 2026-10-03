@@ -1521,3 +1521,18 @@ stay readable at 1440x900 and 1024x720.
 Caveat: the in-app frame timer reads ~2-3 ms in this software-GL VM, which looks too low to trust (GPU process async
 even with finish()). Item 7 measures frame time independently with a Playwright script instead.
 Blocked: nothing. Next: sync main, PR for 3c/3d, then item 4 (crew + site models).
+
+### Commit 8: item 4 - crew and site models with shape cues
+Changed: `models/` (geometry helpers, crew truck with 1..5 tally pegs = crew number, binocular-on-a-post scout, three
+site silhouettes: cabin cluster / waterworks / lodge, fence-post ring, rubble, damage gauge), `markerCues.ts` (pure
+rules, tested), rewritten `AgentMarkers.tsx` / `SiteMarkers.tsx`, labels now spell the state ("Crew 1 · working").
+State cues are shapes AND text: approaching `>>`, withdrawing `<<`, working = spoked ring, retreating = warning
+plate, lost = toppled + muted + cross, idle = none. Site protection: unobserved = outline-only ghost, unprotected =
+plain, underway = fence-post ring with a gap, destroyed = collapsed rubble; damage is a separate 4-notch gauge.
+Agents standing at a site/refuge node are fanned out 92 units beside it (display only) so they never hide a model.
+New dev preset `?scenario=model-states` shows all six agent states and sites in three statuses at once.
+Self-critique (3x crops): first pass models were 10-20 px, unreadable -> scaled 1.9x / 1.7x. A crew at Ridge Cabins sat
+exactly on the cabins and labels covered models -> fan-out + higher label anchors. The legend hid Crew 1/2 at
+1440x900 -> key collapsed under 1700 px and toggles laid out in a row. Still off: tally pegs are subtle at fit zoom
+(the label and rail carry the number); chevron glyphs are small; legend still overlaps the top-left corner of the map.
+Blocked: nothing. Next: item 5 stale-information styling, then 6 camera follow, 7 perf script, 8 replay.

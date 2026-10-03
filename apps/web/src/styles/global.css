@@ -660,3 +660,17 @@ input {
   gap: 0.4rem;
   align-items: center;
 }
+
+/* Compact layer controls: toggles wrap in a row so the legend stays small over the map. */
+.scene-legend__controls {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  max-width: 320px;
+}
+
+.scene-legend__controls .scene-legend__forecast,
+.scene-legend__controls button,
+.scene-legend__controls details {
+  flex-basis: 100%;
+}
