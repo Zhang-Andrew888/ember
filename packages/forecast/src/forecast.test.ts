@@ -223,3 +223,21 @@ describe("tolerance sensitivity", () => {
     expect(counts[counts.length - 1]!).toBeGreaterThan(0);
   });
 });
+
+describe("capping a large supported set", () => {
+  it("never exceeds the member cap and keeps the parameter extremes of what was supported", () => {
+    const obs = [briefingObservation(map), ...observeFire(map, inPrior, [watcher], 20_000)];
+    const snap = snapshotOf("crew-1", obs, 20_000);
+    const config = { ...DEFAULT_FORECAST_CONFIG, rebuildCandidates: 120, memberCount: 12, maxMembers: 14 };
+    const service = new ForecastService(agent, map, config);
+    const rebuilt = service.rebuild(snap, 20_000);
+    expect(rebuilt.reliability).toBe("reliable");
+    expect(rebuilt.members.length).toBeLessThanOrEqual(14);
+    expect(rebuilt.members.length).toBeGreaterThanOrEqual(8);
+    const mult = rebuilt.members.map((m) => m.params.spreadMultiplier);
+    // Weak early evidence supports a wide spread of rates, and the cap keeps both ends of it.
+    expect(Math.max(...mult) - Math.min(...mult)).toBeGreaterThan(0.3);
+    const done = service.events.find((e) => e.kind === "rebuild_complete");
+    expect(done?.kind === "rebuild_complete" && done.supportedCount).toBeGreaterThan(14);
+  });
+});
