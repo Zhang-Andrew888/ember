@@ -9,6 +9,29 @@ import type { WebSocketLike } from "./CoordinatorViewClient.js";
  * literal, hand-written states - not a re-implementation of fire/movement
  * logic, which stays out of apps/web per AGENTS.md lane ownership.
  */
+// Each snapshot's fields are the FULL cumulative state at that sim time,
+// not a diff from the previous one (createMockIncidentSocket replays them
+// independently) - a field left out reverts to the base fixture's value.
+// Shared below so a later snapshot can't silently drop an earlier one's
+// observation by accident.
+
+const siteAWorkStarted: CoordinatorView["sites"][number] = {
+  ...fixtureCoordinatorView.sites[0]!,
+  observedCompletedWork: 0 as never,
+  observedDamage: 0 as never,
+  observedDestroyed: false,
+  lastObservedAt: 95_000 as never,
+  stale: false,
+};
+
+const crew1OnSiteReport: CoordinatorView["recentReports"][number] = {
+  sequence: 4 as never,
+  simTimeMs: 95_000 as never,
+  agentId: "crew-1" as never,
+  text: "Crew 1 on site at Ridge Cabins, beginning protection work.",
+  urgent: false,
+};
+
 export const authoredSnapshots: CoordinatorView[] = [
   fixtureCoordinatorView,
   {
@@ -36,28 +59,8 @@ export const authoredSnapshots: CoordinatorView[] = [
         reportedAt: 95_000 as never,
       },
     ],
-    sites: [
-      {
-        ...fixtureCoordinatorView.sites[0]!,
-        observedCompletedWork: 0 as never,
-        observedDamage: 0 as never,
-        observedDestroyed: false,
-        lastObservedAt: 95_000 as never,
-        stale: false,
-      },
-      fixtureCoordinatorView.sites[1]!,
-      fixtureCoordinatorView.sites[2]!,
-    ],
-    recentReports: [
-      ...fixtureCoordinatorView.recentReports,
-      {
-        sequence: 4 as never,
-        simTimeMs: 95_000 as never,
-        agentId: "crew-1" as never,
-        text: "Crew 1 on site at Ridge Cabins, beginning protection work.",
-        urgent: false,
-      },
-    ],
+    sites: [siteAWorkStarted, fixtureCoordinatorView.sites[1]!, fixtureCoordinatorView.sites[2]!],
+    recentReports: [...fixtureCoordinatorView.recentReports, crew1OnSiteReport],
   },
   {
     ...fixtureCoordinatorView,
@@ -84,15 +87,12 @@ export const authoredSnapshots: CoordinatorView[] = [
         reportedAt: 100_000 as never,
       },
     ],
+    // Carries siteAWorkStarted forward - crew-1's work-in-progress observation
+    // doesn't un-happen just because this snapshot doesn't re-touch the site.
+    sites: [siteAWorkStarted, fixtureCoordinatorView.sites[1]!, fixtureCoordinatorView.sites[2]!],
     recentReports: [
       ...fixtureCoordinatorView.recentReports,
-      {
-        sequence: 4 as never,
-        simTimeMs: 95_000 as never,
-        agentId: "crew-1" as never,
-        text: "Crew 1 on site at Ridge Cabins, beginning protection work.",
-        urgent: false,
-      },
+      crew1OnSiteReport,
       {
         sequence: 5 as never,
         simTimeMs: 100_000 as never,

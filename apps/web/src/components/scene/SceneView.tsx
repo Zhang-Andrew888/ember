@@ -7,6 +7,7 @@ import { SceneLegend } from "./SceneLegend.js";
 import type { CameraControlsHandle } from "./CameraControls.js";
 import { listRefugeNodes, type SceneEntities } from "./sceneEntities.js";
 import { scenarioMap } from "../../map/scenarioMap.js";
+import { siteProtectionStatusLabel } from "../../format/reports.js";
 
 export interface SceneViewProps {
   readonly entities: SceneEntities;
@@ -57,7 +58,9 @@ export function SceneView({ entities, selectedAgentId, onInspectAgent, reducedMo
       x: site.position.x,
       y: 18,
       z: site.position.z,
-      text: site.name,
+      // Status is color-coded on the marker too, but never color-only
+      // (docs/FRONTEND.md) - the label always spells it out as text.
+      text: `${site.name} — ${siteProtectionStatusLabel(site.protectionStatus)}${site.stale ? " (stale)" : ""}`,
       variant: "site" as const,
     }));
     const agentLabels = entities.agents.map((agent) => ({

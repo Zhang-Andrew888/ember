@@ -30,3 +30,19 @@ export function siteProtectionStatus(site: CoordinatorView["sites"][number]): Si
   if (site.observedCompletedWork === null) return "unobserved";
   return site.observedCompletedWork > 0 ? "partially_protected" : "unprotected";
 }
+
+const SITE_PROTECTION_STATUS_LABEL: Record<SiteProtectionStatus, string> = {
+  unobserved: "unobserved",
+  unprotected: "unprotected",
+  partially_protected: "protection underway",
+  destroyed: "destroyed",
+};
+
+/**
+ * Text form of a site's protection status, so the map marker's color isn't
+ * the only way to read it (docs/FRONTEND.md: "Do not convey ... safe/unsafe
+ * ... by color alone").
+ */
+export function siteProtectionStatusLabel(status: SiteProtectionStatus): string {
+  return SITE_PROTECTION_STATUS_LABEL[status];
+}

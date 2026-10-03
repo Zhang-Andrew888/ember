@@ -1,6 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { fixtureCoordinatorView } from "../../../../tests/fixtures/coordinator-view.fixture.js";
-import { latestUrgentReport, routineReports, siteProtectionStatus } from "./reports.js";
+import {
+  latestUrgentReport,
+  routineReports,
+  siteProtectionStatus,
+  siteProtectionStatusLabel,
+} from "./reports.js";
 
 describe("format/reports - latestUrgentReport", () => {
   it("returns null when the fixture has no urgent reports", () => {
@@ -66,5 +71,19 @@ describe("format/reports - siteProtectionStatus", () => {
       observedCompletedWork: 5 as never,
     };
     expect(siteProtectionStatus(site)).toBe("partially_protected");
+  });
+});
+
+describe("format/reports - siteProtectionStatusLabel", () => {
+  it("gives every status a distinct, non-empty label", () => {
+    const statuses: Array<ReturnType<typeof siteProtectionStatus>> = [
+      "unobserved",
+      "unprotected",
+      "partially_protected",
+      "destroyed",
+    ];
+    const labels = statuses.map(siteProtectionStatusLabel);
+    expect(labels.every((label) => label.length > 0)).toBe(true);
+    expect(new Set(labels).size).toBe(statuses.length);
   });
 });
