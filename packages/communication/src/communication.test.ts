@@ -482,6 +482,12 @@ describe("replies from committed outcomes", () => {
   const decision = (type: DecisionEvent["type"], reason: string, action = ""): DecisionEvent =>
     DecisionEvent.parse({ sequence: SequenceNumber.parse(1), tick: SimTimeMs.parse(1000), agentId: AgentId.parse("crew-2"), type, reasonCode: reason, evidenceIds: [], actualAction: action });
 
+  it("announces a yield in words instead of the raw action text", () => {
+    const d = decision("mission_update", "yielded_to_higher_priority", "revised plan to give up a road slot");
+    expect(replyForDecision("Crew 2", d).text).toBe("Crew 2 is yielding the road and replanning. Another crew needs the road first.");
+    expect(replyForDecision("Crew 2", d, "radio").text).toBe("Crew 2, yielding the road and replanning. Another crew needs the road first.");
+  });
+
   it("states the committed result, in plain or radio phrasing, without hiding the reason", () => {
     const d = decision("withdrawal_triggered", "route_closed_by_observation");
     expect(replyForDecision("Crew 2", d).text).toBe("Crew 2 is withdrawing. Our observation closed the planned route.");
@@ -568,4 +574,35 @@ describe("ScriptedInterpreter robustness", () => {
     expect(env?.kind).toBe("relay");
     expect(env?.evidenceQueries[0]?.sourceName).toBe("Crew (1");
   });
+});
+
+describe("scripted demo phrases (#42)", () => {
+  const reports = [scoutReport("obs:scout:90000", 90_000)];
+
+  it.each([
+    "Relay the scout's latest observation to Crew 2",
+    "Crew 2, use Scout's latest report",
+    "Crew 2, use Scout's latest east corridor report",
+    "Pass Scout's latest sighting to Crew 2",
+  ])("relays the scout's report once it exists: %s", (phrase) => {
+    const out = makeGateway({ reports }).say(phrase).outcomes[0]!;
+    expect(out.receipt.recipientId).toBe("crew-2");
+    expect(out.actions.find((a) => a.kind === "relay")).toMatchObject({ observationId: "obs:scout:90000", toAgentId: "crew-2" });
+  });
+
+  it("says plainly that no report was received instead of inventing one", () => {
+    const out = makeGateway({ reports: [] }).say("Relay the scout's latest observation to Crew 2").outcomes[0]!;
+    expect(out.receipt.status).toBe("clarification_required");
+    expect(out.reply).toMatch(/no received report/);
+  });
+
+  it.each(["Crew 2, explain your plan", "Crew 2, what's your plan?", "Crew 2, why are you going there?"])(
+    "answers a plan question with a status reply, not 'could not tell what you want': %s",
+    (phrase) => {
+      const out = makeGateway({ reports: [] }).say(phrase).outcomes[0]!;
+      expect(out.receipt.status).toBe("accepted");
+      expect(out.reply).not.toMatch(/could not tell what you want/);
+      expect(out.actions.some((a) => a.kind === "objective")).toBe(false);
+    },
+  );
 });
