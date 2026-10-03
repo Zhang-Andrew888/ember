@@ -26,7 +26,15 @@ declare module "node:http" {
 declare const Buffer: {
   from(data: unknown): { toString(encoding?: string): string };
 };
-declare const process: { argv: string[]; exitCode?: number; stdout: { write(s: string): void } };
+declare const process: {
+  argv: string[];
+  env: Record<string, string | undefined>;
+  exitCode?: number;
+  stdout: { write(s: string): void };
+  stderr: { write(s: string): void };
+  on(event: "SIGINT" | "SIGTERM", cb: () => void): void;
+  exit(code?: number): never;
+};
 declare function setInterval(handler: () => void, ms: number): unknown;
 declare function setTimeout(handler: (...args: never[]) => void, ms: number): unknown;
 declare function clearInterval(handle: unknown): void;
