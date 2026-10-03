@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { replayLog } from "../net/replayLog.js";
 import { buildSceneEntities } from "./scene/sceneEntities.js";
 import { scenarioMap } from "../map/scenarioMap.js";
@@ -29,6 +29,16 @@ export function ReplayView({ onExit }: ReplayViewProps) {
   const [index, setIndex] = useState(0);
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const reducedMotion = useReducedMotion();
+  const bannerLabelRef = useRef<HTMLSpanElement>(null);
+
+  // This view fully replaces the live page (not an overlay on top of it),
+  // so entering replay unmounts whatever had focus (the EndOverlay's Replay
+  // button) with nothing to take its place - found live via Playwright:
+  // focus silently fell back to <body>. Same fix EndOverlay already uses
+  // for its own mount (focus the element naming what just changed).
+  useEffect(() => {
+    bannerLabelRef.current?.focus();
+  }, []);
 
   const view = replayLog[index]!;
   const entities = useMemo(() => buildSceneEntities(view, scenarioMap), [view]);
@@ -36,7 +46,9 @@ export function ReplayView({ onExit }: ReplayViewProps) {
   return (
     <div className="app-layout replay-view">
       <header className="replay-banner" role="status">
-        <span className="replay-banner__label">REPLAY</span>
+        <span className="replay-banner__label" ref={bannerLabelRef} tabIndex={-1}>
+          REPLAY
+        </span>
         <span>Commands disabled. Showing the coordinator&rsquo;s own recorded knowledge only.</span>
         <button type="button" onClick={onExit}>
           Exit replay
