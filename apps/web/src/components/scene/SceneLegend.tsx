@@ -75,7 +75,7 @@ export const SceneLegend = forwardRef<HTMLDivElement, SceneLegendProps>(function
       </ul>
       <p className="scene-legend__source">
         Map: {scenarioMap.version}
-        {scenarioMap.source.kind === "local-snapshot" ? " (local snapshot; scenarios/ has no valid file)" : ""}
+        {import.meta.env.DEV && scenarioMap.source.kind === "local-snapshot" ? " (local snapshot; scenarios/ has no valid file)" : ""}
       </p>
       </details>
       <div className="scene-legend__controls">
@@ -93,7 +93,7 @@ export const SceneLegend = forwardRef<HTMLDivElement, SceneLegendProps>(function
         </label>
         <p className="scene-legend__forecast" role="status" data-reliability={forecast?.reliability ?? "none"}>
           {forecast ? forecast.headline : "Forecast: not yet built"}
-          {forecast?.explanation ? ` — ${forecast.explanation}` : ""}
+          {forecast?.explanation ? `: ${forecast.explanation}` : ""}
         </p>
         <label className="scene-legend__toggle" title={canFollow ? undefined : "Select a crew to follow it"}>
           <input type="checkbox" checked={canFollow && follow} disabled={!canFollow} onChange={onToggleFollow} />
@@ -113,14 +113,14 @@ export const SceneLegend = forwardRef<HTMLDivElement, SceneLegendProps>(function
         <details className="scene-legend__cells">
           <summary>
             {unseenCount > 0
-              ? `Fire cells (${fireCells.length - unseenCount} observed, ${unseenCount} not observed — replay only)`
+              ? `Fire cells (${fireCells.length - unseenCount} observed, ${unseenCount} not observed, replay only)`
               : `Observed cells (${fireCells.length})`}
           </summary>
           <ul>
             {fireCells.map((cell) => (
               <li key={cell.key}>
                 <button type="button" onClick={() => onInspectCell(cell)}>
-                  Cell {cell.gridCellIndex} — {cell.burnState}
+                  Cell {cell.gridCellIndex}: {cell.burnState}
                   {cell.unseen
                     ? ", not observed by the coordinator"
                     : `${cell.stale ? ", stale" : ""}, last observed ${formatIncidentClock(cell.lastObservedAt)}`}

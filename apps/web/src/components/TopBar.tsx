@@ -15,8 +15,8 @@ export interface TopBarProps {
 const CONNECTION_LABEL: Record<ConnectionStatus, string> = {
   connecting: "Connecting…",
   open: "Connected",
-  closed: "Disconnected — reconnecting",
-  error: "Connection error — reconnecting",
+  closed: "Disconnected, reconnecting",
+  error: "Connection error, reconnecting",
 };
 
 function audioStatusLabel(snapshot: SpeechPlaybackSnapshot): string {
@@ -40,7 +40,7 @@ export function TopBar({ transportMode, simTimeMs, wallElapsedMs, connectionStat
         aria-label="Simulated incident time"
         title={`Incident time runs ${TIME_COMPRESSION}x faster than the clock on the wall`}
       >
-        {simTimeMs === null ? "—:—" : formatIncidentClock(simTimeMs)} simulated
+        {simTimeMs === null ? "--:--" : formatIncidentClock(simTimeMs)} simulated
       </span>
       <span className="top-bar__remaining" aria-label="Remaining real time">
         {wallElapsedMs === null ? "5:00 real time left" : `${formatRemainingWallTime(wallElapsedMs)} real time left`}

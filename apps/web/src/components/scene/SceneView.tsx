@@ -51,6 +51,7 @@ export function SceneView({
   simTimeMs,
 }: SceneViewProps) {
   const [renderContext, setRenderContext] = useState<RenderContext | null>(null);
+  const [firstFrameDrawn, setFirstFrameDrawn] = useState(false);
   const [showFireCells, setShowFireCells] = useState(true);
   const [showRoutes, setShowRoutes] = useState(true);
   const [showForecast, setShowForecast] = useState(true);
@@ -111,7 +112,7 @@ export function SceneView({
         x: site.position.x,
         y: sceneTerrain.groundY(site.position.x, site.position.z) + 40,
         z: site.position.z,
-        text: `${site.name} — ${siteProtectionStatusLabel(site.protectionStatus)}${damageLabel ? `, ${damageLabel}` : ""}${fresh.stale && site.ageMs !== null ? ` (stale, ${fresh.ageLabel})` : ""}`,
+        text: `${site.name}: ${siteProtectionStatusLabel(site.protectionStatus)}${damageLabel ? `, ${damageLabel}` : ""}${fresh.stale && site.ageMs !== null ? ` (stale, ${fresh.ageLabel})` : ""}`,
         variant: "site" as const,
         stale: fresh.stale && site.ageMs !== null,
       };
@@ -132,7 +133,7 @@ export function SceneView({
         x: mid.x,
         y: sceneTerrain.groundY(mid.x, mid.z) + 10,
         z: mid.z,
-        text: line.limitingReason ? `${line.label} — ${humanizeReason(line.limitingReason)}` : line.label,
+        text: line.limitingReason ? `${line.label}: ${humanizeReason(line.limitingReason)}` : line.label,
         variant: "route" as const,
       };
     });
@@ -170,8 +171,14 @@ export function SceneView({
         onInspectAgent={handleInspectAgent}
         onInspectCell={setInspectedCell}
         onReady={handleReady}
+        onFirstFrame={() => setFirstFrameDrawn(true)}
         reducedMotion={reducedMotion}
       />
+      {firstFrameDrawn ? null : (
+        <div className="scene-view__loading" role="status">
+          Preparing the map…
+        </div>
+      )}
       <SceneLabelLayer
         camera={renderContext?.camera ?? null}
         canvasElement={renderContext?.canvasElement ?? null}
@@ -256,7 +263,7 @@ function CellInspectionPanel({
             <dd>
               {formatIncidentClock(cell.lastObservedAt)}
               {ageMs !== null ? ` (${Math.round(ageMs / 1000)}s ago)` : ""}
-              {cell.stale ? " — stale" : ""}
+              {cell.stale ? ", stale" : ""}
             </dd>
           </>
         )}

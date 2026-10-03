@@ -68,7 +68,7 @@ export function ReplayView({ onExit, source, recording }: ReplayViewProps) {
           REPLAY
         </span>
         {source === "illustrative" ? (
-          <span className="replay-banner__notice">Illustrative recording — not from this run.</span>
+          <span className="replay-banner__notice">Illustrative recording, not from this run.</span>
         ) : (
           <span className="replay-banner__notice">This run.</span>
         )}

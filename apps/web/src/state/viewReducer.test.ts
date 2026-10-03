@@ -17,6 +17,16 @@ describe("state/viewReducer - applyIncomingView", () => {
     expect(applyIncomingView(fixtureCoordinatorView, duplicate)).toBe(fixtureCoordinatorView);
   });
 
+  it("accepts an equal sequence with later simulated time (issue #53: sequence held while time advances)", () => {
+    const later = { ...fixtureCoordinatorView, simTimeMs: (fixtureCoordinatorView.simTimeMs as number) + 1_000 } as typeof fixtureCoordinatorView;
+    expect(applyIncomingView(fixtureCoordinatorView, later)).toBe(later);
+  });
+
+  it("rejects an equal sequence with earlier simulated time", () => {
+    const later = { ...fixtureCoordinatorView, simTimeMs: (fixtureCoordinatorView.simTimeMs as number) + 1_000 } as typeof fixtureCoordinatorView;
+    expect(applyIncomingView(later, fixtureCoordinatorView)).toBe(later);
+  });
+
   it("rejects an older/out-of-order sequence", () => {
     const older = { ...fixtureCoordinatorView, sequence: (fixtureCoordinatorView.sequence as number) - 1 } as typeof fixtureCoordinatorView;
     expect(applyIncomingView(fixtureCoordinatorView, older)).toBe(fixtureCoordinatorView);
