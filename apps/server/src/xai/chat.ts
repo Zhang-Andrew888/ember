@@ -1,4 +1,4 @@
-import type { InterpretationRequest } from "@ember/communication";
+import { INTERPRETATION_DEADLINE_MS, type InterpretationRequest } from "@ember/communication";
 import { xaiApiKey } from "./env.js";
 
 const DEFAULT_MODEL = "grok-4-1-fast-non-reasoning";
@@ -40,6 +40,7 @@ interface ChatCompletionResponse {
 export async function completeIntentInterpretation(
   req: InterpretationRequest,
   fetchImpl: typeof fetch = fetch,
+  signal?: AbortSignal,
 ): Promise<string> {
   const key = xaiApiKey();
   if (key === undefined) throw new Error("XAI_API_KEY is not configured");
@@ -59,6 +60,7 @@ export async function completeIntentInterpretation(
         { role: "user", content: req.text },
       ],
     }),
+    signal: signal ?? AbortSignal.timeout(INTERPRETATION_DEADLINE_MS),
   });
 
   if (!response.ok) {

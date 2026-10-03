@@ -4,6 +4,7 @@ import {
   AudioScheduler,
   CommandGateway,
   FailingInterpreter,
+  INTERPRETATION_DEADLINE_MS,
   IntentEnvelope,
   PushToTalk,
   RecordingSink,
@@ -522,6 +523,82 @@ describe("Grok interpreter adapter", () => {
     await Promise.resolve();
     await Promise.resolve();
     expect(delivered[0]).toMatchObject({ inputSequence: 3, explicitRecipient: "Crew 1" });
+  });
+
+  it("aborts a stalled interpretation when the command times out and ignores a late delivery", async () => {
+    let signal: AbortSignal | undefined;
+    const applied: IntentEnvelope[] = [];
+    const hook: { deliver?: (seq: number, env: IntentEnvelope) => void } = {};
+    const gw = new CommandGateway({
+      directory,
+      interpreter: createGrokInterpreter((_req, sig) => {
+        signal = sig;
+        return new Promise((_resolve, reject) => {
+          sig.addEventListener("abort", () => reject(new Error("aborted")));
+        });
+      }, (seq, env) => hook.deliver?.(seq, env)),
+      picture: () => [],
+      status: () => null,
+      nowSimMs: () => 100_000,
+      incidentEnded: () => false,
+    });
+    hook.deliver = (seq, env) => {
+      applied.push(env);
+      gw.deliver(seq, env);
+    };
+    const ticket = gw.submit({ commandId: "cmd-1", text: "Crew 1, hold", idempotencyKey: "k-stall", wallMs: 0 });
+    expect(ticket.outcomes).toHaveLength(0);
+    expect(signal?.aborted).toBe(false);
+    const failed = gw.poll(INTERPRETATION_DEADLINE_MS);
+    expect(failed[0]?.receipt.status).toBe("rejected");
+    expect(failed[0]?.actions).toHaveLength(0);
+    expect(failed[0]?.notes).toContain("interpretation_timeout");
+    expect(signal?.aborted).toBe(true);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(applied).toHaveLength(0);
+    const late = gw.deliver(ticket.inputSequence, {
+      commandId: "cmd-1",
+      inputSequence: ticket.inputSequence,
+      explicitRecipient: "Crew 1",
+      kind: "objective",
+      objective: { kind: "hold" },
+      evidenceQueries: [],
+      unsupportedClaims: [],
+    });
+    expect(late).toHaveLength(0);
+  });
+
+  it("aborts a stalled interpretation when the incident ends and ignores a late delivery", async () => {
+    let signal: AbortSignal | undefined;
+    const gw = new CommandGateway({
+      directory,
+      interpreter: createGrokInterpreter((_req, sig) => {
+        signal = sig;
+        return new Promise(() => {});
+      }, (seq, env) => {
+        gw.deliver(seq, env);
+      }),
+      picture: () => [],
+      status: () => null,
+      nowSimMs: () => 100_000,
+      incidentEnded: () => false,
+    });
+    const ticket = gw.submit({ commandId: "cmd-1", text: "Crew 1, hold", idempotencyKey: "k-end", wallMs: 0 });
+    const cancelled = gw.endIncident();
+    expect(cancelled[0]?.receipt.status).toBe("incident_ended");
+    expect(cancelled[0]?.actions).toHaveLength(0);
+    expect(signal?.aborted).toBe(true);
+    const late = gw.deliver(ticket.inputSequence, {
+      commandId: "cmd-1",
+      inputSequence: ticket.inputSequence,
+      explicitRecipient: "Crew 1",
+      kind: "objective",
+      objective: { kind: "hold" },
+      evidenceQueries: [],
+      unsupportedClaims: [],
+    });
+    expect(late).toHaveLength(0);
   });
 
   it("integrates with CommandGateway when the async answer arrives", async () => {

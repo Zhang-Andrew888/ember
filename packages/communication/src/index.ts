@@ -10,6 +10,7 @@ export {
 } from "./grok-interpreter.js";
 export {
   CommandGateway,
+  INTERPRETATION_DEADLINE_MS,
   statusReply,
   type AgentStatus,
   type GatewayAction,

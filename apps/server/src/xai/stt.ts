@@ -1,3 +1,4 @@
+import { INTERPRETATION_DEADLINE_MS } from "@ember/communication";
 import { xaiApiKey } from "./env.js";
 
 export interface SttResult {
@@ -22,6 +23,7 @@ export async function transcribeAudio(
     method: "POST",
     headers: { Authorization: `Bearer ${key}` },
     body: form,
+    signal: AbortSignal.timeout(INTERPRETATION_DEADLINE_MS),
   });
 
   if (!response.ok) {

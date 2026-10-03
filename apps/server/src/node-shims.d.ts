@@ -46,9 +46,20 @@ declare function setInterval(handler: () => void, ms: number): unknown;
 declare function setTimeout(handler: (...args: never[]) => void, ms: number): unknown;
 declare function clearInterval(handle: unknown): void;
 declare const performance: { now(): number };
+declare class AbortSignal {
+  readonly aborted: boolean;
+  addEventListener(type: "abort", listener: () => void): void;
+  removeEventListener(type: "abort", listener: () => void): void;
+  static timeout(milliseconds: number): AbortSignal;
+  static any(signals: readonly AbortSignal[]): AbortSignal;
+}
+declare class AbortController {
+  readonly signal: AbortSignal;
+  abort(reason?: unknown): void;
+}
 declare const fetch: (
   input: string,
-  init?: { method?: string; headers?: Record<string, string>; body?: string | FormData },
+  init?: { method?: string; headers?: Record<string, string>; body?: string | FormData; signal?: AbortSignal },
 ) => Promise<{ ok: boolean; status: number; json(): Promise<unknown>; arrayBuffer(): Promise<ArrayBuffer> }>;
 declare class URLSearchParams {
   constructor(init?: string);

@@ -94,7 +94,10 @@ export class ConversationBridge {
     const interpreter =
       options.interpreter ??
       (grokIntentEnabled()
-        ? createGrokInterpreter(completeIntentInterpretation, (seq, env) => asyncDeliver.fn?.(seq, env))
+        ? createGrokInterpreter(
+            (req, signal) => completeIntentInterpretation(req, fetch, signal),
+            (seq, env) => asyncDeliver.fn?.(seq, env),
+          )
         : new ScriptedInterpreter());
     this.gateway = new CommandGateway({
       directory: directoryFor(inc.scenario),
