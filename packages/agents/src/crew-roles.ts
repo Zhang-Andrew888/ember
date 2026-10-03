@@ -41,17 +41,17 @@ export const CREW_PROFILES: Readonly<Record<CrewKind, CrewProfile>> = {
   engine: {
     kind: "engine",
     role: "protection_crew",
-    attributes: { speedMps: 4, workRate: 1, fatiguePerMin: 0.04, carryingCapacity: 120 },
+    attributes: { speedMps: 4, workRate: 1, fatiguePerMin: 0.012, carryingCapacity: 120 },
   },
   hand_crew: {
     kind: "hand_crew",
     role: "protection_crew",
-    attributes: { speedMps: 3, workRate: 0.8, fatiguePerMin: 0.025, carryingCapacity: 60 },
+    attributes: { speedMps: 3, workRate: 0.8, fatiguePerMin: 0.008, carryingCapacity: 60 },
   },
   scout: {
     kind: "scout",
     role: "scout",
-    attributes: { speedMps: 4, workRate: 0, fatiguePerMin: 0.02, carryingCapacity: 10 },
+    attributes: { speedMps: 4, workRate: 0, fatiguePerMin: 0.006, carryingCapacity: 10 },
   },
 };
 

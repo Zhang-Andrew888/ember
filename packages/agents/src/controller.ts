@@ -22,6 +22,7 @@ import {
   planReturn,
   protectionTargets,
   type CertifyFailure,
+  type NavConfig,
   type PlanningContext,
   type MissionSearchResult,
   type PriorityClass,
@@ -31,6 +32,7 @@ import type { AgentProjection, SimInput } from "@ember/simulation";
 import { RoadIndex, type PublicMap } from "@ember/simulation/model";
 import { defaultKindForRole, domainRoleOf, navConfigFor, type CrewKind, type CrewProfile, profileOf } from "./crew-roles.js";
 import { EvidenceTracker } from "./evidence.js";
+import { FRESH_MEMBER_STATE, advanceMemberState, tightenNav, type Activity, type MemberState } from "./member-state.js";
 import { explain } from "./explain.js";
 import {
   DEFAULT_CONTROLLER_CONFIG,
@@ -90,6 +92,9 @@ export class CrewController implements AgentController {
   /** Edges the coordinator asked this crew to avoid until resume or a new objective. */
   protected readonly avoidCorridorEdges = new Set<EdgeId>();
   private currentState: ControllerState = "HOLDING";
+  private member: MemberState = FRESH_MEMBER_STATE;
+  private lastTickMs: number | null = null;
+  private lastAtRefuge = true;
   private seq = 0;
   private fireDirty = true;
   private evalDirty = true;
@@ -126,6 +131,46 @@ export class CrewController implements AgentController {
     return profileOf(this.kind);
   }
 
+  /** Fatigue, injury risk and morale. They only ever tighten what this member considers feasible. */
+  get memberState(): MemberState {
+    return this.member;
+  }
+
+  /** Planning config after condition is applied: never looser than the configured one. */
+  protected effectiveNav(): NavConfig {
+    return tightenNav(this.cfg.nav ?? DEFAULT_NAV_CONFIG, this.member);
+  }
+
+  private advanceMember(nowMs: number): void {
+    const prev = this.lastTickMs;
+    this.lastTickMs = nowMs;
+    if (prev === null) return;
+    // Standing at a refuge waiting for a road slot or departure is rest, not exertion.
+    const activity: Activity = this.lastAtRefuge && this.currentState !== "WORKING" && !this.isEmergency(this.currentState) ? "resting" : this.activityOf(this.currentState);
+    this.member = advanceMemberState(this.member, this.profile.attributes, { dtMs: nowMs - prev, activity });
+  }
+
+  private isEmergency(state: ControllerState): boolean {
+    return state === "WITHDRAWING" || state === "RETREATING" || state === "STRANDED";
+  }
+
+  private activityOf(state: ControllerState): Activity {
+    switch (state) {
+      case "WORKING":
+        return "working";
+      case "WITHDRAWING":
+      case "RETREATING":
+      case "STRANDED":
+        return "emergency";
+      case "APPROACHING":
+      case "RETURNING":
+      case "PLANNING":
+        return "travelling";
+      default:
+        return "resting";
+    }
+  }
+
   get state(): ControllerState {
     return this.currentState;
   }
@@ -159,6 +204,8 @@ export class CrewController implements AgentController {
     const now = proj.simTimeMs;
     this.lastProj = proj;
     this.lastEnv = env;
+    this.advanceMember(now);
+    this.lastAtRefuge = this.atRefuge(proj.position);
     if (proj.state === "lost") {
       this.currentState = "LOST";
       this.active = null;
@@ -251,7 +298,7 @@ export class CrewController implements AgentController {
       position: proj.position,
       nowMs: proj.simTimeMs,
       oracle: env.reservations?.oracle(this.agentId, cls, proj.simTimeMs) ?? env.oracle ?? ALWAYS_FREE,
-      config: this.cfg.nav ?? DEFAULT_NAV_CONFIG,
+      config: this.effectiveNav(),
       avoidEdges: avoid,
       diagnose: false,
     };
@@ -291,7 +338,7 @@ export class CrewController implements AgentController {
       position: proj.position,
       legIndex,
       nowMs: proj.simTimeMs,
-      ...(this.cfg.nav === undefined ? {} : { config: this.cfg.nav }),
+      config: this.effectiveNav(),
     });
     if (!certified.ok) {
       this.withdraw(reasonOf(certified.failure), proj, ctx, out);
@@ -462,7 +509,7 @@ export class CrewController implements AgentController {
   }
 
   candidateSearch(ctx: PlanningContext, allowed: ReadonlySet<string> | null): MissionSearchResult {
-    const targets = protectionTargets(this.evidence.siteKnowledge(), this.cfg.nav?.crewWorkRate ?? 1, allowed);
+    const targets = protectionTargets(this.evidence.siteKnowledge(), this.effectiveNav().crewWorkRate, allowed);
     return planMissions(ctx, targets);
   }
 
