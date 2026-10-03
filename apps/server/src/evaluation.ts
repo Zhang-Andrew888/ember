@@ -141,6 +141,9 @@ export interface EvaluationReport {
   readonly variants: readonly VariantReport[];
   readonly failures: readonly RepresentativeFailure[];
   readonly caveats: readonly string[];
+  /** Git commit when the report was written (evaluate-cli). */
+  readonly measuredAtCommit?: string;
+  readonly measuredAt?: string;
 }
 
 const CAVEATS = [

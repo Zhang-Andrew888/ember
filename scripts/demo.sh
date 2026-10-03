@@ -5,6 +5,7 @@
 #   scripts/demo.sh mock         # web only, in-browser mock socket (no server)
 #   scripts/demo.sh --smoke      # live mode, run scripts/smoke.mjs against it, then exit
 #   scripts/demo.sh --no-web     # server only (useful with a separately started web dev server)
+#   scripts/demo.sh --comparison  # print held-out aggregates for the demo pitch (no server)
 #
 # Environment:
 #   PORT       server port (default 3000; the web dev server proxy expects 3000)
@@ -22,16 +23,22 @@ source "$ROOT/scripts/lib/demo-ports.sh"
 MODE="live"
 SMOKE=0
 START_WEB=1
+COMPARISON=0
 for arg in "$@"; do
   case "$arg" in
     mock) MODE="mock" ;;
     live) MODE="live" ;;
     --smoke) SMOKE=1 ;;
     --no-web) START_WEB=0 ;;
-    -h|--help) sed -n '2,16p' "$0"; exit 0 ;;
+    --comparison) COMPARISON=1 ;;
+    -h|--help) sed -n '2,17p' "$0"; exit 0 ;;
     *) echo "unknown argument: $arg" >&2; exit 2 ;;
   esac
 done
+
+if [ "$COMPARISON" = "1" ]; then
+  exec node "$ROOT/scripts/demo-comparison.mjs"
+fi
 
 PORT="${PORT:-3000}"
 WEB_PORT="${WEB_PORT:-5173}"
