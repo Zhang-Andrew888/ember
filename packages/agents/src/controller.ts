@@ -31,8 +31,9 @@ import {
 import type { AgentProjection, SimInput } from "@ember/simulation";
 import { RoadIndex, type PublicMap } from "@ember/simulation/model";
 import { defaultKindForRole, domainRoleOf, navConfigFor, type CrewKind, type CrewProfile, profileOf } from "./crew-roles.js";
+import { decideContinuation, decideOrder } from "./autonomy.js";
 import { EvidenceTracker } from "./evidence.js";
-import { FRESH_MEMBER_STATE, advanceMemberState, tightenNav, type Activity, type MemberState } from "./member-state.js";
+import { FRESH_MEMBER_STATE, MemberState as MemberStateSchema, advanceMemberState, tightenNav, type Activity, type MemberState } from "./member-state.js";
 import { explain } from "./explain.js";
 import {
   DEFAULT_CONTROLLER_CONFIG,
@@ -64,6 +65,8 @@ export interface ControllerOptions {
   readonly role: "protection_crew" | "scout";
   /** Optional finer kind. When given, its role must match `role` and planning uses its capabilities. */
   readonly kind?: CrewKind;
+  /** Starting condition, e.g. a crew that has already been out. Validated; defaults to fresh. */
+  readonly memberState?: MemberState;
   readonly map: PublicMap;
   readonly config?: Partial<ControllerConfig>;
 }
@@ -118,6 +121,7 @@ export class CrewController implements AgentController {
       throw new Error(`crew kind ${options.kind} does not match role ${options.role}`);
     }
     this.kind = options.kind ?? defaultKindForRole(options.role);
+    this.member = options.memberState === undefined ? FRESH_MEMBER_STATE : MemberStateSchema.parse(options.memberState);
     this.map = options.map;
     this.road = new RoadIndex(options.map);
     const cfg = { ...DEFAULT_CONTROLLER_CONFIG, ...options.config };
@@ -344,6 +348,18 @@ export class CrewController implements AgentController {
       this.withdraw(reasonOf(certified.failure), proj, ctx, out);
       return;
     }
+    const continuation = decideContinuation(this.callsign, {
+      member: this.member,
+      phase: this.phaseOf(active, proj),
+      mode: active.mode,
+      routeBlocked: false,
+      certifyFailure: null,
+      forecastReliable: ctx.ensemble.reliability !== "unreliable",
+    });
+    if (continuation.action === "withdraw") {
+      this.withdraw(continuation.reason, proj, ctx, out);
+      return;
+    }
     this.maybeSwitch(proj, ctx, out);
   }
 
@@ -536,6 +552,11 @@ export class CrewController implements AgentController {
     this.lastEvalMs = now;
 
     const allowed = this.objective?.kind === "protect_site" && this.objective.targetId !== null ? new Set([this.objective.targetId]) : null;
+    const fit = decideOrder(this.callsign, { kind: "protect_site", member: this.member, forecastReliable: true, feasible: true, limitingReason: null });
+    if (fit.action === "refuse") {
+      this.noteIdle(proj, fit.reason, out);
+      return;
+    }
     if (!admitsProtection(ctx.ensemble)) {
       this.noteIdle(proj, "forecast_unreliable", out);
       return;
@@ -605,7 +626,14 @@ export class CrewController implements AgentController {
         if (site === undefined) return reject("unknown_site");
         if (site.knownResolved) return reject("target_resolved");
         const result = this.candidateSearch(ctx, new Set([obj.targetId]));
-        if (result.best === null) return reject(result.limitingReason ?? "no_feasible_mission_in_model");
+        const verdict = decideOrder(this.callsign, {
+          kind: obj.kind,
+          member: this.member,
+          forecastReliable: ctx.ensemble.reliability !== "unreliable",
+          feasible: result.best !== null,
+          limitingReason: result.limitingReason,
+        });
+        if (verdict.action === "refuse") return reject(verdict.reason);
         const hadPlan = this.active !== null;
         this.objective = obj;
         this.holding = false;

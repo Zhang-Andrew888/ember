@@ -19,3 +19,11 @@ Running log for the crew increments. Newest last.
 - First version (no deadband, higher fatigue rates) changed apps/server session.test.ts timing (fewer crews crossed e-s-h). Not a bug, but I cannot edit that test, so: fatigue rates recalibrated to incident length and an onset deadband added (rested members plan exactly as before).
 - Gotcha: apps/server tests consume `@ember/agents` from `dist`; run `pnpm build:libs` before probing server tests.
 - Forecast hypotheses untouched: no dangerous hypothesis is ever dropped.
+
+## Increment 3: autonomy policy (feat/crew-3-autonomy, stacked on #11)
+- `autonomy.ts`: pure `decideOrder` (accept/refuse) and `decideContinuation` (continue/withdraw) plus the announcement (callsign-first text, urgent for refusals and withdrawals, silent on accept).
+- Refuse limits are gentler than withdraw limits (fatigue 0.8/0.92, injury 0.5/0.7, morale 0.25/0.1): a crew finishes its task but takes no new one.
+- return/hold/avoid/resume are always accepted (they only restrict exposure). Unknown order kinds are refused.
+- Survival reasons (route closed, certify failure, forecast unreliable) outrank member condition.
+- Rising fatigue tightens certification first, so in practice the forecast reason fires slightly before the member withdraw limit; the member branch is covered by the pure tests.
+- Added optional `memberState` to ControllerOptions (validated) so a crew can start already worn.

@@ -550,3 +550,48 @@ describe("member condition in the controller", () => {
     }
   });
 });
+
+describe("autonomy policy in the controller", () => {
+  const exhausted = { fatigue: 0.85, injuryRisk: 0, morale: 1 };
+  const objective = (kind: Objective["kind"], target: string | null): Objective => ({
+    id: ObjectiveId.parse("obj-p"),
+    recipientId: crew1,
+    kind,
+    targetId: target,
+    constraints: {},
+    issueSequence: SequenceNumber.parse(1),
+  });
+
+  it("refuses a protect order it is too fatigued to take, urgently and with its callsign", () => {
+    const scenario = scenarioWith({ fire: far, work: 60 });
+    const inc = new Incident({ scenario, seed: "p1", overrides: calm });
+    const c = new CrewController({ agentId: crew1, callsign: "Crew 1", role: "protection_crew", map: scenario.map, memberState: exhausted });
+    c.receiveObjective(objective("protect_site", "site-a"));
+    const log = runControllers(inc, [c], 60_000);
+    const rejected = log.decisions.find((d) => d.event.type === "objective_rejected");
+    expect(rejected?.event.reasonCode).toBe("member_fatigued");
+    expect(inc.projectCoordinator().recentReports.some((r) => /Crew 1 .*fatigued/.test(r.text) && r.urgent)).toBe(true);
+    expect(log.decisions.some((d) => d.event.type === "mission_start")).toBe(false);
+  });
+
+  it("takes no new autonomous work while too fatigued and says why once", () => {
+    const scenario = scenarioWith({ fire: far, work: 60 });
+    const inc = new Incident({ scenario, seed: "p2", overrides: calm });
+    const c = new CrewController({ agentId: crew1, callsign: "Crew 1", role: "protection_crew", map: scenario.map, memberState: exhausted });
+    const log = runControllers(inc, [c], 60_000);
+    expect(log.decisions.filter((d) => d.event.type === "idle" && d.event.reasonCode === "member_fatigued")).toHaveLength(1);
+    expect(log.decisions.some((d) => d.event.type === "mission_start")).toBe(false);
+  });
+
+  it("a strained crew leaves its work early and survives: tightened feasibility or the member limit trips first", () => {
+    const scenario = scenarioWith({ fire: far, work: 600 });
+    const inc = new Incident({ scenario, seed: "p3", overrides: calm });
+    const c = new CrewController({ agentId: crew1, callsign: "Crew 1", role: "protection_crew", map: scenario.map, memberState: { fatigue: 0.79, injuryRisk: 0, morale: 1 } });
+    const log = runControllers(inc, [c], 900_000);
+    const w = log.decisions.find((d) => d.event.type === "withdrawal_triggered");
+    // Rising fatigue tightens certification, so the forecast reason usually fires just before the member limit.
+    expect(["member_fatigued", "forecast_leg_unsafe", "forecast_work_unsafe", "forecast_wait_unsafe"]).toContain(w?.event.reasonCode);
+    expect(inc.truth().sites[0]?.completedWork).toBeLessThan(600);
+    expect(inc.projectAgent(crew1).state).not.toBe("lost");
+  });
+});
