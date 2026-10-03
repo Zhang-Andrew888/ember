@@ -48,6 +48,47 @@ describe("components/scene/sceneEntities - buildSceneEntities", () => {
     });
   });
 
+  it("resolves a contradicted cell (two reports for the same edge+index) to the freshest one only", () => {
+    const olderReport = fixtureCoordinatorView.observedCells[0]!; // fire-patch-1 cell 0, burning, stale, t=0
+    const contradicting = {
+      ...olderReport,
+      burnState: "unburned" as const,
+      lastObservedAt: 92_000 as never,
+      stale: false,
+      observerAgentId: "crew-1" as never,
+    };
+    const view = {
+      ...fixtureCoordinatorView,
+      observedCells: [olderReport, contradicting],
+    };
+    const result = buildSceneEntities(view, scenarioMap);
+    const matching = result.fireCells.filter(
+      (c) => c.edgeId === olderReport.edgeId && c.cellIndex === olderReport.cellIndex,
+    );
+    expect(matching).toHaveLength(1);
+    expect(matching[0]).toMatchObject({ burnState: "unburned", lastObservedAt: 92_000, stale: false });
+  });
+
+  it("is order-independent when resolving a contradiction (freshest wins regardless of array order)", () => {
+    const olderReport = fixtureCoordinatorView.observedCells[0]!;
+    const contradicting = {
+      ...olderReport,
+      burnState: "unburned" as const,
+      lastObservedAt: 92_000 as never,
+      stale: false,
+    };
+    const view = {
+      ...fixtureCoordinatorView,
+      observedCells: [contradicting, olderReport], // fresher one listed first this time
+    };
+    const result = buildSceneEntities(view, scenarioMap);
+    const matching = result.fireCells.filter(
+      (c) => c.edgeId === olderReport.edgeId && c.cellIndex === olderReport.cellIndex,
+    );
+    expect(matching).toHaveLength(1);
+    expect(matching[0]?.burnState).toBe("unburned");
+  });
+
   it("skips agents/sites/cells whose id isn't in the scene map", () => {
     const viewWithUnknownIds = {
       ...fixtureCoordinatorView,

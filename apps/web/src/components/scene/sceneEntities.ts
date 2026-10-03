@@ -89,8 +89,32 @@ export function buildSceneEntities(view: CoordinatorView, map: ScenarioMap): Sce
     });
   }
 
-  const fireCells: FireCellMarker[] = [];
+  const fireCells = resolveFireCells(view, map);
+
+  return { agents, sites, fireCells };
+}
+
+/**
+ * A cell can appear more than once in `observedCells` when two agents (or
+ * one agent at two times) reported conflicting evidence for the same
+ * physical cell - e.g. an old "burning" report contradicted by a fresher
+ * "unburned" one. docs/ARCHITECTURE.md: "Fresh local hazard controls
+ * planning" over a stale relay; rendering both entries would draw two
+ * overlapping markers with no defined precedence between them. Keeps only
+ * the entry with the greatest lastObservedAt per edgeId+cellIndex.
+ */
+function resolveFireCells(view: CoordinatorView, map: ScenarioMap): FireCellMarker[] {
+  const latestByKey = new Map<string, CoordinatorView["observedCells"][number]>();
   for (const cell of view.observedCells) {
+    const key = `${cell.edgeId}:${cell.cellIndex}`;
+    const existing = latestByKey.get(key);
+    if (!existing || (cell.lastObservedAt as number) >= (existing.lastObservedAt as number)) {
+      latestByKey.set(key, cell);
+    }
+  }
+
+  const fireCells: FireCellMarker[] = [];
+  for (const cell of latestByKey.values()) {
     const position = resolveCellPosition(map, cell.edgeId, cell.cellIndex);
     if (!position) continue;
     fireCells.push({
@@ -103,6 +127,5 @@ export function buildSceneEntities(view: CoordinatorView, map: ScenarioMap): Sce
       lastObservedAt: cell.lastObservedAt as number,
     });
   }
-
-  return { agents, sites, fireCells };
+  return fireCells;
 }
