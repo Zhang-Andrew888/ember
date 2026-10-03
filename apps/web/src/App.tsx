@@ -37,6 +37,7 @@ import { EndOverlay } from "./components/EndOverlay.js";
 import { ReplayView, type ReplaySource } from "./components/ReplayView.js";
 import { ConnectionBanner } from "./components/ConnectionBanner.js";
 import { DemoBanner } from "./components/DemoBanner.js";
+import { MockPlaybackEndedOverlay } from "./components/MockPlaybackEndedOverlay.js";
 import { playPreparedSpeech } from "./net/grokSpeechPlayback.js";
 import { transcribeViaServer } from "./net/grokStt.js";
 
@@ -67,6 +68,7 @@ export function App() {
   const [replayRecording, setReplayRecording] = useState<IncidentReplayRecording | null>(null);
   const [replayLoading, setReplayLoading] = useState(false);
   const [replayError, setReplayError] = useState<string | null>(null);
+  const [mockPlaybackEnded, setMockPlaybackEnded] = useState(false);
   const mockSocketRef = useRef<MockIncidentSocket | null>(null);
   const protocolSocketRef = useRef<ProtocolWebSocket | null>(null);
   const liveSessionRef = useRef<{ incidentId: string; token: string } | null>(null);
@@ -133,7 +135,10 @@ export function App() {
   const openSocket = useCallback(() => {
     if (IS_MOCK_MODE) {
       const scenarioOptions = resolveScenario(window.location.search);
-      const socket = createMockIncidentSocket(scenarioOptions ?? undefined);
+      const socket = createMockIncidentSocket({
+        ...(scenarioOptions ?? {}),
+        onPlaybackEnded: () => setMockPlaybackEnded(true),
+      });
       mockSocketRef.current = socket;
       return socket;
     }
@@ -149,6 +154,7 @@ export function App() {
   const handleStart = useCallback(async () => {
     setStarting(true);
     setStartError(null);
+    setMockPlaybackEnded(false);
     // A pre-configured WebSocket URL skips incident creation (see net/startPlan.ts).
     if (START_PLAN.kind === "create-incident") {
       const created = await createIncident(REST_BASE_URL ?? "");
@@ -286,7 +292,8 @@ export function App() {
     return view.agents.find((agent) => agent.id === urgent.agentId)?.callsign ?? null;
   }, [view]);
 
-  const composerDisabled = connectionStatus !== "open" || Boolean(view?.incidentEnd);
+  const composerDisabled =
+    connectionStatus !== "open" || Boolean(view?.incidentEnd) || (IS_MOCK_MODE && mockPlaybackEnded);
 
   if (phase === "briefing") {
     return (
@@ -311,12 +318,13 @@ export function App() {
   }
 
   const hasEnded = Boolean(view?.incidentEnd);
+  const mockFrozen = IS_MOCK_MODE && mockPlaybackEnded && !hasEnded;
 
   return (
     <div className="app-layout">
       {demoMode ? <DemoBanner /> : null}
       <ConnectionBanner status={connectionStatus} />
-      <div className="app-layout__content" inert={hasEnded || undefined}>
+      <div className="app-layout__content" inert={hasEnded || mockFrozen || undefined}>
         <TopBar
           transportMode={TRANSPORT_MODE}
           simTimeMs={view ? (view.simTimeMs as number) : null}
@@ -357,6 +365,7 @@ export function App() {
           onSelectAgent={setSelectedAgentId}
         />
       </div>
+      {mockFrozen ? <MockPlaybackEndedOverlay onReload={handleStartAgain} /> : null}
       {view?.incidentEnd ? (
         <EndOverlay
           incidentEnd={view.incidentEnd}

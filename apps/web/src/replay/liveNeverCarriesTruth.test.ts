@@ -93,7 +93,10 @@ describe("what the mock socket actually emits", () => {
 
   async function emitted(options: Parameters<typeof createMockIncidentSocket>[0]): Promise<string[]> {
     vi.useFakeTimers();
-    const socket = createMockIncidentSocket({ intervalMs: 10, ...options });
+    const socket = createMockIncidentSocket({
+      intervalMs: options.intervalMs ?? 10,
+      ...options,
+    });
     const frames: string[] = [];
     socket.onmessage = (event) => frames.push(event.data as string);
     await vi.advanceTimersByTimeAsync(1);
@@ -104,7 +107,7 @@ describe("what the mock socket actually emits", () => {
   }
 
   it("default demo frames parse through the production wire parser with no truth keys", async () => {
-    const frames = await emitted({});
+    const frames = await emitted({ snapshots: authoredSnapshots });
     expect(frames.length).toBe(authoredSnapshots.length);
     for (const raw of frames) {
       const view = parseCoordinatorViewFrame(raw);

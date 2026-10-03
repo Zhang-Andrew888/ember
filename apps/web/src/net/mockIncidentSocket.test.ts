@@ -39,7 +39,7 @@ describe("net/mockIncidentSocket - createMockIncidentSocket", () => {
   });
 
   it("emits every snapshot in order after start()", () => {
-    const socket = createMockIncidentSocket({ intervalMs: 100 });
+    const socket = createMockIncidentSocket({ snapshots: authoredSnapshots, intervalMs: 100 });
     const received: unknown[] = [];
     socket.onmessage = (event) => received.push(JSON.parse(event.data));
 
@@ -52,7 +52,7 @@ describe("net/mockIncidentSocket - createMockIncidentSocket", () => {
   });
 
   it("start() is idempotent", () => {
-    const socket = createMockIncidentSocket({ intervalMs: 100 });
+    const socket = createMockIncidentSocket({ snapshots: authoredSnapshots, intervalMs: 100 });
     const onmessage = vi.fn();
     socket.onmessage = onmessage;
 
@@ -65,7 +65,7 @@ describe("net/mockIncidentSocket - createMockIncidentSocket", () => {
   });
 
   it("stops emitting and calls onclose after close()", () => {
-    const socket = createMockIncidentSocket({ intervalMs: 100 });
+    const socket = createMockIncidentSocket({ snapshots: authoredSnapshots, intervalMs: 100 });
     const onclose = vi.fn();
     const onmessage = vi.fn();
     socket.onclose = onclose;
@@ -104,8 +104,22 @@ describe("net/mockIncidentSocket - createMockIncidentSocket", () => {
     expect(socket.readyState).toBe(3);
   });
 
+  it("calls onPlaybackEnded when the script finishes without incidentEnd", () => {
+    const onPlaybackEnded = vi.fn();
+    const socket = createMockIncidentSocket({
+      snapshots: authoredSnapshots,
+      intervalMs: 100,
+      onPlaybackEnded,
+    });
+    vi.advanceTimersByTime(0);
+    socket.start();
+    vi.advanceTimersByTime(100 * authoredSnapshots.length + 100);
+    expect(onPlaybackEnded).toHaveBeenCalledTimes(1);
+    expect(socket.playbackEnded).toBe(true);
+  });
+
   it("disconnectAfterMs opens normally, delivers snapshots, then self-closes", () => {
-    const socket = createMockIncidentSocket({ intervalMs: 100, disconnectAfterMs: 500 });
+    const socket = createMockIncidentSocket({ snapshots: authoredSnapshots, intervalMs: 100, disconnectAfterMs: 500 });
     const onopen = vi.fn();
     const onclose = vi.fn();
     const received: unknown[] = [];
