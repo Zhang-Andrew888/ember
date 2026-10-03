@@ -4,3 +4,4 @@ export * from "./position.js";
 export * from "./records.js";
 export * from "./coordinator-view.js";
 export * from "./simulation-api.js";
+export * from "./wire-protocol.js";

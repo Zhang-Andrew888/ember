@@ -40,6 +40,7 @@ const directory: Directory = {
     { name: "east corridor", x: 1000, y: 800, radius: 200 },
     { name: "north road", x: 500, y: 1200, radius: 150 },
   ],
+  corridors: [{ id: "e-n-h", name: "east corridor" }],
 };
 
 function makeGateway(over: Partial<GatewayEnv> & { reports?: Report[]; now?: { t: number }; ended?: { v: boolean } } = {}) {
@@ -204,9 +205,10 @@ describe("objective kinds", () => {
 
   it("rejects what the contract or the recipient's role cannot take, with a reason", () => {
     const { say } = makeGateway();
-    const avoid = say("Crew 1, avoid the east corridor").outcomes[0]!;
-    expect(avoid.receipt.status).toBe("rejected");
-    expect(avoid.reply).toMatch(/not supported by the shared contract/);
+    const obj = (text: string) => say(text).outcomes[0]!.actions.find((a) => a.kind === "objective");
+    expect(obj("Crew 1, avoid the east corridor")).toMatchObject({
+      objective: { kind: "avoid_corridor", targetId: "e-n-h", recipientId: "crew-1" },
+    });
     const crewObserve = say("Crew 1, check the north road").outcomes[0]!;
     expect(crewObserve.receipt.status).toBe("rejected");
     expect(crewObserve.reply).toMatch(/not a scout/);

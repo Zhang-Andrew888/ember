@@ -27,7 +27,7 @@ export async function startServer(options: SessionOptions & { port?: number }): 
   const live = new LiveRun(session, bridge, hub, { nowMs: () => performance.now() });
   const wss = new WebSocketServer({ port: options.port ?? 0, host: "127.0.0.1", maxPayload: MAX_MESSAGE_BYTES });
   await new Promise<void>((resolve) => wss.on("listening", resolve));
-  const sockets = new Map<ClientId, { send(data: string): void }>();
+  const sockets = new Map<ClientId, { send(data: string): void; close(code?: number, reason?: string): void }>();
   wss.on("connection", (socket) => {
     const id = hub.connect();
     sockets.set(id, socket);
@@ -42,7 +42,13 @@ export async function startServer(options: SessionOptions & { port?: number }): 
     flush();
   });
   const flush = (): void => {
-    for (const [id, socket] of sockets) for (const m of hub.drain(id)) socket.send(m);
+    for (const [id, socket] of sockets) {
+      if (hub.backpressureClosed.has(id)) {
+        socket.close(1013, "backpressure");
+        continue;
+      }
+      for (const m of hub.drain(id)) socket.send(m);
+    }
   };
   live.start();
   const timer = setInterval(() => {

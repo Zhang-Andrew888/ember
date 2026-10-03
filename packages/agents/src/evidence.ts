@@ -1,5 +1,4 @@
 import type { Observation, SiteId } from "@ember/domain";
-import { GRID_EDGE } from "@ember/knowledge";
 import type { SiteKnowledge } from "@ember/navigation";
 import type { PublicMap } from "@ember/simulation/model";
 
@@ -26,10 +25,10 @@ export class EvidenceTracker {
       const obs = observations[this.pointer]!;
       let hasFire = false;
       for (const f of obs.observedFields) {
-        if (f.kind === "cell" && f.edgeId === GRID_EDGE) {
+        if (f.kind === "cell") {
           if (f.burnState !== "unburned") {
             hasFire = true;
-            this.closed.add(f.cellIndex);
+            this.closed.add(f.gridCellIndex);
           }
         } else if (f.kind === "site") {
           const prev = this.sites.get(f.siteId);

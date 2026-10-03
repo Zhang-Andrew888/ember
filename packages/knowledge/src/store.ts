@@ -1,10 +1,7 @@
 import type { AgentId, Observation, ObservedField, SimTimeMs, SiteId } from "@ember/domain";
-import { EdgeId, SimTimeMs as SimTimeMsSchema } from "@ember/domain";
+import { SimTimeMs as SimTimeMsSchema } from "@ember/domain";
 import { hashValue } from "./digest.js";
 import type { AgentKnowledgeSnapshot } from "./types.js";
-
-/** Pseudo edge id carrying flat 64x64 grid cell indices in cell observation fields. */
-export const GRID_EDGE = EdgeId.parse("grid");
 
 export const STALE_AFTER_MS = 30_000;
 
@@ -105,8 +102,7 @@ export class KnowledgeStore {
       });
       return;
     }
-    if (field.edgeId !== GRID_EDGE) return;
-    const cell = field.cellIndex;
+    const cell = field.gridCellIndex;
     if (field.burnState !== "unburned") this.closed.add(cell);
     const prev = this.cells.get(cell);
     const next: CellBelief = {

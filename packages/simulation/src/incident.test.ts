@@ -208,7 +208,7 @@ describe("knowledge scoping and relay", () => {
       .at(-1);
     expect(scoutObs).toBeDefined();
     const burningCell = scoutObs!.observedFields.find((f) => f.kind === "cell" && f.burnState === "burning");
-    const cell = burningCell && burningCell.kind === "cell" ? burningCell.cellIndex : -1;
+    const cell = burningCell && burningCell.kind === "cell" ? burningCell.gridCellIndex : -1;
     // Coordinator knows; the crew does not and its planning input is unchanged.
     expect(inc.coordinator.cellBelief(cell)?.state).toBe("burning");
     expect(inc.agentStores.get(crew1)?.cellBelief(cell)).toBeUndefined();

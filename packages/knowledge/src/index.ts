@@ -3,7 +3,6 @@
 export type { AgentKnowledgeSnapshot } from "./types.js";
 export { canonicalJson, hashText, hashValue } from "./digest.js";
 export {
-  GRID_EDGE,
   STALE_AFTER_MS,
   KnowledgeStore,
   toSimTime,

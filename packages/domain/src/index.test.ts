@@ -7,6 +7,7 @@ import {
   IncidentEnd,
   CommandReceipt,
   Meters,
+  Objective,
 } from "./index.js";
 
 describe("domain/ids", () => {
@@ -47,8 +48,7 @@ describe("domain/records - Observation", () => {
     observedFields: [
       {
         kind: "cell",
-        edgeId: "edge-e1",
-        cellIndex: 3,
+        gridCellIndex: 3,
         burnState: "burning",
       },
     ],
@@ -122,6 +122,7 @@ describe("domain/records - CommandReceipt", () => {
 
 describe("domain/coordinator-view - CoordinatorView", () => {
   const minimalView = {
+    protocolVersion: 1,
     sequence: 0,
     simTimeMs: 0,
     wallElapsedMs: 0,
@@ -130,6 +131,8 @@ describe("domain/coordinator-view - CoordinatorView", () => {
     agents: [],
     sites: [],
     observedCells: [],
+    agentPlans: [],
+    coordinatorForecast: null,
     recentReports: [],
     incidentEnd: null,
   };
@@ -182,5 +185,18 @@ describe("domain/coordinator-view - CoordinatorView", () => {
     expect(() =>
       CoordinatorView.parse({ ...minimalView, incidentStatus: "paused" }),
     ).toThrow();
+  });
+
+  it("parses avoid_corridor objectives", () => {
+    expect(() =>
+      Objective.parse({
+        id: "obj-1",
+        recipientId: "crew-1",
+        kind: "avoid_corridor",
+        targetId: "e-n-h",
+        constraints: {},
+        issueSequence: 1,
+      }),
+    ).not.toThrow();
   });
 });

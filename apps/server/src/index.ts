@@ -26,3 +26,6 @@ export {
 export { SessionHub, LiveRun, type ClientId } from "./hub.js";
 export { ClientMessage, ServerMessage, decode, encode } from "./protocol.js";
 export { startServer, type ServerHandle } from "./ws-server.js";
+export { startHttpApp, type HttpAppHandle } from "./http-app.js";
+export { IncidentRegistry, type IncidentRecord } from "./incident-registry.js";
+export { encodeClient, encodeServer, parseServerWire } from "./protocol.js";

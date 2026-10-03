@@ -161,7 +161,7 @@ describe("forecast service", () => {
         ...o,
         id: o.id.replace("obs:", "obs:far:") as typeof o.id,
         observedAt: 8000 as typeof o.observedAt,
-        observedFields: [{ kind: "cell" as const, edgeId: o.observedFields[0]!.kind === "cell" ? o.observedFields[0]!.edgeId : ("grid" as never), cellIndex: cellIndexOf(900, 1300)!, burnState: "burning" as const }],
+        observedFields: [{ kind: "cell" as const, gridCellIndex: cellIndexOf(900, 1300)!, burnState: "burning" as const }],
       })),
     ];
     const snap = snapshotOf("crew-1", impossible, 10_000);

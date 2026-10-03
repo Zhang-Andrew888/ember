@@ -1,4 +1,5 @@
-import { AgentId, type DecisionEvent, type MissionPlan, type Objective } from "@ember/domain";
+import { AgentId, SimTimeMs, type CoordinatorView, type DecisionEvent, type MissionPlan, type Objective } from "@ember/domain";
+import { ForecastService, toCoordinatorForecastView } from "@ember/forecast";
 import {
   CrewController,
   ScoutController,
@@ -44,10 +45,12 @@ export class IncidentSession {
   readonly controllerMs: number[] = [];
   private readonly road: RoadIndex;
   private readonly hooks: ReservationHooks;
+  private readonly coordinatorForecast: ForecastService;
 
   constructor(options: SessionOptions) {
     this.incident = new Incident(options);
     this.road = new RoadIndex(this.incident.scenario.map);
+    this.coordinatorForecast = new ForecastService(AgentId.parse("coordinator"), this.incident.scenario.map);
     this.reservations = new ReservationService(this.road);
     const reservations = this.reservations;
     const failures = this.planFailures;
@@ -137,6 +140,20 @@ export class IncidentSession {
 
   sendObjective(objective: Objective): void {
     this.controllers.get(objective.recipientId)?.receiveObjective(objective);
+  }
+
+  /** Coordinator projection including forecast envelope for the map (#2). */
+  coordinatorView(): CoordinatorView {
+    const now = this.incident.simTimeMs;
+    const snapshot = this.incident.coordinator.snapshot(SimTimeMs.parse(now));
+    const ensemble = this.coordinatorForecast.update(snapshot, now);
+    let explanation: string | null = null;
+    if (ensemble.reliability === "unreliable") {
+      const last = [...this.coordinatorForecast.events].reverse().find((e) => e.kind === "contradiction");
+      explanation = last?.explanation ?? null;
+    }
+    const forecast = toCoordinatorForecastView(ensemble, this.road, now, explanation);
+    return this.incident.projectCoordinator({ coordinatorForecast: forecast });
   }
 
 }

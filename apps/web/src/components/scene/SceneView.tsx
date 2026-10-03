@@ -157,7 +157,7 @@ function CellInspectionPanel({
       <dl>
         <dt>Edge</dt>
         <dd>
-          {cell.edgeId} (cell {cell.cellIndex})
+          Grid cell {cell.gridCellIndex}
         </dd>
         <dt>State</dt>
         <dd>{cell.burnState}</dd>

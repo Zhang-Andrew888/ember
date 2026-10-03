@@ -4,7 +4,7 @@ import { buildSyntheticScenario, type SimScenario } from "@ember/simulation";
 import { cellIndexOf } from "@ember/simulation/model";
 import { ConversationBridge } from "./conversation.js";
 import { LiveRun, SessionHub } from "./hub.js";
-import { ServerMessage } from "./protocol.js";
+import { parseServerWire } from "./protocol.js";
 import { IncidentSession } from "./session.js";
 
 vi.setConfig({ testTimeout: 300_000 });
@@ -15,6 +15,10 @@ afterEach(async () => {
 });
 
 const SECRET_SEED = "SECRET-SEED-XYZ-9183";
+
+function wire(raw: string) {
+  return parseServerWire(raw)!;
+}
 const patch = (x: number, y: number): number[] => [cellIndexOf(x, y)!, cellIndexOf(x + 25, y)!, cellIndexOf(x, y + 25)!, cellIndexOf(x + 25, y + 25)!];
 const steady = {
   ...DEFAULT_FORECAST_CONFIG,
@@ -63,9 +67,13 @@ describe("wire protocol and information boundary", () => {
       expect(blob).not.toContain(forbidden);
     }
     // Every message is valid under the shared schema and carries only whitelisted fields.
-    for (const m of all) expect(() => ServerMessage.parse(JSON.parse(m))).not.toThrow();
-    const lastView = [...all].reverse().map((m) => JSON.parse(m) as { type: string; view?: { observedCells: { burnState: string }[] } }).find((m) => m.type === "view");
-    const seenBurning = lastView?.view?.observedCells.filter((c) => c.burnState !== "unburned").length ?? 0;
+    for (const m of all) expect(parseServerWire(m)).not.toBeNull();
+    const lastView = [...all]
+      .reverse()
+      .map((m) => parseServerWire(m))
+      .find((m) => m?.type === "view");
+    const seenBurning =
+      lastView?.type === "view" ? lastView.view.observedCells.filter((c) => c.burnState !== "unburned").length : 0;
     const truth = session.incident.truth().cellState;
     let trueBurning = 0;
     for (const c of truth) if (c === 2 || c === 3) trueBurning += 1;
@@ -80,7 +88,7 @@ describe("wire protocol and information boundary", () => {
     for (const bad of ["not json", "{}", JSON.stringify({ type: "teleport" }), JSON.stringify({ type: "say", text: "", idempotencyKey: "k" }), JSON.stringify({ type: "say", text: "x".repeat(5000), idempotencyKey: "k" })]) {
       hub.handle(id, bad, 0);
     }
-    const msgs = hub.drain(id).map((m) => JSON.parse(m) as { type: string; kind?: string });
+    const msgs = hub.drain(id).map(wire);
     expect(msgs.filter((m) => m.type === "notice" && m.kind === "bad_message")).toHaveLength(5);
     expect(session.incident.inputLog).toHaveLength(0);
   });
@@ -97,7 +105,7 @@ describe("wire protocol and information boundary", () => {
     hub.handle(id, JSON.stringify({ type: "ptt_release", transcript: "again" }), 3100);
     clock.t += 1000;
     live.pump();
-    const msgs = hub.drain(id).map((m) => JSON.parse(m) as { type: string; receipt?: { status: string; recipientId: string } });
+    const msgs = hub.drain(id).map(wire);
     const receipts = msgs.filter((m) => m.type === "receipt");
     expect(receipts).toHaveLength(1);
     expect(receipts[0]?.receipt).toMatchObject({ status: "accepted", recipientId: "crew-2" });
@@ -113,13 +121,13 @@ describe("wire protocol and information boundary", () => {
     hub.drain(id);
     hub.handle(id, JSON.stringify({ type: "inspect", agentId: "crew-3" }), 200);
     hub.handle(id, JSON.stringify({ type: "inspect", agentId: "nobody" }), 300);
-    const msgs = hub.drain(id).map((m) => JSON.parse(m) as { type: string; agentId?: string; kind?: string });
+    const msgs = hub.drain(id).map(wire);
     expect(msgs.find((m) => m.type === "inspection")?.agentId).toBe("crew-3");
     expect(msgs.some((m) => m.type === "notice" && m.kind === "bad_message")).toBe(true);
     expect(bridge.gateway.activeRecipientId).toBe("crew-2");
     // A follow-up with no name still goes to the previously addressed crew.
     hub.handle(id, JSON.stringify({ type: "say", text: "resume your own judgment", idempotencyKey: "b" }), 400);
-    const follow = hub.drain(id).map((m) => JSON.parse(m) as { type: string; receipt?: { recipientId: string } });
+    const follow = hub.drain(id).map(wire);
     expect(follow.find((m) => m.type === "receipt")?.receipt?.recipientId).toBe("crew-2");
   });
 
@@ -133,10 +141,10 @@ describe("wire protocol and information boundary", () => {
     expect(hub.unsentUtterance(id)).toMatchObject({ startedMs: 1000, releasedMs: 2500 });
     expect(session.incident.inputLog).toHaveLength(0);
     hub.reconnect(id);
-    const back = hub.drain(id).map((m) => JSON.parse(m) as { type: string; kind?: string; detail?: string });
+    const back = hub.drain(id).map(wire);
     expect(back.find((m) => m.type === "notice" && m.kind === "unsent_utterance")?.detail).toBe("Crew 2, protect the");
     hub.handle(id, JSON.stringify({ type: "resend" }), 9000);
-    const after = hub.drain(id).map((m) => JSON.parse(m) as { type: string });
+    const after = hub.drain(id).map(wire);
     expect(after.some((m) => m.type === "receipt")).toBe(true);
   });
 });
@@ -159,11 +167,12 @@ describe("live run", () => {
     live.start();
     clock.t += 400_000; // past five real minutes: the incident is finalized through tick 1,500
     live.pump();
+    hub.afterStep();
     expect(session.incident.ended).toBe(true);
-    const msgs = hub.drain(id).map((m) => JSON.parse(m) as { type: string });
+    const msgs = hub.drain(id).map(wire);
     expect(msgs.filter((m) => m.type === "ended")).toHaveLength(1);
     hub.handle(id, JSON.stringify({ type: "say", text: "Crew 1, hold", idempotencyKey: "late" }), live.wallElapsedMs);
-    const reply = hub.drain(id).map((m) => JSON.parse(m) as { type: string; receipt?: { status: string } });
+    const reply = hub.drain(id).map(wire);
     expect(reply.find((m) => m.type === "receipt")?.receipt?.status).toBe("incident_ended");
   });
 });

@@ -75,15 +75,20 @@ export function resolveAgentPosition(map: ScenarioMap, position: AgentPosition):
   return resolveEdgePoint(map, position.edgeId, position.distanceAlongPolyline);
 }
 
-/** Resolves the midpoint of the given fire cell along its edge. */
-export function resolveCellPosition(
-  map: ScenarioMap,
-  edgeId: string,
-  cellIndex: number,
-): SceneVector | null {
-  const edge = map.edges.get(edgeId);
-  if (!edge || edge.cellCount <= 0) return null;
-  const clampedIndex = clamp(cellIndex, 0, edge.cellCount - 1);
-  const centerT = (clampedIndex + 0.5) / edge.cellCount;
-  return resolveEdgePoint(map, edgeId, centerT * edge.lengthMeters);
+const GRID_SIZE = 64;
+const CELL_METERS = 25;
+const SCENE_SIZE = 1400;
+const WORLD_METERS = GRID_SIZE * CELL_METERS;
+
+/** Resolves the center of a flat terrain grid cell (matches @ember/simulation/model). */
+export function resolveGridCellPosition(gridCellIndex: number): SceneVector {
+  const gx = gridCellIndex % GRID_SIZE;
+  const gy = Math.floor(gridCellIndex / GRID_SIZE);
+  const xm = (gx + 0.5) * CELL_METERS;
+  const ym = (gy + 0.5) * CELL_METERS;
+  const scale = SCENE_SIZE / WORLD_METERS;
+  return {
+    x: (xm - WORLD_METERS / 2) * scale,
+    z: (ym - WORLD_METERS / 2) * scale,
+  };
 }

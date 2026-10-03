@@ -19,11 +19,14 @@ import { runEndedScenarios } from "./scenarios.js";
  */
 export const replayLog: CoordinatorView[] = [
   {
+    ...fixtureCoordinatorView,
     sequence: 1 as CoordinatorView["sequence"],
     simTimeMs: 0 as CoordinatorView["simTimeMs"],
     wallElapsedMs: 0 as CoordinatorView["wallElapsedMs"],
     incidentStatus: "active",
     activeRecipientId: null,
+    agentPlans: [],
+    coordinatorForecast: null,
     agents: [
       { ...fixtureCoordinatorView.agents[1]!, state: "idle", reportedAt: 0 as never }, // crew-2, at refuge-west
       {
