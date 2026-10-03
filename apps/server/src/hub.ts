@@ -40,7 +40,7 @@ export class SessionHub {
   ) {}
 
   private emitView(view: CoordinatorView, clientId?: ClientId): void {
-    this.viewRecorder.record(view);
+    this.viewRecorder.record(view, this.session.incident.eventCount);
     if (clientId !== undefined) this.send(clientId, { type: "view", view });
     else this.broadcast({ type: "view", view });
   }

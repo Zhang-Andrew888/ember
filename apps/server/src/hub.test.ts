@@ -38,16 +38,41 @@ class FakeClock {
   }
 }
 
-function setup(scenario?: SimScenario) {
+function setup(scenario?: SimScenario, recorder: ViewRecorder = new ViewRecorder()) {
   const base = buildSyntheticScenario();
   const sc = scenario ?? { ...base, map: { ...base.map, initialFireCells: patch(230, 1100) } };
   const session = new IncidentSession({ scenario: sc, seed: SECRET_SEED, overrides: { spreadMultiplier: 1.3737373, windShiftMs: 333_000, initialWindRad: 0.1234567 }, controllerConfig: { forecast: steady } });
   const bridge = new ConversationBridge(session);
-  const hub = new SessionHub(session, bridge, new ViewRecorder());
+  const hub = new SessionHub(session, bridge, recorder);
   const clock = new FakeClock();
   const live = new LiveRun(session, bridge, hub, clock);
   return { session, bridge, hub, clock, live };
 }
+
+describe("replay recording", () => {
+  it("records against the incident's event count, not the per-step view sequence", () => {
+    class SpyRecorder extends ViewRecorder {
+      readonly calls: Array<{ sequence: number; revision: number | undefined }> = [];
+      override record(view: Parameters<ViewRecorder["record"]>[0], revision?: number): void {
+        this.calls.push({ sequence: view.sequence, revision });
+        super.record(view, revision);
+      }
+    }
+    const recorder = new SpyRecorder();
+    const { session, hub, clock, live } = setup(undefined, recorder);
+    hub.connect();
+    live.start();
+    for (let i = 0; i < 20; i++) {
+      clock.t += 1000;
+      live.pump();
+    }
+    expect(recorder.calls.length).toBeGreaterThan(5);
+    for (const call of recorder.calls) expect(typeof call.revision).toBe("number");
+    expect(recorder.calls[recorder.calls.length - 1]!.revision).toBe(session.incident.eventCount);
+    // The view sequence also counts quiet steps, so it runs ahead of the event count.
+    expect(recorder.calls.some((call) => call.revision !== call.sequence)).toBe(true);
+  });
+});
 
 describe("wire protocol and information boundary", () => {
   it("never sends private parameters, the seed or truth fire state in any message during a run", () => {

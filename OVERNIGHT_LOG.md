@@ -1772,3 +1772,10 @@ Authorised by Andrew: "go fix 51 52 53, make a pr and you may make the sim fix".
 - **#52**: terrain surround fades from a dim edge tone to near-black instead of hard bands; favicon added; em dashes removed from UI copy; the three server message types the client ignores are now an explicit, tested list.
 - **Not done, and why**: bundle size (needs a production build, which this brief forbids); eslint react-hooks plugin (new dependency, and likely many existing findings); holding crews labelled "approaching" (the coarse AgentState in contract issue #3); WS origin check, incident eviction, token in URL, unnamed presets (sim server design); `.DS_Store` and docs staleness (docs/** is forbidden); demo-path test coverage beyond what was added.
 - Checked in a browser (mock): briefing fits at 1440x900, 1440x1000, 1024x720; loading cover appears and clears; composer placeholder visible; wide 1800x700 canvas fades at the edges; no 4xx for favicon.
+
+## feat/web-scene: replay recording follow-up (branch fix/replay-view-recording)
+
+- Review finding on #96 (merged): the step-based view sequence made `ViewRecorder` store a view every step, about 2.3x the replay payload (reviewer measured 645 vs 1,500 views for a full run). The finding was right; I had noted the side effect but not measured it.
+- Fix: the recorder dedupes on a revision the hub supplies, `Incident.eventCount` (new getter), which is exactly the old sequence, so the recorded density returns to what it was on main before #96. Clients still receive the step-based sequence, so the clock fix is untouched.
+- Tests: incident event count steady on quiet steps while the sequence rises; recorder keeps one view per revision; the hub passes the event count (mutation-checked: fails when the hub reverts to the default).
+- Not measured: the full-run view count with this change. By construction it equals the old per-event count, but I did not re-run the reviewer's measurement.

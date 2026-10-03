@@ -120,6 +120,11 @@ export class Incident {
     for (const agent of this.world.agents) this.sample(agent.id, 0);
   }
 
+  /** Number of events published so far (observations and the end). Unlike the view sequence, it does not rise on quiet steps. */
+  get eventCount(): number {
+    return this.eventSequence;
+  }
+
   get simTimeMs(): number {
     return this.world.timeMs;
   }

@@ -34,4 +34,13 @@ describe("ViewRecorder", () => {
     r.record(sampleView(3, 10_000));
     expect(r.coordinatorLog().map((v) => v.sequence)).toEqual([1, 2, 3]);
   });
+
+  it("keeps only the first view per revision when one is given (view sequences can rise on quiet steps)", () => {
+    const r = new ViewRecorder();
+    r.record(sampleView(10, 1000), 4);
+    r.record(sampleView(11, 2000), 4);
+    r.record(sampleView(12, 3000), 4);
+    r.record(sampleView(13, 4000), 5);
+    expect(r.coordinatorLog().map((v) => v.sequence)).toEqual([10, 13]);
+  });
 });
