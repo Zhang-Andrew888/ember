@@ -4,6 +4,7 @@ import {
   staleContradictionScenario,
   siteDamageScenario,
   modelStatesScenario,
+  staleLaterScenario,
   runEndedScenarios,
 } from "./scenarios.js";
 import { fixtureCoordinatorView } from "../../../../tests/fixtures/coordinator-view.fixture.js";
@@ -15,6 +16,7 @@ export const SCENARIO_NAMES = [
   "stale-contradiction",
   "site-damage",
   "model-states",
+  "stale-transition",
   "ends-while-active",
   "ended-time-expired",
   "ended-fire-extinguished",
@@ -49,6 +51,8 @@ export function resolveScenario(search: string): MockIncidentSocketOptions | nul
       return { snapshots: [siteDamageScenario] };
     case "model-states":
       return { snapshots: [modelStatesScenario] };
+    case "stale-transition":
+      return { snapshots: [fixtureCoordinatorView, staleLaterScenario], intervalMs: 2000 };
     case "ends-while-active":
       // Starts live (so there's time to send a message / start a
       // push-to-talk hold), then transitions to ended 1.5s later - unlike

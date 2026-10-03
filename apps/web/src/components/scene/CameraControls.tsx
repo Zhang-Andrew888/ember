@@ -125,11 +125,28 @@ export const CameraControls = forwardRef<CameraControlsHandle, CameraControlsPro
   // A pan gesture hands the camera back to the user.
   useEffect(() => {
     const element = gl.domElement;
+    const touches = new Set<number>();
     const handlePointerDown = (event: PointerEvent) => {
-      if (isPanGesture(event)) onUserPanRef.current();
+      if (event.pointerType === "touch") touches.add(event.pointerId);
+      const gesture = {
+        button: event.button,
+        shiftKey: event.shiftKey,
+        ctrlKey: event.ctrlKey,
+        metaKey: event.metaKey,
+        pointerType: event.pointerType,
+        touchCount: touches.size,
+      };
+      if (isPanGesture(gesture)) onUserPanRef.current();
     };
+    const handlePointerEnd = (event: PointerEvent) => touches.delete(event.pointerId);
     element.addEventListener("pointerdown", handlePointerDown);
-    return () => element.removeEventListener("pointerdown", handlePointerDown);
+    element.addEventListener("pointerup", handlePointerEnd);
+    element.addEventListener("pointercancel", handlePointerEnd);
+    return () => {
+      element.removeEventListener("pointerdown", handlePointerDown);
+      element.removeEventListener("pointerup", handlePointerEnd);
+      element.removeEventListener("pointercancel", handlePointerEnd);
+    };
   }, [gl]);
 
   // Start (or stop) following: kick the first frame under frameloop="demand".

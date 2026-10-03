@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { CoordinatorView } from "@ember/domain";
 import type { FireCellMarker } from "../components/scene/sceneEntities.js";
-import { resolveGridCellPosition } from "../map/positions.js";
+import type { ScenarioMap } from "../map/scenarioMap.js";
+import { GRID_SIZE, resolveGridCellPosition } from "../map/positions.js";
 
 /**
  * REPLAY-ONLY TRUTH.
@@ -15,7 +16,6 @@ import { resolveGridCellPosition } from "../map/positions.js";
  * (burning/burned cell indices per time) as a LOCAL schema, so apps/web
  * never imports sim-lane packages.
  */
-export const GRID_SIZE = 64;
 
 const CellIndex = z.number().int().nonnegative().max(GRID_SIZE * GRID_SIZE - 1);
 
@@ -56,12 +56,17 @@ export function truthFrameAt(frames: readonly ReplayTruthFrame[], simTimeMs: num
 
 /**
  * Overlays the truth on the coordinator's observed cells for display in
- * replay. A truth cell the coordinator never observed is marked `unseen`
- * (drawn with a dashed frame and labelled in inspection); a cell the
- * coordinator did observe keeps its own observed entry unless the truth says
- * it is burning/burned and the observation is out of date.
+ * replay. A cell whose true state the coordinator has a CURRENT matching
+ * observation of keeps that observation. Every other truth cell (never
+ * observed, or last observed in a different/out-of-date state) is marked
+ * `unseen`: that state was never observed, so it must not be presented as an
+ * observation with an age.
  */
-export function mergeTruthCells(observed: readonly FireCellMarker[], frame: ReplayTruthFrame): FireCellMarker[] {
+export function mergeTruthCells(
+  observed: readonly FireCellMarker[],
+  frame: ReplayTruthFrame,
+  map: ScenarioMap,
+): FireCellMarker[] {
   const byIndex = new Map(observed.map((cell) => [cell.gridCellIndex, cell] as const));
   const merged: FireCellMarker[] = [];
   const add = (index: number, burnState: "burning" | "burned") => {
@@ -72,12 +77,12 @@ export function mergeTruthCells(observed: readonly FireCellMarker[], frame: Repl
       merged.push({
         key: `truth-${index}`,
         gridCellIndex: index,
-        position: resolveGridCellPosition(index),
+        position: resolveGridCellPosition(map, index),
         burnState,
         stale: false,
         lastObservedAt: frame.timeMs,
         ageMs: 0,
-        unseen: existing === undefined,
+        unseen: true,
       });
     }
     byIndex.delete(index);
