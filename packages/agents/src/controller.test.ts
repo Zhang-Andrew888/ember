@@ -193,7 +193,8 @@ describe("autonomous withdrawal and survival", () => {
     const order = out.orders[0];
     if (order?.kind === "commit_plan") {
       expect(order.mode).toBe("withdrawing");
-      expect(order.plan.timedLegs.map((l) => l.edgeId)).toContain("e-n-h");
+      // Home by the south-east road instead: the corridor cell is observed burning.
+      expect(order.plan.timedLegs.map((l) => l.edgeId)).toContain("e-rs-sc");
       expect(order.plan.timedLegs.map((l) => l.edgeId)).not.toContain("e-s-h");
     }
     expect(out.reports[0]?.urgent).toBe(true);
@@ -227,7 +228,7 @@ describe("autonomous withdrawal and survival", () => {
 
   it("reports itself stranded, keeps observing, and invents no route when none is known passable", () => {
     const { c, store, planId } = startedCrew();
-    store.ingest(burning(["e-s-h", "e-n-h"], 300_000));
+    store.ingest(burning(["e-s-h", "e-n-h", "e-h-sc"], 300_000));
     const atSite: AgentPosition = { kind: "node", nodeId: NodeId.parse("n-sa") };
     const out = c.tick(
       projection(store, atSite, 301_000, { planId, legIndex: 4, legCount: 7, mode: "normal", working: true }),

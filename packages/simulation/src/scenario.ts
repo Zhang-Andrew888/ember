@@ -44,6 +44,11 @@ const NODES: readonly [string, number, number][] = [
   ["n-sc", 1200, 550],
 ];
 
+/** Interior points for edges that are not straight lines. */
+const VIA: Readonly<Record<string, readonly { x: number; y: number }[]>> = {
+  "e-rs-sc": [{ x: 1000, y: 250 }],
+};
+
 const EDGES: readonly [string, string, string, boolean][] = [
   ["e-rw-j1", "n-rw", "n-j1", false],
   ["e-j1-s", "n-j1", "n-s", false],
@@ -54,6 +59,8 @@ const EDGES: readonly [string, string, string, boolean][] = [
   ["e-h-sa", "n-h", "n-sa", false],
   ["e-h-sb", "n-h", "n-sb", false],
   ["e-h-sc", "n-h", "n-sc", false],
+  // A second, independent approach so crews from Refuge South are not all funnelled through the corridor.
+  ["e-rs-sc", "n-rs", "n-sc", false],
 ];
 
 const ALL_AGENTS: readonly [string, "protection_crew" | "scout", string, string][] = [
@@ -94,7 +101,7 @@ export function buildSyntheticScenario(options: SyntheticOptions = {}): SimScena
         id: EdgeId.parse(id),
         from: NodeId.parse(from),
         to: NodeId.parse(to),
-        via: [],
+        via: [...(VIA[id] ?? [])],
         singleCapacity,
       })),
       sites: sites.map(([id, name, nodeId, requiredWork, value]) => ({

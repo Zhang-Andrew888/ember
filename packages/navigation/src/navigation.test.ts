@@ -90,7 +90,7 @@ describe("complete mission search", () => {
 
   it("rejects an intentionally infeasible one-member case and names the limiting member", () => {
     // Member b ignites both ways home at 400 s; the earliest possible return crosses after 435 s.
-    const ign = ignite(road, ["e-s-h", "e-n-h"], 400_000);
+    const ign = ignite(road, ["e-s-h", "e-n-h", "e-h-sc"], 400_000);
     const ensemble = makeEnsemble(map, [{ id: "a" }, { id: "b", ignition: ign }]);
     const result = planMissions(ctxWith({ ensemble }), protectionTargets(siteA));
     expect(result.feasible).toBe(false);
@@ -100,7 +100,7 @@ describe("complete mission search", () => {
   });
 
   it("accepts a shorter work interval when the full one fails the same member", () => {
-    const ign = ignite(road, ["e-s-h", "e-n-h"], 600_000);
+    const ign = ignite(road, ["e-s-h", "e-n-h", "e-h-sc"], 600_000);
     const ensemble = makeEnsemble(map, [{ id: "a" }, { id: "b", ignition: ign }]);
     const result = planMissions(ctxWith({ ensemble }), protectionTargets(siteA));
     expect(result.feasible).toBe(true);
@@ -281,7 +281,7 @@ describe("withdrawal, reversal and retreat", () => {
   it("falls back to a best-effort retreat that minimizes exposure when no normal return passes", () => {
     const atHub: AgentPosition = { kind: "node", nodeId: NodeId.parse("n-h") };
     // Both ways home burn soon, but the north way burns later: lower exposure despite being longer.
-    const south = ignite(road, ["e-s-h", "e-j1-s", "e-rs-s"], 20_000);
+    const south = ignite(road, ["e-s-h", "e-j1-s", "e-rs-s", "e-h-sc", "e-rs-sc"], 20_000);
     const north = ignite(road, ["e-n-h", "e-j1-n"], 200_000);
     const merged = new Map([...south, ...north]);
     const ensemble = makeEnsemble(map, [{ id: "a", ignition: merged }]);
@@ -296,14 +296,14 @@ describe("withdrawal, reversal and retreat", () => {
 
   it("never retreats through directly observed burning cells and reports stranded when none is passable", () => {
     const atHub: AgentPosition = { kind: "node", nodeId: NodeId.parse("n-h") };
-    const closed = new Set([...cellsOfEdge(road, "e-s-h"), ...cellsOfEdge(road, "e-n-h")]);
+    const closed = new Set([...cellsOfEdge(road, "e-s-h"), ...cellsOfEdge(road, "e-n-h"), ...cellsOfEdge(road, "e-h-sc")]);
     const ensemble = makeEnsemble(map, [{ id: "a" }]);
     expect(planRetreat(ctxWith({ ensemble, position: atHub, closedCells: closed }))).toBeNull();
   });
 
   it("ranks emergency options with provisional candidates when the forecast is unreliable", () => {
     const atHub: AgentPosition = { kind: "node", nodeId: NodeId.parse("n-h") };
-    const ensemble = makeEnsemble(map, [{ id: "p", ignition: ignite(road, ["e-s-h"], 20_000) }], { reliability: "unreliable" });
+    const ensemble = makeEnsemble(map, [{ id: "p", ignition: ignite(road, ["e-s-h", "e-h-sc"], 20_000) }], { reliability: "unreliable" });
     const retreat = planRetreat(ctxWith({ ensemble, position: atHub, nowMs: 10_000 }));
     expect(retreat?.plan.timedLegs[0]?.edgeId).toBe("e-n-h");
     expect(retreat?.bestEffort).toBe(true);

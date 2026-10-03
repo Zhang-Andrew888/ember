@@ -33,7 +33,7 @@ function scout(): ScoutController {
 describe("public site-access importance", () => {
   it("counts the site value that loses or lengthens access when an edge is lost", () => {
     const imp = edgeImportance(road);
-    expect(imp.get("e-s-h")).toBeCloseTo(4.5, 9); // every site's shortest approach uses the corridor
+    expect(imp.get("e-s-h")).toBeCloseTo(2.5, 9); // Ridge Cabins and Waterworks both route through it; the Lodge has its own road
     expect(imp.get("e-h-sa")).toBeCloseTo(1, 9); // only Ridge Cabins loses access
     expect(imp.get("e-n-h")).toBe(0); // the north road is only a spare
   });
