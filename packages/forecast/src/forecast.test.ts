@@ -209,3 +209,17 @@ describe("incremental fitting", () => {
     expect(full.reliability).toBe(fresh.reliability);
   });
 });
+
+describe("tolerance sensitivity", () => {
+  it("retains at least as many members as the disagreement tolerance loosens", () => {
+    const snap = snapshotOf("crew-1", evidence({ ...inPrior, spreadMultiplier: 1.12, windShiftMs: 480_000 }, 100_000), 100_000);
+    const counts = [0.02, 0.05, 0.1, 0.2, 0.4].map((tolerance) => {
+      const svc = new ForecastService(agent, map, { ...DEFAULT_FORECAST_CONFIG, disagreementTolerance: tolerance, memberCount: 24 });
+      const e = svc.update(snap, 100_000);
+      // Count the prior members that survive directly, before perturbation refills the set.
+      return e.members.filter((m) => m.kind !== "replenished").length;
+    });
+    for (let i = 1; i < counts.length; i++) expect(counts[i]!).toBeGreaterThanOrEqual(counts[i - 1]!);
+    expect(counts[counts.length - 1]!).toBeGreaterThan(0);
+  });
+});

@@ -151,6 +151,21 @@ describe("complete mission search", () => {
     expect(hm.latestDepartMs(edge, "reverse")).not.toBeCloseTo(expected, 3);
   });
 
+  it("changes the chosen route and arrival when the forecast shifts", () => {
+    const before = planMissions(ctxWith({ ensemble: makeEnsemble(map, [{ id: "a" }]) }), protectionTargets(siteA));
+    // After the (forecast) wind shift the south corridor closes before a crew could cross it.
+    const after = planMissions(
+      ctxWith({ ensemble: makeEnsemble(map, [{ id: "a", ignition: ignite(road, ["e-s-h"], 150_000) }]) }),
+      protectionTargets(siteA),
+    );
+    expect(before.plan!.timedLegs.map((l) => l.edgeId)).toContain("e-s-h");
+    expect(after.feasible).toBe(true);
+    expect(after.plan!.timedLegs.map((l) => l.edgeId)).not.toContain("e-s-h");
+    expect(after.plan!.timedLegs.map((l) => l.edgeId)).toContain("e-n-h");
+    const arrival = (r: typeof before): number => r.plan!.workInterval.startMs;
+    expect(arrival(after)).toBeGreaterThan(arrival(before));
+  });
+
   it("rejects when forecast support ends before the mission can finish", () => {
     const ensemble = makeEnsemble(map, [{ id: "a" }], { horizonMs: 300_000 });
     const result = planMissions(ctxWith({ ensemble }), protectionTargets(siteA));
