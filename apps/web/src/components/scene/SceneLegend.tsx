@@ -13,6 +13,8 @@ export interface SceneLegendProps {
   readonly showForecast: boolean;
   readonly onToggleForecast: () => void;
   readonly forecast: ForecastLayer | null;
+  /** Replay with the full fire on: explain the dashed frames. */
+  readonly showUnseenKey?: boolean;
   readonly canFollow: boolean;
   readonly follow: boolean;
   readonly onToggleFollow: () => void;
@@ -29,10 +31,11 @@ export interface SceneLegendProps {
  * scene labels from rendering underneath it.
  */
 export const SceneLegend = forwardRef<HTMLDivElement, SceneLegendProps>(function SceneLegend(
-  { showFireCells, onToggleFireCells, showRoutes, onToggleRoutes, showForecast, onToggleForecast, forecast, canFollow, follow, onToggleFollow, onResetCamera, fireCells, onInspectCell },
+  { showFireCells, onToggleFireCells, showRoutes, onToggleRoutes, showForecast, onToggleForecast, forecast, showUnseenKey = false, canFollow, follow, onToggleFollow, onResetCamera, fireCells, onInspectCell },
   ref,
 ) {
   // The key is collapsed on narrower viewports so it never hides routes or forecast.
+  const unseenCount = fireCells.filter((cell) => cell.unseen === true).length;
   const [keyOpen, setKeyOpen] = useState(() => typeof window !== "undefined" && window.innerWidth >= 1700);
   return (
     <div ref={ref} className="scene-legend" role="group" aria-label="Map layers and camera">
@@ -59,6 +62,12 @@ export const SceneLegend = forwardRef<HTMLDivElement, SceneLegendProps>(function
           <span className="scene-legend__swatch scene-legend__swatch--route" />
           Route: &gt;&gt; approach · solid work · dashed return
         </li>
+        {showUnseenKey ? (
+          <li>
+            <span className="scene-legend__swatch scene-legend__swatch--unseen" />
+            Dashed frame: fire the coordinator never saw (replay only)
+          </li>
+        ) : null}
         <li>
           <span className="scene-legend__swatch" style={{ background: colors.refuge }} />
           Refuge
@@ -102,13 +111,19 @@ export const SceneLegend = forwardRef<HTMLDivElement, SceneLegendProps>(function
       */}
       {fireCells.length > 0 ? (
         <details className="scene-legend__cells">
-          <summary>Observed cells ({fireCells.length})</summary>
+          <summary>
+            {unseenCount > 0
+              ? `Fire cells (${fireCells.length - unseenCount} observed, ${unseenCount} never observed — replay only)`
+              : `Observed cells (${fireCells.length})`}
+          </summary>
           <ul>
             {fireCells.map((cell) => (
               <li key={cell.key}>
                 <button type="button" onClick={() => onInspectCell(cell)}>
                   Cell {cell.gridCellIndex} — {cell.burnState}
-                  {cell.stale ? ", stale" : ""}, last observed {formatIncidentClock(cell.lastObservedAt)}
+                  {cell.unseen
+                    ? ", never observed by the coordinator"
+                    : `${cell.stale ? ", stale" : ""}, last observed ${formatIncidentClock(cell.lastObservedAt)}`}
                 </button>
               </li>
             ))}

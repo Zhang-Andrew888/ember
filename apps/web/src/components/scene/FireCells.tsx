@@ -25,14 +25,18 @@ export function FireCells({
   readonly cells: FireCellMarker[];
   readonly onInspectCell: (cell: FireCellMarker) => void;
 }) {
-  const fresh = useMemo(() => cells.filter((c) => c.burnState === "burning" && !c.stale), [cells]);
-  const stale = useMemo(() => cells.filter((c) => c.stale && c.burnState !== "unburned"), [cells]);
-  const burned = useMemo(() => cells.filter((c) => c.burnState === "burned" && !c.stale), [cells]);
+  const unseen = useMemo(() => cells.filter((c) => c.unseen), [cells]);
+  const known = useMemo(() => cells.filter((c) => !c.unseen), [cells]);
+  const fresh = useMemo(() => known.filter((c) => c.burnState === "burning" && !c.stale), [known]);
+  const stale = useMemo(() => known.filter((c) => c.stale && c.burnState !== "unburned"), [known]);
+  const burned = useMemo(() => known.filter((c) => c.burnState === "burned" && !c.stale), [known]);
 
   return (
     <>
       <BedGroup cells={fresh} color={colors.observedFire} opacity={0.9} lift={1} onInspectCell={onInspectCell} />
       <BedGroup cells={stale} color={colors.staleOutline} opacity={0.55} lift={0.4} onInspectCell={onInspectCell} />
+      {/* REPLAY ONLY: real fire the coordinator never observed - dashed violet frame, not a solid tile. */}
+      <BedGroup cells={unseen} color="#B79CFF" opacity={1} lift={0.3} wire onInspectCell={onInspectCell} />
       <BedGroup cells={burned} color="#1c1714" opacity={0.95} lift={0.2} onInspectCell={onInspectCell} />
     </>
   );
@@ -43,12 +47,14 @@ function BedGroup({
   color,
   opacity,
   lift,
+  wire = false,
   onInspectCell,
 }: {
   readonly cells: FireCellMarker[];
   readonly color: string;
   readonly opacity: number;
   readonly lift: number;
+  readonly wire?: boolean;
   readonly onInspectCell: (cell: FireCellMarker) => void;
 }) {
   const meshRef = useRef<InstancedMesh>(null);
@@ -83,7 +89,7 @@ function BedGroup({
   return (
     <instancedMesh key={cells.length} ref={meshRef} args={[undefined, undefined, cells.length]} frustumCulled={false} onClick={handleClick}>
       <boxGeometry args={[size, BED_THICKNESS, size]} />
-      <meshStandardMaterial color={new Color(color)} transparent={opacity < 1} opacity={opacity} emissive={new Color(color)} emissiveIntensity={opacity > 0.8 && color === colors.observedFire ? 0.8 : 0.1} />
+      <meshStandardMaterial wireframe={wire} color={new Color(color)} transparent={opacity < 1} opacity={opacity} emissive={new Color(color)} emissiveIntensity={opacity > 0.8 && color === colors.observedFire ? 0.8 : 0.1} />
     </instancedMesh>
   );
 }

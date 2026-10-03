@@ -44,6 +44,11 @@ export interface FireCellMarker {
   readonly lastObservedAt: number;
   /** Sim ms since this cell was last observed. */
   readonly ageMs: number;
+  /**
+   * REPLAY ONLY: this fire is real but the coordinator never observed it. Never set on live
+   * data; only replay/recording.ts (mergeTruthCells) produces it.
+   */
+  readonly unseen?: boolean;
 }
 
 export interface SceneEntities {

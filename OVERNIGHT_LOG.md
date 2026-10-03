@@ -1597,3 +1597,32 @@ Product-critical layers (routes, forecast, crews, sites, observed fire, labels) 
 screenshot of the low tier: all readable, forest simply sparser).
 Caveat carried from 3d: the in-app timer (RenderPipeline) under-reads in software GL; this script is the number to use.
 Next: item 8 replay (truth only there).
+
+### Commit 12: item 8 - replay mode that reveals the full fire (the only place truth may appear)
+Contract fact: `packages/domain` has NO truth channel (and must not get one in the live types). So truth is declared as a
+separate, LOCAL, replay-only schema in `apps/web/src/replay/`: `ReplayRecording` = `{ coordinatorLog, truthFrames }`
+(strict Zod; frames are {timeMs, burning[], burned[]} cell indices, mirroring the shape of the sim lane's reveal output
+without importing any sim-lane package). `mockRecording.ts` is a hand-authored deterministic mock log (rectangles of cells
+growing north-east of the briefed ignition patch; it is data, not a spread model) whose final frame has 84 cells vs the 6
+the coordinator ever observed. `truthGate.truthForDisplay` is the single gate: it returns a frame only for
+phase === "replay" AND the explicit "Replay: full simulated fire" toggle (default off). `mergeTruthCells` overlays truth
+on the observed cells; truth cells the coordinator never saw are `unseen` (dashed violet frame, legend entry, inspection
+text, banner wording).
+PROOF (apps/web/src/replay/liveNeverCarriesTruth.test.ts, 40+ cases):
+  1. every live payload (fixture, authored snapshots, every ?scenario= preset, ended views) passes
+     `CoordinatorView.strict()` and a deep key scan for truth keys (burning, burned, truthFrames, cellState,
+     ignitedAtMs, unseen, privateWorldParameters, requiredWork, ...);
+  2. what the mock socket actually EMITS (fake timers, through the production wire parser) is truth-free, default demo
+     and every preset;
+  3. the wire client strips a truthFrames/privateWorldParameters field a server might add;
+  4. the display gate returns null for briefing/live whatever the toggle and returns a frame only in replay+toggle;
+  5. source guard: only components/ReplayView.tsx imports replay/{recording,mockRecording,truthGate}; App.tsx never
+     imports replay/; live fire cells never carry `unseen`.
+  Mutation-checked: removing the gate's phase check, adding a truth key to the live socket, and importing the gate from
+  App.tsx each make the intended tests FAIL (then reverted).
+Screenshots (1440x900 and 1024x720, replay at 5:00): toggle off = 6 observed cells, stale agents "seen 3:30 ago";
+toggle on = flames/glow/char over the whole fire with dashed frames on the 78 never-observed cells. Console clean.
+Self-critique: the legend list said "Observed cells (84)" with truth on, which was a lie -> now "84 cells (6 observed,
+78 never observed - replay only)". The mock fire is a boxy rectangle (fine for mock data). Replay does not yet interpolate
+between snapshots or animate the spread between events; it steps by event.
+Blocked: nothing. Next: self-review of the whole diff (dead code, bugs, missing tests), then the final summary.
