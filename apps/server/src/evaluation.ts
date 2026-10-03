@@ -33,6 +33,8 @@ export interface RunResult {
   readonly bundle: RunBundle;
   readonly relays: readonly RelayLogEntry[];
   readonly replanLatencyMs: readonly number[];
+  readonly simStepMs: readonly number[];
+  readonly controllerMs: readonly number[];
 }
 
 export function factoryFor(variant: Variant): ControllerFactory {
@@ -79,7 +81,16 @@ export function runVariant(options: RunOptions): RunResult {
     policy: { name: POLICY_NAME, version: POLICY_VERSION },
     policyLog: policy.log.map((l) => ({ tick: l.tick, observationId: l.observationId, toAgentId: l.toAgentId })),
   };
-  return { variant: options.variant, seed: options.seed, metrics, bundle, relays: policy.log, replanLatencyMs: session.replanLatencyMs };
+  return {
+    variant: options.variant,
+    seed: options.seed,
+    metrics,
+    bundle,
+    relays: policy.log,
+    replanLatencyMs: session.replanLatencyMs,
+    simStepMs: session.simStepMs,
+    controllerMs: session.controllerMs,
+  };
 }
 
 /** Seed families: development, one rehearsed showcase seed, and held-out evaluation seeds. */
@@ -104,6 +115,12 @@ export interface VariantReport {
   readonly runs: readonly RunMetrics[];
   readonly replanLatencyP50Ms: number;
   readonly replanLatencyP95Ms: number;
+  /** Authoritative step work and total controller work per simulated second, in real ms. */
+  readonly simStepMeanMs: number;
+  readonly simStepP50Ms: number;
+  readonly simStepP95Ms: number;
+  readonly simStepMaxMs: number;
+  readonly controllerTickP95Ms: number;
 }
 
 export interface EvaluationReport {
@@ -134,10 +151,14 @@ export function runEvaluation(options: { seeds: readonly string[]; variants?: re
   for (const variant of variants) {
     const runs: RunMetrics[] = [];
     const latencies: number[] = [];
+    const steps: number[] = [];
+    const ctrl: number[] = [];
     options.seeds.forEach((seed, i) => {
       const result = runVariant({ variant, seed, scenario, overrides: overridesForSeed(seed, i), untilMs });
       runs.push(result.metrics);
       latencies.push(...result.replanLatencyMs);
+      steps.push(...result.simStepMs);
+      ctrl.push(...result.controllerMs);
       options.onRun?.(result);
     });
     reports.push({
@@ -146,6 +167,11 @@ export function runEvaluation(options: { seeds: readonly string[]; variants?: re
       runs,
       replanLatencyP50Ms: percentile(latencies, 50),
       replanLatencyP95Ms: percentile(latencies, 95),
+      simStepMeanMs: steps.length === 0 ? 0 : steps.reduce((a, b) => a + b, 0) / steps.length,
+      simStepP50Ms: percentile(steps, 50),
+      simStepP95Ms: percentile(steps, 95),
+      simStepMaxMs: steps.length === 0 ? 0 : Math.max(...steps),
+      controllerTickP95Ms: percentile(ctrl, 95),
     });
   }
   return {

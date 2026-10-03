@@ -39,6 +39,9 @@ export class IncidentSession {
   readonly planFailures: { tick: number; agentId: string; reason: string }[] = [];
   /** Real milliseconds a controller took on ticks that produced a plan (replanning latency). */
   readonly replanLatencyMs: number[] = [];
+  /** Real milliseconds spent in the authoritative step (simulation only) and in all controller ticks. */
+  readonly simStepMs: number[] = [];
+  readonly controllerMs: number[] = [];
   private readonly road: RoadIndex;
   private readonly hooks: ReservationHooks;
 
@@ -104,6 +107,7 @@ export class IncidentSession {
         this.reservations.updateOccupancy(agent.id, null);
       }
     }
+    const controllersStart = Date.now();
     for (const [id, controller] of this.controllers) {
       const t0 = Date.now();
       const out = controller.tick(inc.projectAgent(id), { reservations: this.hooks });
@@ -113,7 +117,10 @@ export class IncidentSession {
       const callsign = inc.scenario.agents.find((a) => a.id === id)?.callsign ?? id;
       for (const event of out.decisions) this.decisions.push({ event, callsign });
     }
+    this.controllerMs.push(Date.now() - controllersStart);
+    const stepStart = Date.now();
     inc.advanceTo(now + SIM_DEFAULTS.stepMs);
+    this.simStepMs.push(Date.now() - stepStart);
   }
 
   runUntil(simMs: number, afterStep?: (session: IncidentSession) => void): void {
