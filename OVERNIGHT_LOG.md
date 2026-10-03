@@ -1407,3 +1407,21 @@ status, testing performed, and explicit merge instructions) and, at
 finer grain with the reasoning behind every non-obvious decision, in the
 log entries above this one in this same file. Nothing is pending beyond
 human review: `lane/web` is green, pushed, and PR'd.
+
+# feat/web-scene
+
+Branch `feat/web-scene`, created from the checked-out branch `claude/upbeat-carson-qdm8ud`. That branch already
+contains all of `origin/lane/web` plus 58 newer commits from `main` (contract sync, #7), so the PR into `lane/web`
+will also show those main commits. Andrew authorised this branch explicitly (AGENTS.md still lists two lanes).
+
+## Setup notes
+- `pnpm` via corepack is broken in this VM (cached 12.8.1 ships `pnpm.mjs`, shim wants `pnpm.cjs`). Used the
+  installed pnpm 10.28.0 through a wrapper outside the repo. `pnpm install --frozen-lockfile` succeeds.
+- Contract status: `packages/domain` on this branch ALREADY has `agentPlans` (#1) and `coordinatorForecast` (#2).
+  So item 1 uses the real fields; no local "pending contract" types are needed.
+- Item 2 risk: `scenarios/` holds only `scenario-v1.placeholder.json` (all `PENDING`, no coordinates). The synthetic
+  topology exists only as code in sim-lane `packages/simulation/src/scenario.ts`. Decision recorded below at item 2.
+- Art direction saved at `apps/web/ART_DIRECTION.md`.
+
+### Commit 1: art direction file
+Changed: added `apps/web/ART_DIRECTION.md`. Blocked: nothing. Next: item 1 (route + forecast layers).
