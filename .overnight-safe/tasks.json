@@ -1,0 +1,69 @@
+[
+  {
+    "id": "sim-clock-lifecycle",
+    "worker": "claude",
+    "base_commit": "3d0b0fd4e53229202191ca1ae98024405e739e7c",
+    "allowed_paths": [
+      "packages/simulation/"
+    ],
+    "read_paths": [
+      "AGENTS.md",
+      "packages/simulation/src/index.ts",
+      "packages/domain/src/simulation-api.ts",
+      "packages/domain/src/units.ts",
+      "docs/SIMULATION.md"
+    ],
+    "budget_cents": 1200,
+    "timeout_seconds": 2700,
+    "checks": [
+      [
+        "pnpm",
+        "typecheck"
+      ],
+      [
+        "pnpm",
+        "lint"
+      ],
+      [
+        "pnpm",
+        "test"
+      ]
+    ],
+    "depends_on": [],
+    "prompt": "Work only on packages/simulation. Read AGENTS.md and the listed read_paths first; follow its lane constraints. Implement one bounded, tested Slice 1 increment: deterministic fixed-tick incident clock and minimal incident lifecycle using the existing domain units/contracts. The same initial configuration and tick sequence must produce the same clock/state progression. Distinguish wallElapsedMs and simTimeMs; no LLM/provider work in the tick. Add Vitest tests for clock progression, repeated advancement, and stopped/ended lifecycle boundaries based on the relevant simulation specification. Keep all tests in packages/simulation. Do not claim the full fire/movement/planner is complete. If an existing shared contract cannot support the increment, return a precise contract-change request in your summary rather than editing domain. Read only relevant interfaces as needed, not the full documentation tree. No new dependencies, root config changes, docs edits, Git operations, paid APIs, deployment, or subprocess agents. The runner handles commits/pushes; the coordinator creates a draft PR into lane/sim."
+  },
+  {
+    "id": "web-fixture-scene",
+    "worker": "cursor",
+    "base_commit": "3d0b0fd4e53229202191ca1ae98024405e739e7c",
+    "allowed_paths": [
+      "apps/web/"
+    ],
+    "read_paths": [
+      "AGENTS.md",
+      "apps/web/src/main.tsx",
+      "apps/web/package.json",
+      "packages/domain/src/coordinator-view.ts",
+      "tests/fixtures/coordinator-view.fixture.ts",
+      "docs/FRONTEND.md"
+    ],
+    "budget_cents": 0,
+    "timeout_seconds": 2700,
+    "checks": [
+      [
+        "pnpm",
+        "typecheck"
+      ],
+      [
+        "pnpm",
+        "lint"
+      ],
+      [
+        "pnpm",
+        "test"
+      ]
+    ],
+    "depends_on": [],
+    "prompt": "Work only on apps/web. Read AGENTS.md and the listed read_paths first. Build one bounded initial Three.js/Fiber scene with readable crew/site markers and a DOM transcript, using the existing CoordinatorView schema and authored fixture as the frontend boundary. Use current React/Fiber/Three dependencies. Add frontend-local adapter/fixture code inside apps/web if needed without editing the shared fixture. Parse cross-boundary data using domain Zod schemas. Keep world advancement and hidden truth out of frontend state; do not invent a second simulation. This is fixture-driven initial UI, not a complete live incident. Preserve accessible labels and reduced-motion behavior where relevant to this increment. Do not inspect backend implementation or load simulation/navigation/forecast specifications. No new dependencies, root configs/lockfile changes, shared domain edits, docs edits, Git operations, paid provider calls, or deployment. If shared schema or fixture data is insufficient, record the exact contract request as a blocker. The runner handles Git; a reviewed draft PR targets lane/web. If free usage is exhausted, stop rather than enabling paid fallback."
+  }
+]

@@ -1,0 +1,76 @@
+{
+  "repo_url": "https://github.com/Zhang-Andrew888/ember.git",
+  "github_repo": "Zhang-Andrew888/ember",
+  "base_commit": "3d0b0fd4e53229202191ca1ae98024405e739e7c",
+  "integration_branch": "unused-in-lane-mode",
+  "bind": "127.0.0.1",
+  "port": 8765,
+  "deadline": null,
+  "workspace": "./coordinator-state",
+  "tasks_file": "tasks.json",
+  "usable_budget_cents": 10000,
+  "allocations_cents": {
+    "claude": 5000,
+    "cursor": 0,
+    "orchestrator": 5000
+  },
+  "authorized_ceiling_cents": {
+    "claude": 7000,
+    "orchestrator": 7000
+  },
+  "plan_budget_cents": 200,
+  "review_budget_cents": 200,
+  "max_turns": 25,
+  "integration_checks": [
+    [
+      "pnpm",
+      "typecheck"
+    ],
+    [
+      "pnpm",
+      "lint"
+    ],
+    [
+      "pnpm",
+      "test"
+    ]
+  ],
+  "setup_commands": [
+    [
+      "pnpm",
+      "install",
+      "--frozen-lockfile"
+    ],
+    [
+      "pnpm",
+      "build:libs"
+    ]
+  ],
+  "pause_cursor_on_failure": true,
+  "worker_stale_seconds": 180,
+  "auto_resolve_conflicts": true,
+  "conflict_repair_budget_cents": 600,
+  "conflict_repair_timeout_seconds": 480,
+  "conflict_repair_max_turns": 15,
+  "lane_mode": true,
+  "enforce_lane_scope": true,
+  "max_task_budget_cents": 1200,
+  "max_task_timeout_seconds": 2700,
+  "require_billing_confirmation": true,
+  "provider_billing_confirmed": false,
+  "token_envs": {
+    "admin": "OVERNIGHT_ADMIN_TOKEN",
+    "claude": "OVERNIGHT_CLAUDE_TOKEN",
+    "cursor": "OVERNIGHT_CURSOR_TOKEN"
+  },
+  "max_tasks": 2,
+  "auto_merge_lanes": true,
+  "auto_merge_main": true,
+  "ci_timeout_seconds": 1800,
+  "ci_poll_seconds": 15,
+  "required_ci_names": [
+    "Typecheck",
+    "Lint",
+    "Test"
+  ]
+}

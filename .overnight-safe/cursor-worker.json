@@ -1,0 +1,31 @@
+{
+  "worker": "cursor",
+  "server": "http://127.0.0.1:8765",
+  "token_env": "OVERNIGHT_CURSOR_TOKEN",
+  "repo_url": "https://github.com/Zhang-Andrew888/ember.git",
+  "workspace": "./cursor-state",
+  "setup_commands": [
+    [
+      "pnpm",
+      "install",
+      "--frozen-lockfile"
+    ],
+    [
+      "pnpm",
+      "build:libs"
+    ]
+  ],
+  "max_turns": 25,
+  "claude_tools": [
+    "Read",
+    "Glob",
+    "Grep",
+    "Edit",
+    "Write",
+    "Bash"
+  ],
+  "cursor_provider_limit_confirmed": false,
+  "pause_on_failure": true,
+  "require_billing_confirmation": true,
+  "provider_billing_confirmed": false
+}
