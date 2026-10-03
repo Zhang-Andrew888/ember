@@ -119,3 +119,41 @@ a real `vite build` once `App.tsx`/`main.tsx` wire everything together
 **Next:** surrounding DOM UI (briefing screen, top bar, conversation
 panel + urgent strip, agent rail, end overlay), then wire into
 `main.tsx`/`App.tsx` and verify a real production build.
+
+## 2026-10-03 07:1x-07:2x UTC (03:1x-03:2x ET) - increment 3
+
+**What changed:** commit `2d774d6` - the rest of the docs/FRONTEND.md
+layout (Briefing, TopBar, ConversationPanel, UrgentStrip, AgentRail,
+EndOverlay) and `App.tsx`/`main.tsx` wiring everything (net + state + map +
+format + scene modules) into one app. Added `CameraControls.focusOn` so
+selecting an agent card re-centers the camera once without fighting the
+user's own pan on every snapshot.
+
+**Decision: push-to-talk is a real disabled control, not a fake one.**
+Grok voice integration is Slice 5 and explicitly out of this session's
+scope (task brief: Slice 1 scene + Slice 6 Three.js experience only). The
+button is present, accessible, and clearly labeled as not connected, per
+docs/FRONTEND.md's own allowance for "a visible microphone permission/error
+state". Text input is the always-working path.
+
+**Decision: briefing content is a small authored module
+(`briefing/briefingInfo.ts`), not derived from any live data.** The real
+`POST /incidents` briefing endpoint doesn't exist (apps/server is still a
+stub). Authored to list exactly the sites/callsigns the mock harness's
+snapshots use, so the briefing screen can't promise an agent or site that
+never shows up live.
+
+**Decision: composer send is a best-effort POST, silently dropped in mock
+mode.** There's no backend listening in mock mode, so `onSendMessage` only
+calls `fetch` when `VITE_INCIDENT_REST_BASE_URL` is configured; no invented
+receipts or fabricated acceptance either way.
+
+**Status:** `pnpm typecheck && pnpm lint && pnpm test` all green (76
+tests). A real `vite build` is running now to validate the production
+bundle end-to-end (resolving `three/examples/jsm/...`, the cross-directory
+fixture import, etc.) - result recorded in the next log entry.
+
+**Blocked:** nothing yet; waiting on the build check above.
+
+**Next:** confirm the production build, then this is a complete,
+demoable Slice 1 + Slice 6 increment on `lane/web`.
