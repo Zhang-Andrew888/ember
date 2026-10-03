@@ -399,7 +399,7 @@ export class CrewController implements AgentController {
     const ctx = this.asClass(ctx0, "emergency");
     const ret = planReturn(ctx);
     if (ret !== null && this.commit(proj, ret.plan, "withdrawing", "emergency", null, null, 0, out)) {
-      this.decide(out, proj, "withdrawal_triggered", reason, `withdrawing to ${ret.refugeNodeId}`);
+      this.decide(out, proj, "withdrawal_triggered", reason, `withdrawing to ${this.nodeName(ret.refugeNodeId)}`);
       this.report(out, explain(this.callsign, { type: "withdrawal_triggered", reasonCode: reason, actualAction: "" }), true);
       return;
     }
@@ -410,7 +410,7 @@ export class CrewController implements AgentController {
     const ctx = this.asClass(ctx0, "return");
     const ret = planReturn(ctx);
     if (ret !== null && this.commit(proj, ret.plan, "normal", "return", null, null, 0, out)) {
-      this.decide(out, proj, "mission_update", reason, `returning to ${ret.refugeNodeId}`);
+      this.decide(out, proj, "mission_update", reason, `returning to ${this.nodeName(ret.refugeNodeId)}`);
       this.report(out, explain(this.callsign, { type: "mission_update", reasonCode: reason, actualAction: "returning to refuge" }), false);
       return;
     }
@@ -425,7 +425,7 @@ export class CrewController implements AgentController {
     const ctx = this.asClass(ctx0, "emergency");
     const ret = planReturn(ctx);
     if (ret !== null && this.commit(proj, ret.plan, "withdrawing", "emergency", null, null, 0, out)) {
-      this.decide(out, proj, "withdrawal_triggered", reason, `withdrawing to ${ret.refugeNodeId}`);
+      this.decide(out, proj, "withdrawal_triggered", reason, `withdrawing to ${this.nodeName(ret.refugeNodeId)}`);
       return;
     }
     this.retreatOrStrand(reason, proj, ctx, out);
@@ -436,7 +436,7 @@ export class CrewController implements AgentController {
     if (retreat !== null) {
       this.stranded = false;
       this.commit(proj, retreat.plan, "retreating", "emergency", null, null, 0, out);
-      this.decide(out, proj, "retreat_triggered", "no_normal_return", `retreating to ${retreat.refugeNodeId} (best effort)`);
+      this.decide(out, proj, "retreat_triggered", "no_normal_return", `retreating to ${this.nodeName(retreat.refugeNodeId)} (best effort)`);
       this.report(out, explain(this.callsign, { type: "retreat_triggered", reasonCode: "no_normal_return", actualAction: "" }), true);
       return;
     }
@@ -511,7 +511,7 @@ export class CrewController implements AgentController {
     if (chosen !== null) {
       this.lastIdleReason = null;
       const t = chosen.target;
-      this.decide(out, proj, "mission_start", "mission_admitted", `${this.missionVerb(t.id)} (work ${Math.round(chosen.workMs / 1000)} s, return to ${chosen.refugeNodeId})`);
+      this.decide(out, proj, "mission_start", "mission_admitted", `${this.missionVerb(t.id)} (work ${Math.round(chosen.workMs / 1000)} s, return to ${this.nodeName(chosen.refugeNodeId)})`);
       this.report(out, explain(this.callsign, { type: "mission_start", reasonCode: "mission_admitted", actualAction: this.missionVerb(t.id) }), false);
       return;
     }
@@ -613,7 +613,7 @@ export class CrewController implements AgentController {
         if (!this.commit(proj, ret.plan, "normal", "return", null, null, 0, out)) return reject("reservation_unavailable");
         this.holding = obj.kind === "hold";
         this.objective = obj.kind === "hold" ? obj : null;
-        this.decide(out, proj, "mission_update", "objective_accepted", `returning to ${ret.refugeNodeId} on coordinator objective`);
+        this.decide(out, proj, "mission_update", "objective_accepted", `returning to ${this.nodeName(ret.refugeNodeId)} on coordinator objective`);
         return;
       }
       default:
@@ -625,6 +625,16 @@ export class CrewController implements AgentController {
 
   protected missionVerb(id: string): string {
     return `heading to ${this.siteName(id)}`;
+  }
+
+  /** Player-facing name for a map node: refuge, site, or scout point; the raw id is never shown. */
+  protected nodeName(nodeId: string): string {
+    const refuge = this.map.refuges.find((r) => r.nodeId === nodeId);
+    if (refuge !== undefined) return refuge.name;
+    const site = this.map.sites.find((x) => x.nodeId === nodeId);
+    if (site !== undefined) return site.name;
+    const point = this.map.scoutPoints.findIndex((p) => p === nodeId);
+    return point >= 0 ? `survey point ${point + 1}` : "a waypoint";
   }
 
   protected siteName(id: string): string {
@@ -727,7 +737,7 @@ export class CrewController implements AgentController {
     return {
       callsign: this.callsign,
       currentAction: verbs[this.computeState(proj)] === null ? null : `${verbs[this.computeState(proj)]}${targetName !== null && this.computeState(proj) !== "HOLDING" ? ` (${targetName})` : ""}`,
-      objective: this.objective === null ? null : `${this.objective.kind}${this.objective.targetId === null ? "" : ` ${this.objective.targetId}`}`,
+      objective: this.objective === null ? null : `${this.objective.kind.replaceAll("_", " ")}${this.objective.targetId === null ? "" : ` ${this.siteName(this.objective.targetId)}`}`,
       returnEstimateSec: last === undefined || last === null ? null : Math.max(0, (last.arriveMs - proj.simTimeMs) / 1000),
       lastRejection: this.lastRejectionText,
       knownConditions: this.evidence.closed.size === 0 ? null : `${this.evidence.closed.size} cells observed burning or burned`,

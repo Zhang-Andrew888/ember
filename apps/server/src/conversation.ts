@@ -1,5 +1,5 @@
 import { SimTimeMs } from "@ember/domain";
-import type { AgentId } from "@ember/domain";
+import type { AgentId, EndReason } from "@ember/domain";
 import type { SimScenario } from "@ember/simulation";
 import {
   AudioScheduler,
@@ -23,6 +23,14 @@ import { completeIntentInterpretation } from "./xai/chat.js";
 import { grokIntentEnabled } from "./xai/env.js";
 import { synthesizeSpeech } from "./xai/tts.js";
 import type { SpeechItem, SpeechTier } from "@ember/communication";
+
+/** Spoken/transcript sentence per end reason (the web debrief uses the same wording). */
+const END_REASON_SENTENCE: Record<EndReason, string> = {
+  all_protection_crews_lost: "All protection crews were lost.",
+  all_sites_resolved: "All sites were resolved.",
+  fire_extinguished: "The fire was extinguished.",
+  time_expired: "The incident window expired.",
+};
 
 const POINT_NAMES: Record<string, string> = { "n-n": "north road", "n-s": "south junction", "n-h": "hub" };
 
@@ -216,7 +224,7 @@ export class ConversationBridge {
     if (inc.ended && !this.endAnnounced) {
       this.endAnnounced = true;
       for (const o of this.gateway.endIncident()) this.apply(o, false);
-      const text = `The incident has ended. ${inc.end?.displayReason.replaceAll("_", " ") ?? ""}.`;
+      const text = `The incident has ended. ${END_REASON_SENTENCE[inc.end?.displayReason ?? "time_expired"]}`;
       this.transcript.push({ kind: "system", text, simTimeMs: now, urgent: false });
       const endItem = {
         id: `sp-${this.speechSeq++}`,

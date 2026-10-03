@@ -80,7 +80,7 @@ export interface ForecastBand {
   readonly spreadMs: number | null;
   /** Scene-unit ribbon half-width. Wider = less certain arrival time. */
   readonly widthUnits: number;
-  /** Incident-time text, e.g. "fire may reach 10:00–15:00 (incident time)". */
+  /** Simulated-time text, e.g. "fire may reach 10:00–15:00 (simulated time)". */
   readonly label: string;
 }
 
@@ -109,11 +109,11 @@ function bandLabel(earliest: number | null, latest: number | null, simTimeMs: nu
   if (earliest === null && latest === null) return "no modeled fire arrival";
   if (earliest === null || latest === null) {
     const only = (earliest ?? latest) as number;
-    return `fire may reach ${formatIncidentClock(only)} (incident time, partial)`;
+    return `fire may reach ${formatIncidentClock(only)} (simulated time, partial)`;
   }
   if (latest <= simTimeMs) return `modeled fire arrival already passed (${formatIncidentClock(latest)})`;
-  if (earliest === latest) return `fire may reach ${formatIncidentClock(earliest)} (incident time)`;
-  return `fire may reach ${formatIncidentClock(earliest)}–${formatIncidentClock(latest)} (incident time)`;
+  if (earliest === latest) return `fire may reach ${formatIncidentClock(earliest)} (simulated time)`;
+  return `fire may reach ${formatIncidentClock(earliest)}–${formatIncidentClock(latest)} (simulated time)`;
 }
 
 const HEADLINE: Record<ForecastReliability, (members: number) => string> = {

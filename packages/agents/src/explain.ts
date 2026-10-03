@@ -24,7 +24,7 @@ export function explain(callsign: string, decision: Pick<DecisionEvent, "type" |
 /** Announcement text for a refusal or withdrawal decided by the autonomy policy (same wording crews already use). */
 export function explainCode(callsign: string, kind: "refusal" | "withdrawal", reasonCode: string): string {
   return kind === "refusal"
-    ? explain(callsign, { type: "objective_rejected", reasonCode, actualAction: "" }, `(${reasonCode})`)
+    ? explain(callsign, { type: "objective_rejected", reasonCode, actualAction: "" })
     : explain(callsign, { type: "withdrawal_triggered", reasonCode, actualAction: "" });
 }
 

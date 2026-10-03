@@ -56,7 +56,7 @@ export const SceneLegend = forwardRef<HTMLDivElement, SceneLegendProps>(function
         </li>
         <li>
           <span className="scene-legend__swatch scene-legend__swatch--hatch" />
-          Forecast envelope (hatched, incident time)
+          Forecast envelope (hatched, simulated time)
         </li>
         <li>
           <span className="scene-legend__swatch scene-legend__swatch--route" />

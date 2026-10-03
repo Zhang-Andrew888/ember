@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import type { IncidentEnd } from "@ember/domain";
-import { formatIncidentClock } from "../format/time.js";
+import { formatElapsedWallTime, formatIncidentClock } from "../format/time.js";
 import { endReasonDisplayText } from "../format/endReason.js";
 
 export type ReplayOffer = "this-run" | "illustrative" | "none";
@@ -46,12 +46,16 @@ export function EndOverlay({
       </h1>
       <p className="end-overlay__reason">{endReasonDisplayText(incidentEnd.displayReason)}</p>
       <dl className="end-overlay__facts">
-        <dt>Incident time</dt>
+        <dt>Simulated time</dt>
         <dd>{formatIncidentClock(incidentEnd.tick)}</dd>
+        <dt>Real time</dt>
+        <dd>{formatElapsedWallTime(incidentEnd.wallElapsedMs)}</dd>
         <dt>Other matching end conditions</dt>
         <dd>
-          {incidentEnd.matchingReasons.filter((reason) => reason !== incidentEnd.displayReason).join(", ") ||
-            "none"}
+          {incidentEnd.matchingReasons
+            .filter((reason) => reason !== incidentEnd.displayReason)
+            .map(endReasonDisplayText)
+            .join(" ") || "none"}
         </dd>
       </dl>
       <div className="end-overlay__actions">

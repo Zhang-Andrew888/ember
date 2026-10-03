@@ -1741,3 +1741,14 @@ resolve; console clean. It also exposed two legibility problems the mock never s
 - route labels showed raw `work_interval_limited_by_forecast` -> `humanizeReason`.
 Observation, not a bug: sites read "stale, seen 0:49 ago" at t~1 min because their briefed observation (t=0) is >30 sim-s old.
 That is the staleness rule working; whether briefed site data should ever count as stale is a product question for Andrew.
+
+## feat/web-scene: issues #44, #45, #47 (branch fix/web-transcript-time-issues)
+
+Authorised by Andrew to edit sim-lane content where needed, without changing architecture or conventions.
+
+- **#44** transcript follows new lines unless the reader scrolled up (`conversation/stickToBottom.ts`, tested; wired in `ConversationPanel`).
+- **#45 web** (`conversation/transcript.ts`): routine wire `agent` lines are dropped (the view's reports already carry them; urgent ones are kept); the player's own message is "You" and sorts before its reply; replies are "Control"; wire kind is mapped to a display name; a control line that repeats a receipt reply is dropped. Tested.
+- **#45 sim**: agent text names refuges, sites and survey points instead of raw node ids (`CrewController.nodeName`, used in decisions and the scout verb); `explainCode` no longer appends the raw reason code; objective status text uses the site name and no snake_case; the server end sentence uses a per-reason sentence instead of `replaceAll("_", " ")`. Test: no decision text contains a map node id.
+- **#47**: top bar says "simulated" and "real time left" with a line that incident time runs 5x faster (`TIME_COMPRESSION`, derived from 25 min over the 5 min wall limit); end overlay shows simulated and real time and maps other end reasons through `endReasonDisplayText`; "time expired" now reads as the real-time limit; scene forecast labels say "simulated time".
+- Check: top bar fits at 1440 and 1024 (Playwright). Gate: typecheck, lint, 763 tests pass.
+- Judgement call: scout points have no names in the map, so the agents package says "survey point N"; the server still has its own POINT_NAMES for speech.

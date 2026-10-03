@@ -99,6 +99,11 @@ input {
   font-variant-numeric: tabular-nums;
 }
 
+.top-bar__compression {
+  font-size: 0.8rem;
+  opacity: 0.75;
+}
+
 .connection-banner,
 .demo-banner {
   padding: 0.5rem 1rem;
