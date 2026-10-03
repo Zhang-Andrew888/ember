@@ -1626,3 +1626,12 @@ Self-critique: the legend list said "Observed cells (84)" with truth on, which w
 78 never observed - replay only)". The mock fire is a boxy rectangle (fine for mock data). Replay does not yet interpolate
 between snapshots or animate the spread between events; it steps by event.
 Blocked: nothing. Next: self-review of the whole diff (dead code, bugs, missing tests), then the final summary.
+
+## feat/navigation (2026-10-03)
+
+Branch: `feat/navigation` on `main` @ web-ui merge (`e458ab4`).
+
+- **Approach routes:** `enumerateApproachRoutes` in `packages/navigation` — BFS over edge bans (up to 6 polylines) so mission `candidates` can include south and north corridor approaches when both certify.
+- **Calibration (not RL):** `NAV_CALIBRATION_PRESETS`, `nav-calibration-cli.ts`, `packages/navigation/README.md`; `DEVELOPMENT.md` offline section.
+- **Exploratory report:** `apps/server/evaluation-results/nav-calibration-exploratory.json` — `ember_line` × 5 dev seeds × 6 presets. No crew losses on any preset; `buffer-loose` slightly lower mean work (642.4 vs 648.4) on this batch — **not** adopted into defaults (dev-only sweep per docs).
+- **CI:** 711 tests green after merge with main.
