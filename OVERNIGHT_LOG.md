@@ -148,6 +148,11 @@ Reading these honestly:
   (`npx tsx src/check-scenario-cli.ts <file>`); the synthetic scenario passes all five gates, the placeholder
   `scenarios/scenario-v1.placeholder.json` correctly fails the schema (its fields are still PENDING).
 
+- Fixed: `ScriptedInterpreter` threw on a callsign containing regex metacharacters (now escaped); the WebSocket
+  server now caps messages at 64 KiB (closes with 1009) and absorbs socket errors.
+- Known gap: the server does not apply backpressure to a client that stops reading its socket (the `ws` library
+  buffers without limit). Acceptable for the loopback-only demo server; not handled.
+
 ## CI notes
 
 Two pushed commits (`fb01dc1`, `d67effe`) showed a red `Test` job even though every test passed: vitest exited 1
