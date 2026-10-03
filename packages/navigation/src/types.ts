@@ -70,6 +70,8 @@ export interface PlanningContext {
   readonly config?: NavConfig;
   /** Edges the planner must not use (e.g. an avoid-corridor objective). */
   readonly avoidEdges?: ReadonlySet<EdgeId>;
+  /** Name the forecast members that rule out every mission when rejecting (costly; default true). */
+  readonly diagnose?: boolean;
 }
 
 export interface RankedMission {

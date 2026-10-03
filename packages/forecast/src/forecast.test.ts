@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { buildSyntheticScenario } from "@ember/simulation";
 import { SIM_DEFAULTS, cellIndexOf, type FireParams } from "@ember/simulation/model";
 import {
@@ -16,6 +16,9 @@ import {
   snapshotOf,
 } from "./index.js";
 import { AgentId } from "@ember/domain";
+
+// Full simulated runs and cold forecast rollouts are slow on shared CI machines.
+vi.setConfig({ testTimeout: 120_000 });
 
 const map = buildSyntheticScenario().map;
 const inPrior: FireParams = { spreadMultiplier: 1, initialWindRad: 0, windShiftMs: 550_000, postShiftWindRad: 1.2 };

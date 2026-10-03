@@ -317,8 +317,9 @@ export class World {
       const pos = agent.pos;
       if (pos.turnMs > 0) {
         pos.turnMs = Math.max(0, pos.turnMs - STEP);
-      } else if (agent.commitment !== null) {
-        // An agent mid-edge with no commitment keeps still (forced emergency stop).
+      } else if (agent.commitment !== null && agent.commitment.legIndex < agent.commitment.plan.timedLegs.length) {
+        // With no commitment, or one whose legs are exhausted (a halt), a mid-edge agent keeps
+        // still: a forced emergency stop.
         this.travel(agent, pos, SIM_DEFAULTS.agentSpeedMps * (STEP / 1000));
       }
     }

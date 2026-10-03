@@ -71,9 +71,15 @@ export interface FitResult {
  * A member is supported when, at every observation time, at most `tolerance` of the footprint
  * disagrees and every disagreement lies within one cell of a matching predicted state.
  */
-export function fitMember(member: ForecastMember, observations: readonly FitObservation[], tolerance: number): FitResult {
+export function fitMember(
+  member: ForecastMember,
+  observations: readonly FitObservation[],
+  tolerance: number,
+  startIndex = 0,
+): FitResult {
   const ign = member.ignitionMs;
-  for (const o of observations) {
+  for (let oi = startIndex; oi < observations.length; oi++) {
+    const o = observations[oi]!;
     let mismatches = 0;
     for (let i = 0; i < o.cells.length; i++) {
       const cell = o.cells[i]!;
@@ -99,4 +105,51 @@ export function fitMember(member: ForecastMember, observations: readonly FitObse
     if (mismatches / o.cells.length > tolerance) return { pass: false, failedObservationId: o.id };
   }
   return { pass: true, failedObservationId: null };
+}
+
+/**
+ * Incremental version of fitObservations for an append-only observation list. Falls back to a
+ * full rebuild (and bumps `generation`, invalidating cached member fits) if evidence arrives
+ * out of order for a source.
+ */
+export class FitAccumulator {
+  generation = 0;
+  private processed = 0;
+  private list: FitObservation[] = [];
+  private readonly memory = new Map<string, { mem: Uint8Array; lastAt: number }>();
+
+  update(snapshot: AgentKnowledgeSnapshot): readonly FitObservation[] {
+    const all = snapshot.observations;
+    let reset = all.length < this.processed;
+    for (let i = this.processed; i < all.length && !reset; i++) {
+      const obs = all[i]!;
+      const src = this.memory.get(obs.sourceAgentId) ?? { mem: new Uint8Array(SIZE * SIZE), lastAt: -1 };
+      this.memory.set(obs.sourceAgentId, src);
+      if (obs.observedAt < src.lastAt) {
+        reset = true;
+        break;
+      }
+      src.lastAt = obs.observedAt;
+      for (const field of obs.observedFields) {
+        if (field.kind === "cell" && field.edgeId === GRID_EDGE) src.mem[field.cellIndex] = stateCode(field.burnState);
+      }
+      const fp = obs.spatialFootprint;
+      const known: number[] = [];
+      for (const cell of cellsWithin(fp.centerX, fp.centerY, fp.radius)) if (src.mem[cell] !== 0) known.push(cell);
+      if (known.length > 0) {
+        const states = new Uint8Array(known.length);
+        for (let j = 0; j < known.length; j++) states[j] = src.mem[known[j]!]!;
+        this.list.push({ id: obs.id, timeMs: obs.observedAt, cells: Int32Array.from(known), states });
+      }
+    }
+    if (reset) {
+      this.generation += 1;
+      this.memory.clear();
+      this.list = fitObservations(snapshot);
+      this.processed = all.length;
+      return this.list;
+    }
+    this.processed = all.length;
+    return this.list;
+  }
 }

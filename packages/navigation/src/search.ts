@@ -177,3 +177,115 @@ export function startsFromPosition(
   consider(position.direction === "forward" ? "reverse" : "forward", config.turnaroundMs);
   return out;
 }
+
+/**
+ * Backward table: for every (node, bucket) the earliest bucket at which a refuge can be reached
+ * safely, or -1. One pass answers the return search for every work interval of a mission.
+ */
+export class ReturnTable {
+  private readonly nodes: NodeId[];
+  private readonly index = new Map<NodeId, number>();
+  private readonly arrive: Int32Array[] = [];
+  private readonly how: Int32Array[] = [];
+  private readonly options: { edge: RoadEdge; direction: "forward" | "reverse"; to: number; travelK: number }[][] = [];
+  readonly maxK: number;
+
+  constructor(
+    private readonly hm: HazardModel,
+    private readonly nowMs: number,
+    oracle: ReservationOracle,
+    ban: ReadonlySet<EdgeId> | undefined,
+    private readonly config: NavConfig,
+  ) {
+    const road = hm.road;
+    this.nodes = [...road.nodes.keys()].sort();
+    this.nodes.forEach((n, i) => this.index.set(n, i));
+    this.maxK = Math.floor((hm.horizonEndMs - config.bufferMs - 1 - nowMs) / config.bucketMs);
+    for (const n of this.nodes) {
+      const list = [...(road.adjacency.get(n) ?? [])]
+        .sort((a, b) => (a.edgeId !== b.edgeId ? (a.edgeId < b.edgeId ? -1 : 1) : a.direction < b.direction ? -1 : 1))
+        .filter((a) => !ban?.has(a.edgeId))
+        .map((a) => {
+          const edge = road.mustEdge(a.edgeId);
+          return {
+            edge,
+            direction: a.direction,
+            to: this.index.get(a.toNode)!,
+            travelK: bucketTravelMs(edge.length, config) / config.bucketMs,
+          };
+        });
+      this.options.push(list);
+    }
+    for (let k = 0; k <= Math.max(0, this.maxK); k++) {
+      this.arrive.push(new Int32Array(this.nodes.length).fill(-1));
+      this.how.push(new Int32Array(this.nodes.length).fill(-1));
+    }
+    for (let k = this.maxK; k >= 0; k--) {
+      const t = nowMs + k * config.bucketMs;
+      for (let ni = 0; ni < this.nodes.length; ni++) {
+        const node = this.nodes[ni]!;
+        if (road.refugeNodes.has(node)) {
+          this.arrive[k]![ni] = k;
+          this.how[k]![ni] = 0;
+          continue;
+        }
+        let best = -1;
+        let choice = -1;
+        if (k + 1 <= this.maxK && hm.nodeSafeAt(node, t + config.bucketMs)) {
+          const a = this.arrive[k + 1]![ni]!;
+          if (a >= 0) {
+            best = a;
+            choice = 1;
+          }
+        }
+        const opts = this.options[ni]!;
+        for (let i = 0; i < opts.length; i++) {
+          const o = opts[i]!;
+          if (!(t < hm.latestDepartMs(o.edge, o.direction))) continue;
+          const kk = k + o.travelK;
+          if (kk > this.maxK) continue;
+          if (o.edge.singleCapacity && !oracle.isFree(o.edge.id, o.direction, t, nowMs + kk * config.bucketMs)) continue;
+          const a = this.arrive[kk]![o.to]!;
+          if (a >= 0 && (best < 0 || a < best)) {
+            best = a;
+            choice = 2 + i;
+          }
+        }
+        this.arrive[k]![ni] = best;
+        this.how[k]![ni] = choice;
+      }
+    }
+  }
+
+  /** Earliest bucket of refuge arrival from (nodeId, k), or -1 if no safe return exists. */
+  arrival(nodeId: NodeId, k: number): number {
+    const ni = this.index.get(nodeId);
+    if (ni === undefined || k < 0 || k > this.maxK) return -1;
+    return this.arrive[k]![ni]!;
+  }
+
+  /** The timed legs and refuge reached for the earliest return from (nodeId, k). */
+  returnFrom(nodeId: NodeId, k: number): { legs: TimedLeg[]; refuge: NodeId } {
+    const legs: TimedLeg[] = [];
+    let ni = this.index.get(nodeId)!;
+    let layer = k;
+    for (;;) {
+      const how = this.how[layer]![ni]!;
+      if (how === 0) return { legs, refuge: this.nodes[ni]! };
+      if (how === 1) {
+        layer += 1;
+        continue;
+      }
+      if (how < 0) throw new Error("no return from here");
+      const o = this.options[ni]![how - 2]!;
+      legs.push({
+        edgeId: o.edge.id,
+        direction: o.direction,
+        departMs: SimTimeMs.parse(this.nowMs + layer * this.config.bucketMs),
+        arriveMs: SimTimeMs.parse(this.nowMs + (layer + o.travelK) * this.config.bucketMs),
+      });
+      layer += o.travelK;
+      ni = o.to;
+    }
+  }
+}

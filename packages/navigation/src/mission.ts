@@ -2,7 +2,7 @@ import { MissionPlan, MissionPlanId, NodeId, SequenceNumber, SimTimeMs, type Edg
 import { admitsProtection } from "@ember/forecast";
 import { hashValue } from "@ember/knowledge";
 import { HazardModel } from "./hazard.js";
-import { timeExpandedSearch, startsFromPosition, type Reach, type SearchStart } from "./search.js";
+import { ReturnTable, timeExpandedSearch, startsFromPosition, type Reach, type SearchStart } from "./search.js";
 import {
   ALWAYS_FREE,
   DEFAULT_NAV_CONFIG,
@@ -64,10 +64,8 @@ function edgeKeys(legs: readonly TimedLeg[]): EdgeId[] {
 export function planWithHazard(ctx: PlanningContext, hm: HazardModel, targets: readonly MissionTarget[]): RankedMission[] {
   const config = ctx.config ?? DEFAULT_NAV_CONFIG;
   const oracle = ctx.oracle ?? ALWAYS_FREE;
-  const road = ctx.road;
   const starts = startsFromPosition(hm, ctx.position, ctx.nowMs, config);
   if (starts.length === 0) return [];
-  const refuges = new Set(road.map.refuges.map((r) => r.nodeId));
   const out: Built[] = [];
   const revision = SequenceNumber.parse(ctx.ensemble.knowledgeRevision);
 
@@ -75,6 +73,7 @@ export function planWithHazard(ctx: PlanningContext, hm: HazardModel, targets: r
     timeExpandedSearch({ hm, nowMs: ctx.nowMs, starts: from, oracle, ban, config });
 
   const avoid = new Set<EdgeId>(ctx.avoidEdges ?? []);
+  const table = new ReturnTable(hm, ctx.nowMs, oracle, avoid, config);
   for (const target of targets) {
     const bases = new Map<string, { legs: TimedLeg[]; k: number }>();
     const attempt = (ban: Set<EdgeId>): void => {
@@ -97,10 +96,11 @@ export function planWithHazard(ctx: PlanningContext, hm: HazardModel, targets: r
         const arriveMs = ctx.nowMs + approach.k * config.bucketMs;
         const endMs = ctx.nowMs + workEndK * config.bucketMs;
         if (!(endMs < nodeSafeLimit) || !(endMs + config.bufferMs < hm.horizonEndMs)) break;
-        const back = search([{ nodeId: target.nodeId, k: workEndK, prefix: [] }], avoid);
-        const hit = back.earliest(refuges);
-        if (hit === null) continue;
-        const returnLegs = back.legsTo(hit.nodeId, hit.k);
+        const arrivalK = table.arrival(target.nodeId, workEndK);
+        if (arrivalK < 0) continue;
+        const ret = table.returnFrom(target.nodeId, workEndK);
+        const hit = { k: arrivalK, nodeId: ret.refuge };
+        const returnLegs = ret.legs;
         const legs = [...approach.legs, ...returnLegs];
         const returnMs = (hit.k - workEndK) * config.bucketMs;
         const total = Math.max(1, ((hit.k * config.bucketMs) / 1000));
@@ -174,6 +174,7 @@ export function planMissions(ctx: PlanningContext, targets: readonly MissionTarg
   const open = new HazardModel(ctx.road, ctx.ensemble, new Set(), config, []);
   if (planWithHazard(ctx, open, targets).length === 0) return reject("forecast_horizon_insufficient");
   const limiting: string[] = [];
+  if (ctx.diagnose === false) return reject("no_feasible_mission_in_model");
   for (const member of ctx.ensemble.members) {
     const single = new HazardModel(ctx.road, ctx.ensemble, ctx.closedCells, config, [member]);
     if (planWithHazard(ctx, single, targets).length === 0) limiting.push(member.id);

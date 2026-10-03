@@ -32,8 +32,10 @@ interface Cached {
 }
 
 const cache = new Map<string, Cached>();
-const CACHE_LIMIT = 2000;
+const CACHE_LIMIT = 600;
 const ROUND_MS = 300_000;
+/** Roll out once to cover the whole incident plus the forecast horizon, so refreshes hit the cache. */
+const ROLLOUT_FLOOR_MS = 3_300_000;
 
 function paramKey(ctx: RolloutContext, p: FireParams, stepMs: number): string {
   const r = (v: number): string => (Number.isFinite(v) ? v.toFixed(5) : "inf");
@@ -49,7 +51,7 @@ export function rolloutIgnition(ctx: RolloutContext, params: FireParams, endMs: 
   const key = paramKey(ctx, params, stepMs);
   const hit = cache.get(key);
   if (hit !== undefined && hit.endMs >= endMs) return hit.ign;
-  const target = Math.ceil(endMs / ROUND_MS) * ROUND_MS;
+  const target = Math.max(ROLLOUT_FLOOR_MS, Math.ceil(endMs / ROUND_MS) * ROUND_MS);
   const field = new FireField(ctx.terrain, ctx.nonburnable);
   field.ignite(ctx.initialCells, 0, params.initialProgress ?? 0);
   for (let t = stepMs; t <= target; t += stepMs) field.step(t, stepMs, params);
@@ -64,5 +66,5 @@ export function rolloutIgnition(ctx: RolloutContext, params: FireParams, endMs: 
 }
 
 export function rolloutEndFor(endMs: number): number {
-  return Math.ceil(endMs / ROUND_MS) * ROUND_MS;
+  return Math.max(ROLLOUT_FLOOR_MS, Math.ceil(endMs / ROUND_MS) * ROUND_MS);
 }

@@ -79,10 +79,10 @@ export function buildSyntheticScenario(options: SyntheticOptions = {}): SimScena
   const agentFilter = options.agents;
   const siteFilter = options.sites;
   const initialFireCells = [
-    cellIndexOf(230, 980),
-    cellIndexOf(255, 980),
-    cellIndexOf(230, 1005),
-    cellIndexOf(255, 1005),
+    cellIndexOf(230, 1100),
+    cellIndexOf(255, 1100),
+    cellIndexOf(230, 1125),
+    cellIndexOf(255, 1125),
   ].filter((c): c is number => c !== null);
 
   const sites = ALL_SITES.filter(([id]) => siteFilter === undefined || siteFilter.includes(id));

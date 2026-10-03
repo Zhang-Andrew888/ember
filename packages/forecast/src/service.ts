@@ -2,7 +2,7 @@ import { SimTimeMs, type AgentId } from "@ember/domain";
 import { GRID_EDGE, hashValue, type AgentKnowledgeSnapshot } from "@ember/knowledge";
 import { streamRng, type PublicMap } from "@ember/simulation/model";
 import { DEFAULT_FORECAST_CONFIG, widenRanges, type ForecastConfig } from "./config.js";
-import { fitMember, fitObservations, type FitObservation } from "./fit.js";
+import { FitAccumulator, fitMember, type FitObservation } from "./fit.js";
 import {
   boundaryCandidates,
   buildMember,
@@ -32,6 +32,9 @@ export class ForecastService {
   private readonly ctx: RolloutContext;
   private contradictedHash: string | null = null;
   private lastRebuildHash: string | null = null;
+  private readonly accum = new FitAccumulator();
+  /** How many fit observations each member has already been verified against. */
+  private readonly verified = new WeakMap<ForecastMember, { generation: number; upTo: number }>();
 
   constructor(
     readonly agentId: AgentId,
@@ -64,12 +67,14 @@ export class ForecastService {
     if (cur !== null && cur.inputHash === hash && cur.reliability === "unreliable") return cur;
 
     const horizonEndMs = nowMs + this.config.horizonMs;
-    const fitObs = fitObservations(snapshot);
+    const fitObs = this.accum.update(snapshot);
     const prefix = this.agentId;
-    const pool: Candidate[] =
-      cur !== null && cur.reliability === "reliable"
-        ? cur.members.map((m) => ({ id: m.id, kind: m.kind, params: m.params }))
-        : priorCandidates(this.config, streamRng(`${prefix}`, "forecast-prior"), "p");
+    const pool: readonly (Candidate | ForecastMember)[] =
+      cur !== null && cur.reliability === "reliable" && cur.members.every((m) => m.rolloutEndMs >= horizonEndMs)
+        ? cur.members
+        : cur !== null && cur.reliability === "reliable"
+          ? cur.members.map((m) => ({ id: m.id, kind: m.kind, params: m.params }))
+          : priorCandidates(this.config, streamRng(`${prefix}`, "forecast-prior"), "p");
 
     const survivors = this.supported(pool, fitObs, horizonEndMs);
     if (survivors.members.length === 0) {
@@ -116,7 +121,7 @@ export class ForecastService {
     const hash = snapshotScopeHash(snapshot);
     this.lastRebuildHash = hash;
     const horizonEndMs = nowMs + this.config.horizonMs;
-    const fitObs = fitObservations(snapshot);
+    const fitObs = this.accum.update(snapshot);
     const observationIds = fitObs.map((o) => o.id);
     let lastRanges = widenRanges(this.config, 8);
     for (const factor of this.config.widenFactors) {
@@ -194,17 +199,22 @@ export class ForecastService {
   }
 
   private supported(
-    candidates: readonly Candidate[],
+    candidates: readonly (Candidate | ForecastMember)[],
     fitObs: readonly FitObservation[],
     horizonEndMs: number,
   ): { members: ForecastMember[]; firstFailure: string | null } {
     const members: ForecastMember[] = [];
     let firstFailure: string | null = null;
     for (const c of candidates) {
-      const member = buildMember(this.ctx, this.config, c.id, c.kind, c.params, horizonEndMs);
-      const fit = fitMember(member, fitObs, this.config.disagreementTolerance);
-      if (fit.pass) members.push(member);
-      else if (firstFailure === null) firstFailure = fit.failedObservationId;
+      const member =
+        "ignitionMs" in c ? c : buildMember(this.ctx, this.config, c.id, c.kind, c.params, horizonEndMs);
+      const seen = this.verified.get(member);
+      const from = seen !== undefined && seen.generation === this.accum.generation ? seen.upTo : 0;
+      const fit = fitMember(member, fitObs, this.config.disagreementTolerance, from);
+      if (fit.pass) {
+        this.verified.set(member, { generation: this.accum.generation, upTo: fitObs.length });
+        members.push(member);
+      } else if (firstFailure === null) firstFailure = fit.failedObservationId;
     }
     return { members, firstFailure };
   }
@@ -240,7 +250,10 @@ export class ForecastService {
       const cand = perturb(base.params, rng, bounds, `${base.id}~${attempts}`);
       attempts += 1;
       const member = buildMember(this.ctx, this.config, cand.id, cand.kind, cand.params, horizonEndMs);
-      if (fitMember(member, fitObs, this.config.disagreementTolerance).pass) members.push(member);
+      if (fitMember(member, fitObs, this.config.disagreementTolerance).pass) {
+        this.verified.set(member, { generation: this.accum.generation, upTo: fitObs.length });
+        members.push(member);
+      }
     }
     return members;
   }

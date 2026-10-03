@@ -53,6 +53,8 @@ export class KnowledgeStore {
   private readonly sites = new Map<SiteId, SiteBelief>();
   private readonly closed = new Set<number>();
   private rev = 0;
+  /** Order-independent running digest of every entry, updated in O(1) per ingest. */
+  private readonly digest = [0, 0, 0, 0];
 
   constructor(agentId: AgentId) {
     this.agentId = agentId;
@@ -77,6 +79,8 @@ export class KnowledgeStore {
     this.ids.add(observation.id);
     this.entries.push({ observation, provenance });
     this.rev += 1;
+    const h = hashValue({ p: provenance, o: observation });
+    for (let i = 0; i < 4; i++) this.digest[i] = ((this.digest[i] ?? 0) + parseInt(h.slice(i * 8, i * 8 + 8), 16)) >>> 0;
     for (const field of observation.observedFields) this.apply(observation, provenance, field);
     return true;
   }
@@ -175,10 +179,8 @@ export class KnowledgeStore {
 
   /** Hash of everything this store knows. Equal knowledge gives an equal hash. */
   inputHash(): string {
-    const sorted = [...this.entries].sort((a, b) =>
-      a.observation.id < b.observation.id ? -1 : a.observation.id > b.observation.id ? 1 : 0,
-    );
-    return hashValue(sorted.map((e) => ({ p: e.provenance, o: e.observation })));
+    const hex = this.digest.map((d) => d.toString(16).padStart(8, "0")).join("");
+    return `${this.entries.length.toString(16)}-${hex}`;
   }
 }
 
