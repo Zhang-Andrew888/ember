@@ -586,3 +586,41 @@ input {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+
+/* ---------- Route / forecast layers ---------- */
+
+.scene-label--route {
+  border-color: #f1f4ed;
+}
+
+.scene-label--forecast {
+  border-style: dashed;
+  border-color: var(--color-forecast, #ffc98b);
+  color: #ffc98b;
+}
+
+.scene-legend__swatch--hatch {
+  background: repeating-linear-gradient(135deg, #ffc98b 0 2px, rgba(255, 201, 139, 0.15) 2px 4px);
+}
+
+.scene-legend__swatch--route {
+  background: repeating-linear-gradient(90deg, #f1f4ed 0 3px, transparent 3px 5px);
+}
+
+.scene-legend__forecast {
+  margin: 0;
+  font-size: 0.8rem;
+  max-width: 320px;
+}
+
+.scene-legend__forecast[data-reliability="unreliable"],
+.scene-legend__forecast[data-reliability="rebuilding"] {
+  border-left: 3px dashed #c1443b;
+  padding-left: 0.4rem;
+}
+
+.scene-legend__source {
+  margin: 0;
+  font-size: 0.7rem;
+  opacity: 0.7;
+}

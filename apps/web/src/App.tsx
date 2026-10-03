@@ -16,7 +16,7 @@ import { useReducedMotion } from "./state/useReducedMotion.js";
 import { createSpeechPlaybackStub } from "./state/speechPlaybackStub.js";
 import { useSpeechPlaybackStub } from "./state/useSpeechPlaybackStub.js";
 import { buildSceneEntities } from "./components/scene/sceneEntities.js";
-import { scenarioMap } from "./map/scenarioMap.js";
+import { scenarioMap } from "./map/activeScenario.js";
 import { routineReports, latestUrgentReport } from "./format/reports.js";
 import { Briefing } from "./components/Briefing.js";
 import { TopBar } from "./components/TopBar.js";
@@ -35,7 +35,7 @@ const REST_BASE_URL = import.meta.env.VITE_INCIDENT_REST_BASE_URL as string | un
 const HAS_LIVE_REST = REST_BASE_URL !== undefined;
 const IS_MOCK_MODE = !WS_URL && !HAS_LIVE_REST;
 
-const EMPTY_ENTITIES = { agents: [], sites: [], fireCells: [] };
+const EMPTY_ENTITIES = { agents: [], sites: [], fireCells: [], routes: [], forecast: null };
 
 type Phase = "briefing" | "live" | "replay";
 

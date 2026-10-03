@@ -1,50 +1,66 @@
-import { useMemo } from "react";
-import { scenarioMap } from "../../map/scenarioMap.js";
+import { useEffect, useMemo } from "react";
+import { BufferGeometry, Float32BufferAttribute, Uint16BufferAttribute, Uint32BufferAttribute } from "three";
+import { scenarioMap } from "../../map/activeScenario.js";
 import { colors } from "../../styles/colors.js";
+import { buildRibbonData, subdividePolyline } from "./ribbon.js";
+import { createDashTexture } from "./patternTextures.js";
+import { sceneTerrain } from "./terrain/sceneTerrain.js";
 
-const ROAD_WIDTH = 6;
-const ROAD_HEIGHT = 1;
-/** Constant road elevation, well above the terrain's max bump height (~2.4). */
-const ROAD_Y = 6;
+const ROAD_HALF_WIDTH = 5;
+const ROAD_LIFT = 1.2;
+const MARKING_LIFT = 1.6;
+const STEP = 18;
 
-interface RoadSegment {
-  readonly key: string;
-  readonly x: number;
-  readonly z: number;
-  readonly length: number;
-  readonly rotationY: number;
+function toGeometry(data: ReturnType<typeof buildRibbonData>): BufferGeometry {
+  const geo = new BufferGeometry();
+  geo.setAttribute("position", new Float32BufferAttribute(data.positions, 3));
+  geo.setAttribute("uv", new Float32BufferAttribute(data.uvs, 2));
+  geo.setIndex(
+    data.indices.length > 65535 ? new Uint32BufferAttribute(data.indices, 1) : new Uint16BufferAttribute(data.indices, 1),
+  );
+  geo.computeVertexNormals();
+  return geo;
 }
 
+/**
+ * Road polylines draped on the terrain. Single-capacity (constrained)
+ * segments carry an extra dashed centre marking, so "one crew at a time"
+ * is a shape on the road, not only a colour.
+ */
 export function Roads() {
-  const segments = useMemo<RoadSegment[]>(() => {
-    const result: RoadSegment[] = [];
+  const { roads, markings } = useMemo(() => {
+    const groundAt = (lift: number) => (x: number, z: number) => sceneTerrain.groundY(x, z) + lift;
+    const roadGeos: BufferGeometry[] = [];
+    const markingGeos: BufferGeometry[] = [];
     for (const edge of scenarioMap.edges.values()) {
-      const from = scenarioMap.nodes.get(edge.fromNodeId);
-      const to = scenarioMap.nodes.get(edge.toNodeId);
-      if (!from || !to) continue;
-      const dx = to.x - from.x;
-      const dz = to.z - from.z;
-      result.push({
-        key: edge.id,
-        x: (from.x + to.x) / 2,
-        z: (from.z + to.z) / 2,
-        length: Math.hypot(dx, dz),
-        rotationY: -Math.atan2(dz, dx),
-      });
+      const points = subdividePolyline(edge.points, STEP);
+      roadGeos.push(toGeometry(buildRibbonData(points, ROAD_HALF_WIDTH, groundAt(ROAD_LIFT), 30)));
+      if (edge.singleCapacity) {
+        markingGeos.push(toGeometry(buildRibbonData(points, 1.6, groundAt(MARKING_LIFT), 12)));
+      }
     }
-    return result;
+    return { roads: roadGeos, markings: markingGeos };
   }, []);
+  const dash = useMemo(() => createDashTexture("#E6C36B"), []);
+
+  useEffect(
+    () => () => {
+      for (const geo of [...roads, ...markings]) geo.dispose();
+      dash.dispose();
+    },
+    [roads, markings, dash],
+  );
 
   return (
     <group>
-      {segments.map((segment) => (
-        <mesh
-          key={segment.key}
-          position={[segment.x, ROAD_Y, segment.z]}
-          rotation={[0, segment.rotationY, 0]}
-        >
-          <boxGeometry args={[segment.length, ROAD_HEIGHT, ROAD_WIDTH]} />
-          <meshStandardMaterial color={colors.road} roughness={0.9} />
+      {roads.map((geo, i) => (
+        <mesh key={`road-${i}`} geometry={geo} renderOrder={2} frustumCulled={false}>
+          <meshStandardMaterial color={colors.road} roughness={0.95} polygonOffset polygonOffsetFactor={-2} />
+        </mesh>
+      ))}
+      {markings.map((geo, i) => (
+        <mesh key={`mark-${i}`} geometry={geo} renderOrder={2} frustumCulled={false}>
+          <meshBasicMaterial map={dash} transparent depthWrite={false} polygonOffset polygonOffsetFactor={-3} />
         </mesh>
       ))}
     </group>
