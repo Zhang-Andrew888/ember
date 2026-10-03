@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { AgentId, NodeId } from "@ember/domain";
 import { DEFAULT_FORECAST_CONFIG } from "@ember/forecast";
 import { buildSyntheticScenario, type SimScenario } from "@ember/simulation";
@@ -6,6 +6,11 @@ import { cellIndexOf } from "@ember/simulation/model";
 import { IncidentSession } from "./session.js";
 
 vi.setConfig({ testTimeout: 180_000 });
+
+// Long synchronous tests starve the worker's RPC channel; yield a macrotask between tests so it can flush.
+afterEach(async () => {
+  await new Promise<void>((resolve) => setTimeout(() => resolve(), 0));
+});
 
 const calm = { spreadMultiplier: 0.6, windShiftMs: 1e9, initialWindRad: 0 };
 const patch = (x: number, y: number): number[] => [cellIndexOf(x, y)!, cellIndexOf(x + 25, y)!, cellIndexOf(x, y + 25)!, cellIndexOf(x + 25, y + 25)!];

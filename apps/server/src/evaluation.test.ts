@@ -1,9 +1,14 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { BundleReplayReader, serializeBundle, parseBundle } from "@ember/replay";
 import { replayRecord } from "@ember/simulation";
 import { HELD_OUT_SEEDS, VARIANTS, overridesForSeed, runEvaluation, runVariant } from "./evaluation.js";
 
 vi.setConfig({ testTimeout: 300_000 });
+
+// Long synchronous tests starve the worker's RPC channel; yield a macrotask between tests so it can flush.
+afterEach(async () => {
+  await new Promise<void>((resolve) => setTimeout(() => resolve(), 0));
+});
 
 const SHORT = 300_000;
 

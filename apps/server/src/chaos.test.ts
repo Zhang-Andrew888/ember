@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { AgentId } from "@ember/domain";
 import { Rng, cellIndexOf } from "@ember/simulation/model";
 import { DEFAULT_FORECAST_CONFIG } from "@ember/forecast";
@@ -7,6 +7,11 @@ import { ConversationBridge } from "./conversation.js";
 import { IncidentSession } from "./session.js";
 
 vi.setConfig({ testTimeout: 600_000 });
+
+// Long synchronous tests starve the worker's RPC channel; yield a macrotask between tests so it can flush.
+afterEach(async () => {
+  await new Promise<void>((resolve) => setTimeout(() => resolve(), 0));
+});
 
 const UTTERANCES = [
   "Crew 1, protect the lodge",
