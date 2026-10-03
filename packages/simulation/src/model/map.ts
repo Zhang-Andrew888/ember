@@ -77,7 +77,7 @@ export interface Adjacent {
   readonly toNode: NodeId;
 }
 
-export const GRID_EDGE_ID = EdgeId.parse("grid");
+export { GRID_EDGE as GRID_EDGE_ID } from "@ember/knowledge";
 
 export function cellIndexOf(x: number, y: number): number | null {
   const { gridSize, cellMeters } = SIM_DEFAULTS;
