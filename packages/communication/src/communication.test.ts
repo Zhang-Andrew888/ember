@@ -477,3 +477,23 @@ describe("replies from committed outcomes", () => {
     expect(lossNarration("Crew 3")).toEqual({ text: "Control: Crew 3 has been lost.", tier: 1 });
   });
 });
+
+describe("ScriptedInterpreter robustness", () => {
+  it("treats callsigns containing regex metacharacters literally and never throws", () => {
+    const odd: Directory = {
+      ...directory,
+      agents: [{ id: "x", callsign: "Crew (1", role: "protection_crew" }, ...directory.agents],
+    };
+    const interpreter = new ScriptedInterpreter();
+    const request = {
+      commandId: "c1",
+      inputSequence: 1,
+      directory: odd,
+      activeRecipientCallsign: null,
+    };
+    expect(() => interpreter.interpret({ ...request, text: "relay crew (1's latest report to Scout" })).not.toThrow();
+    const env = interpreter.interpret({ ...request, text: "relay crew (1's latest report to Scout" });
+    expect(env?.kind).toBe("relay");
+    expect(env?.evidenceQueries[0]?.sourceName).toBe("Crew (1");
+  });
+});

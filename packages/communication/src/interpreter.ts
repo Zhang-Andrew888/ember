@@ -15,6 +15,8 @@ export interface Interpreter {
   interpret(request: InterpretationRequest): IntentEnvelope | null;
 }
 
+const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 const CLAIM = /\b(?:is|are)\s+(?:definitely\s+|totally\s+|completely\s+)?(?:safe|clear|open|closed|burning|fine)\b/i;
 
 /**
@@ -33,7 +35,7 @@ export class ScriptedInterpreter implements Interpreter {
     const sources: string[] = [];
     if (usesReport) {
       for (const a of req.directory.agents) {
-        if (new RegExp(`${a.callsign.toLowerCase()}'?s?\\s+(latest\\s+)?[a-z\\- ]*(report|observation|sighting)`).test(lower)) {
+        if (new RegExp(`${escapeRegExp(a.callsign.toLowerCase())}'?s?\\s+(latest\\s+)?[a-z\\- ]*(report|observation|sighting)`).test(lower)) {
           sources.push(a.callsign);
           callsigns.delete(a.callsign);
         }
