@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { AgentId } from "@ember/domain";
-import { buildSyntheticScenario } from "@ember/simulation";
-import { RoadIndex, streamRng } from "@ember/simulation/model";
+import { buildSyntheticScenario, derivePrivateParameters } from "@ember/simulation";
+import { FireField, RoadIndex, SIM_DEFAULTS, createTerrain, refugeCells, streamRng } from "@ember/simulation/model";
 import { arrivalCoverage, calibrateArrivalPadding, type ArrivalCalibrationCase } from "./calibration.js";
 import { DEFAULT_FORECAST_CONFIG } from "./config.js";
 import { edgeArrivalBands } from "./coordinator-projection.js";
@@ -57,5 +57,31 @@ describe("arrival band calibration", () => {
     expect(padding).toBe(DEFAULT_FORECAST_CONFIG.arrivalPaddingMs);
     expect(arrivalCoverage(training, padding)).toBeCloseTo(35 / 38);
     expect(measured).toBe(1);
+  });
+
+  it("covers separate simulator world seeds without tuning on them", () => {
+    const map = buildSyntheticScenario().map;
+    const road = new RoadIndex(map);
+    const config = { ...DEFAULT_FORECAST_CONFIG, arrivalPaddingMs: 0 };
+    const ensemble = new ForecastService(AgentId.parse("coordinator"), map, config)
+      .update(snapshotOf("coordinator", [briefingObservation(map)], 0), 0);
+    const bands = new Map(edgeArrivalBands(ensemble, road, 0).map((band) => [band.edgeId, band]));
+    const cases: ArrivalCalibrationCase[] = [];
+    for (const seed of ["world-held-11", "world-held-12", "world-held-13", "world-held-14"]) {
+      const params = derivePrivateParameters(seed);
+      const field = new FireField(createTerrain(map.terrainSeed), refugeCells(road, SIM_DEFAULTS.refugeRadiusM));
+      field.ignite(map.initialFireCells, 0);
+      for (let t = SIM_DEFAULTS.stepMs; t <= config.horizonMs; t += SIM_DEFAULTS.stepMs) {
+        field.step(t, SIM_DEFAULTS.stepMs, params);
+      }
+      for (const edge of road.edges.values()) {
+        const truthMs = Math.min(...edge.cells.map((cell) => field.ignitedAtMs[cell.cell] ?? Infinity));
+        if (!Number.isFinite(truthMs) || truthMs > config.horizonMs) continue;
+        const band = bands.get(edge.id)!;
+        cases.push({ earliestMs: band.earliestIgnitionMs, latestMs: band.latestIgnitionMs, truthMs });
+      }
+    }
+    expect(cases.length).toBe(30);
+    expect(arrivalCoverage(cases, DEFAULT_FORECAST_CONFIG.arrivalPaddingMs)).toBe(1);
   });
 });

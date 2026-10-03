@@ -128,6 +128,9 @@ describe("forecast service", () => {
     expect(e.provisional.length).toBeGreaterThan(0);
     expect(admitsProtection(e)).toBe(false);
     expect(ensembleValidity(e)).toBe("contradicted");
+    const empty = { ...e, reliability: "reliable" as const, members: [] };
+    expect(ensembleValidity(empty)).toBe("empty");
+    expect(admitsProtection(empty)).toBe(false);
     expect(admitsProtection(null)).toBe(false);
     expect(ensembleValidity(null)).toBe("empty");
     const event = service.events.find((x) => x.kind === "contradiction");
@@ -213,9 +216,10 @@ describe("forecast service", () => {
     const base = { ...inPrior, initialProgress: 0, windShiftMs: Infinity };
     const wet = rolloutIgnition(ctx, { ...base, moistureMultiplier: 1.3 }, 600_000, 5000);
     const dry = rolloutIgnition(ctx, { ...base, moistureMultiplier: 0.7 }, 600_000, 5000);
+    const unspotted = rolloutIgnition(ctx, base, 600_000, 5000);
     const spotted = rolloutIgnition(ctx, { ...base, spotDistanceCells: 8, spotTimeMs: 200_000 }, 600_000, 5000);
     expect(dry.some((t, i) => t < wet[i]!)).toBe(true);
-    expect(spotted.some((t, i) => t < wet[i]!)).toBe(true);
+    expect(spotted.some((t, i) => t < unspotted[i]!)).toBe(true);
   });
 });
 
