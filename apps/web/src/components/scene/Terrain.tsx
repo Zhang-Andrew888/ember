@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from "react";
-import { BufferGeometry, Float32BufferAttribute, MeshStandardMaterial, Uint32BufferAttribute } from "three";
+import { BufferGeometry, Float32BufferAttribute, MeshLambertMaterial, MeshStandardMaterial, Uint32BufferAttribute } from "three";
+import { useQuality } from "./quality/QualityContext.js";
 import { sceneTerrain, waterCells, waterLevel } from "./terrain/sceneTerrain.js";
 import { fuelDensity, terrainColor } from "./terrain/terrainColor.js";
 import { SCENE_SIZE } from "../../map/worldScale.js";
@@ -50,11 +51,15 @@ export function Terrain() {
     return geo;
   }, []);
   useEffect(() => () => geometry.dispose(), [geometry]);
+  const cheap = useQuality().cheapLighting;
   const groundMaterial = useMemo(() => {
-    const material = new MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 1, metalness: 0 });
+    // The ground covers the whole canvas, so its per-pixel cost dominates on weak GPUs: Lambert on cheaper tiers.
+    const material = cheap
+      ? new MeshLambertMaterial({ vertexColors: true, flatShading: true })
+      : new MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 1, metalness: 0 });
     applyFireLight(material, false, true);
     return material;
-  }, []);
+  }, [cheap]);
   useEffect(() => () => groundMaterial.dispose(), [groundMaterial]);
 
   return (

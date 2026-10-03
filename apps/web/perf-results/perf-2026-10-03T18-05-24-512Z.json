@@ -1,0 +1,89 @@
+{
+  "label": "cloud VM, headless Chromium, software rendering, not representative",
+  "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+  "softwareRendering": true,
+  "targetFps": 30,
+  "secondsPerTier": 6,
+  "date": "2026-10-03T18:05:24.512Z",
+  "node": "v22.22.0",
+  "results": [
+    {
+      "viewport": "1440x900",
+      "tier": "low",
+      "frames": 74,
+      "meanMs": 80.18,
+      "p50Ms": 83.3,
+      "p95Ms": 116.7,
+      "p99Ms": 133.4,
+      "maxMs": 133.4,
+      "fps": 12.47,
+      "over33msShare": 0.95,
+      "meetsTarget": false
+    },
+    {
+      "viewport": "1440x900",
+      "tier": "medium",
+      "frames": 10,
+      "meanMs": 629.97,
+      "p50Ms": 599.9,
+      "p95Ms": 900,
+      "p99Ms": 900,
+      "maxMs": 900,
+      "fps": 1.59,
+      "over33msShare": 1,
+      "meetsTarget": false
+    },
+    {
+      "viewport": "1440x900",
+      "tier": "high",
+      "frames": 7,
+      "meanMs": 945.2,
+      "p50Ms": 1016.6,
+      "p95Ms": 3016.6,
+      "p99Ms": 3016.6,
+      "maxMs": 3016.6,
+      "fps": 1.06,
+      "over33msShare": 0.86,
+      "meetsTarget": false
+    },
+    {
+      "viewport": "1024x720",
+      "tier": "low",
+      "frames": 122,
+      "meanMs": 49.32,
+      "p50Ms": 50,
+      "p95Ms": 83.4,
+      "p99Ms": 83.4,
+      "maxMs": 99.9,
+      "fps": 20.28,
+      "over33msShare": 0.85,
+      "meetsTarget": false
+    },
+    {
+      "viewport": "1024x720",
+      "tier": "medium",
+      "frames": 16,
+      "meanMs": 357.28,
+      "p50Ms": 350.1,
+      "p95Ms": 399.9,
+      "p99Ms": 399.9,
+      "maxMs": 399.9,
+      "fps": 2.8,
+      "over33msShare": 1,
+      "meetsTarget": false
+    },
+    {
+      "viewport": "1024x720",
+      "tier": "high",
+      "frames": 7,
+      "meanMs": 764.26,
+      "p50Ms": 766.6,
+      "p95Ms": 783.4,
+      "p99Ms": 783.4,
+      "maxMs": 783.4,
+      "fps": 1.31,
+      "over33msShare": 1,
+      "meetsTarget": false
+    }
+  ]
+}

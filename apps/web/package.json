@@ -6,7 +6,8 @@
     "dev": "vite",
     "build": "tsc -p tsconfig.json && vite build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "perf": "node scripts/perf.mjs"
   },
   "dependencies": {
     "@ember/domain": "workspace:*",

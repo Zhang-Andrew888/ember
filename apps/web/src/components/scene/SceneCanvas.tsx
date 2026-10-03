@@ -29,6 +29,8 @@ export interface SceneCanvasProps {
   readonly showRoutes: boolean;
   readonly showForecast: boolean;
   readonly selectedAgentId: string | null;
+  readonly followTarget: { readonly x: number; readonly z: number } | null;
+  readonly onUserPan: () => void;
   readonly onInspectAgent: (agentId: string) => void;
   readonly onInspectCell: (cell: FireCellMarker) => void;
   readonly onReady: (state: RootState) => void;
@@ -36,7 +38,7 @@ export interface SceneCanvasProps {
 }
 
 export const SceneCanvas = forwardRef<CameraControlsHandle, SceneCanvasProps>(function SceneCanvas(
-  { entities, showFireCells, showRoutes, showForecast, selectedAgentId, onInspectAgent, onInspectCell, onReady, reducedMotion },
+  { entities, showFireCells, showRoutes, showForecast, selectedAgentId, followTarget, onUserPan, onInspectAgent, onInspectCell, onReady, reducedMotion },
   controlsRef,
 ) {
   const qualityState = useQualityState();
@@ -56,7 +58,7 @@ export const SceneCanvas = forwardRef<CameraControlsHandle, SceneCanvasProps>(fu
       orthographic
       shadows="soft"
       camera={{ position: INITIAL_CAMERA_POSITION, zoom: INITIAL_ZOOM, near: 1, far: 4000 }}
-      dpr={[1, quality.dprMax]}
+      dpr={[...quality.dpr]}
       onCreated={onReady}
       // The scene is static between interactions - render on demand
       // (camera move, new snapshot, pulse animation) instead of a
@@ -101,7 +103,7 @@ export const SceneCanvas = forwardRef<CameraControlsHandle, SceneCanvasProps>(fu
         selectedAgentId={selectedAgentId}
         onInspectAgent={onInspectAgent}
       />
-      <CameraControls ref={controlsRef} reducedMotion={reducedMotion} />
+      <CameraControls ref={controlsRef} reducedMotion={reducedMotion} followTarget={followTarget} onUserPan={onUserPan} />
       </QualityProvider>
     </Canvas>
   );
