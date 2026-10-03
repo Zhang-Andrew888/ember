@@ -13,6 +13,17 @@ declare module "node:path" {
 declare module "node:url" {
   export function fileURLToPath(url: string | URL): string;
 }
+declare module "node:worker_threads" {
+  export class Worker {
+    constructor(filename: URL | string);
+    postMessage(value: unknown): void;
+    on(event: "message", listener: (value: unknown) => void): void;
+    on(event: "error", listener: (error: Error) => void): void;
+    on(event: "exit", listener: (code: number) => void): void;
+    terminate(): Promise<number>;
+    unref(): void;
+  }
+}
 declare module "node:http" {
   export interface IncomingMessage {
     url?: string;
