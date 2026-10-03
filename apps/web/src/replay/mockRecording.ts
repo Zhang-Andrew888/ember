@@ -1,4 +1,5 @@
-import { ReplayRecording, GRID_SIZE, type ReplayTruthFrame } from "./recording.js";
+import { GRID_SIZE } from "../map/positions.js";
+import { ReplayRecording, type ReplayTruthFrame } from "./recording.js";
 import { replayLog } from "../net/replayLog.js";
 
 /**

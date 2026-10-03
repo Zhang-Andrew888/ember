@@ -1626,3 +1626,80 @@ Self-critique: the legend list said "Observed cells (84)" with truth on, which w
 78 never observed - replay only)". The mock fire is a boxy rectangle (fine for mock data). Replay does not yet interpolate
 between snapshots or animate the spread between events; it steps by event.
 Blocked: nothing. Next: self-review of the whole diff (dead code, bugs, missing tests), then the final summary.
+
+### Commit 13: self-review of the whole diff (own pass + independent code-review over 16b82c4..HEAD)
+Method: a mechanical unused-export scan, a manual read, then the code-review skill over the full range. Fixed, each with a
+test or a measurement where one is possible:
+- DEAD CODE removed: the `fireLightUniforms` re-export in Fire.tsx, the unused `ring()` geometry helper, the unused
+  `worldMeters` parameter of `createHeightField`, a no-op shader branch in fireLight.ts, a clumsy `--real-gpu` filter.
+- BUG: route/forecast labels stayed on screen when their layer was toggled off (labels memo ignored the toggles).
+- BUG (truthfulness): in replay, a truth cell that replaced a stale/different observation was built as `stale:false,
+  ageMs:0, unseen:false`, so it read "last observed (0s ago)". It is now `unseen` (dashed frame, "not observed"); tests added.
+- BUG/RISK: `resolveGridCellPosition` hard-coded a 64x25 m grid while terrain, fire light and tree char used the scenario's
+  grid. It now takes the scenario map; a test uses a 32x50 m grid to prove it follows the scenario.
+- BUG: the middle mouse button (zoom in OrbitControls) paused follow and touch panning never did. `isPanGesture` now matches
+  OrbitControls (right button, modifier+left, two fingers); tests added.
+- PERF: RenderPipeline wrote frame timing into the React store every 4th frame in production, re-rendering the whole Canvas
+  tree. Timing now lives in its own store, written only in dev builds; only a tier change touches the main store (tested).
+- LEAK: Fire.tsx replaced instanced attributes on a shared geometry, leaving GPU buffers allocated. Each flame/smoke set now
+  has its own geometry, disposed when replaced. (Reasoned from three's buffer lifecycle; not measurable from here.)
+- UX: clicking the already-selected agent on the map after a pan now resumes follow.
+- CLEANUP: stale materials (agents, sites) moved from mutate-in-render to a `useStaleMaterial` hook with an explicit repaint
+  request. I TRIED to prove this fixes a missed repaint in reduced motion (new dev preset `?scenario=stale-transition`):
+  the canvas repainted WITH and WITHOUT the explicit request (other layers also request a frame on each snapshot), so this is
+  defensive cleanup, NOT a demonstrated bug fix.
+Not mine, reported only (pre-existing `lane/web` code in `App.tsx`; outside the brief, so not touched):
+  1. with `VITE_INCIDENT_REST_BASE_URL` set, Start always creates a new incident and ignores the preconfigured
+     `VITE_INCIDENT_WS_URL`/`VITE_INCIDENT_ID`/`VITE_INCIDENT_TOKEN`, contradicting `.env.example`;
+  2. a failed `createIncident` leaves Start doing nothing and shows no error;
+  3. the "Received: ..." speech plays even when the socket is not open (the `say` is dropped), and `crypto.randomUUID()` throws
+     on plain-http non-localhost pages.
+Still no test for: GL components (RenderPipeline, Trees, Fire, markers - the repo has no DOM/GL test environment; verified by
+screenshot and the Playwright scripts), the Vite plugin's `load` hook (its pure core, `stripPrivateFields`, is tested).
+
+## feat/web-scene - FINAL SUMMARY (written 14:3x ET; nothing further planned)
+
+State: all 8 brief items implemented, tested and verified (Playwright screenshots or measurements, recorded above). Every
+commit passed `pnpm typecheck && pnpm lint && pnpm test`. PRs went to `main` (not `lane/web`) after Andrew said so mid-run:
+#8 (lane/web, item 1, before that instruction), #12, #14, #16, #20, #23, #25 merged by Zhang-Andrew888; the closing review-fix PR
+is the last one. The branch was always synced by merging `origin/main` (no rebase, no force-push).
+
+| # | Item | Verified by |
+|---|---|---|
+| 1 | Route emphasis + forecast (uncertainty) layers | real `agentPlans`/`coordinatorForecast` fields (domain already had them); screenshots |
+| 2 | Scenario loader replaces hand-authored map | Zod loader + tests; one generated fallback snapshot (see below) |
+| 3 | Terrain: elevation, vegetation, roads, water (+ art direction: trees, fire light, bloom/vignette/AA, tiers, dev panel) | screenshots 1440x900/1024x720, tests |
+| 4 | Crew/site models, non-colour state cues | `?scenario=model-states` crops, tests |
+| 5 | Stale styling (fade, hatch, age) | `?scenario=model-states` crops, tests |
+| 6 | Camera follow, reset, reduced motion | Playwright measurements (normal + reduced) |
+| 7 | Frame-rate script | ran it; numbers below |
+| 8 | Replay reveals full fire; truth only there | `liveNeverCarriesTruth.test.ts`, mutation-checked; screenshots |
+
+PENDING ON CONTRACT / OTHER LANES (nothing in packages/domain was edited):
+- Route + forecast need no contract change any more (#1/#2 are in the domain). They carry no timestamps, so those layers cannot show their own staleness.
+- `scenarios/` still holds only the all-`PENDING` placeholder. The map therefore loads `apps/web/src/map/synthetic-v1.snapshot.json`,
+  generated once from the sim lane's synthetic scenario (topology + public height/fuel grids; `requiredWork` removed). Someone with
+  sim-lane access should freeze a real scenario file into `scenarios/` (it wins automatically if valid); then delete the snapshot.
+- There is no truth/replay channel in the contract. Replay uses a LOCAL strict schema (`replay/recording.ts`) matching the shape of the
+  sim lane's reveal output; reconcile it when the server's replay endpoint exists.
+- New direct dependency: `zod` 3.24.2 in apps/web (same version as @ember/domain; `@ember/domain` does not re-export `z`).
+
+FRAME RATE - cloud VM, headless Chromium, software rendering, not representative (SwiftShader; target 30 fps = 33.3 ms), final:
+  1440x900: low 12.5 fps (80 ms, p95 117) | medium 1.6 fps | high 1.1 fps     1024x720: low 20.3 fps (49 ms) | medium 2.8 | high 1.3
+  TARGET MISSED at every tier on this VM. ANDREW MUST RUN THE SAME SCRIPT ON HIS OWN NAMED MACHINE:
+  `pnpm --filter ember-web perf -- --machine "<model, GPU, OS>" --real-gpu --headed` - only that result may be quoted.
+  Decoration was already dropped first (see commit 11). The review-fix commit does not change rendering cost.
+
+THINGS I COULD NOT VERIFY (be sceptical of these):
+- A production bundle: no production vite build was run (the brief forbids it). The debug panel and `?perfContinuous` are guarded
+  by `import.meta.env.DEV` and tested at source level only; confirm the prod bundle has no "Scene debug" string.
+- The GPU-buffer leak fix (commit 13) is reasoned from three's buffer lifecycle, not measured.
+- The in-app frame timer reads implausibly low in software GL; use the perf script, not that readout.
+- Real-GPU appearance and speed of bloom, MSAA and shadows: unknown until Andrew's run.
+
+Pre-existing issues seen in `App.tsx` (lane/web code, not touched): start flow ignores preconfigured WS env vars when the REST base
+URL is set; failed `createIncident` is silent; "Received:" speech plays when the socket is closed and `crypto.randomUUID()` can throw
+on plain-http pages. Details in commit 13.
+
+Environment notes: corepack's cached pnpm 12.8.1 is broken in this VM; pnpm 10.28 was used through a wrapper outside the repo.
+Playwright is not a repo dependency (the perf script resolves it locally or from the global npm root).

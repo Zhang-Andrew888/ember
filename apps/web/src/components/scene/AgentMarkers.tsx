@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from "react";
 import type { ThreeEvent } from "@react-three/fiber";
 import { DoubleSide, MeshStandardMaterial, type BufferGeometry } from "three";
-import { applyStaleHatch, type StaleHatchUniform } from "./staleHatch.js";
+import { useStaleMaterial } from "./useStaleMaterial.js";
 import { freshness } from "./staleness.js";
 import type { AgentMarker } from "./sceneEntities.js";
 import { sceneTerrain } from "./terrain/sceneTerrain.js";
@@ -145,17 +145,12 @@ function AgentModel({
   const fresh = freshness(agent.ageMs);
   // Colour fades toward grey with age as well as opacity: an old position never looks current.
   const color = cue.muted || fresh.stale ? (cue.muted ? MUTED : MUTED_STALE) : agent.role === "scout" ? SCOUT_COLOR : CREW_COLORS[slot % CREW_COLORS.length]!;
-  const hatch = useMemo<StaleHatchUniform>(() => ({ uStaleHatch: { value: 0 } }), []);
-  hatch.uStaleHatch.value = fresh.stale ? 1 : 0;
-  const material = useMemo(() => {
-    const m = new MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.7, fog: false });
-    applyStaleHatch(m, hatch);
-    return m;
-  }, [hatch]);
-  material.color.set(color);
-  material.transparent = fresh.stale;
-  material.opacity = fresh.opacity;
-  useEffect(() => () => material.dispose(), [material]);
+  const material = useStaleMaterial(
+    () => new MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.7, fog: false }),
+    color,
+    fresh,
+    fresh.stale,
+  );
   const y = sceneTerrain.groundY(agent.position.x, agent.position.z) + MODEL_LIFT;
   const handleClick = (event: ThreeEvent<MouseEvent>) => {
     event.stopPropagation();

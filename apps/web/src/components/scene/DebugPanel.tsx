@@ -1,4 +1,4 @@
-import { currentTier, qualityStore, useQualityState, type QualityMode, type SceneParams } from "./quality/qualityStore.js";
+import { currentTier, qualityStore, useFrameMs, useQualityState, type QualityMode, type SceneParams } from "./quality/qualityStore.js";
 import { QUALITY_TIERS } from "./quality/tiers.js";
 
 /**
@@ -9,6 +9,7 @@ import { QUALITY_TIERS } from "./quality/tiers.js";
  */
 export default function DebugPanel() {
   const state = useQualityState();
+  const frameMs = useFrameMs();
   const { params } = state;
   const num = (key: keyof SceneParams, min: number, max: number, step: number) => (
     <label className="debug-panel__row">
@@ -51,7 +52,7 @@ export default function DebugPanel() {
           ))}
         </select>
         <output>
-          {currentTier(state)} · {state.frameMs.toFixed(1)} ms
+          {currentTier(state)} · {frameMs.toFixed(1)} ms
         </output>
       </label>
       {color("background")}

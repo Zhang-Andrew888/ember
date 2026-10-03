@@ -40,11 +40,25 @@ export function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
 }
 
+export interface PointerGesture {
+  readonly button: number;
+  readonly shiftKey: boolean;
+  readonly ctrlKey: boolean;
+  readonly metaKey: boolean;
+  readonly pointerType: string;
+  /** Touch pointers currently down, including this one. */
+  readonly touchCount: number;
+}
+
 /**
- * Only a PAN gesture pauses follow (right/middle button, or a modifier-drag);
- * orbiting and zooming keep following, so a user can inspect the crew they
- * are following without losing it.
+ * Only a PAN gesture pauses follow, and "pan" is exactly what three's
+ * OrbitControls treats as pan: right button, left button with a modifier, or
+ * two fingers (which also pinch-zoom). The middle button is DOLLY (zoom), and
+ * one finger is ROTATE, so neither pauses follow: a user can orbit and zoom
+ * to inspect the crew they are following without losing it.
  */
-export function isPanGesture(event: { button: number; shiftKey: boolean; ctrlKey: boolean; metaKey: boolean }): boolean {
-  return event.button === 1 || event.button === 2 || event.shiftKey || event.ctrlKey || event.metaKey;
+export function isPanGesture(gesture: PointerGesture): boolean {
+  if (gesture.pointerType === "touch") return gesture.touchCount >= 2;
+  if (gesture.button === 2) return true;
+  return gesture.button === 0 && (gesture.shiftKey || gesture.ctrlKey || gesture.metaKey);
 }

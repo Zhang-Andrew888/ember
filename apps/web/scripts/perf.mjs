@@ -157,13 +157,13 @@ async function main() {
   }
 
   const executablePath = findChromium();
+  // Force software GL unless told this machine has a real GPU (--real-gpu), so the default
+  // run is reproducible in a GPU-less container.
+  const softwareGlArgs = ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"];
   const browser = await chromium.launch({
     headless,
     ...(executablePath ? { executablePath } : {}),
-    args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"].filter(
-      // On a machine with a real GPU, do not force software GL.
-      () => !args["real-gpu"],
-    ),
+    args: args["real-gpu"] ? [] : softwareGlArgs,
   });
 
   const rows = [];
