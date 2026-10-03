@@ -1474,3 +1474,16 @@ scale (0.55 -> 0.9), shrank the water quantile (0.07 -> 0.035), more saturated s
 Now reads cool-dusk with ochre patches; still foggy and low-contrast at the far edge, no trees or fire light yet
 (3b/3c). Legend is still tall at 1024x720.
 Blocked: nothing. Next: merge main + lane/web, open PR to main, then trees (3b).
+
+### Commit 5: item 3b - instanced conifers, quality tiers, camera fit, compact legend
+Changed: `trees/` (deterministic placement from the vegetation layer, spatial-hash road/pond avoidance, two merged
+species geometries, vertex-shader sway), `Trees.tsx` (one InstancedMesh per species, per-instance tint, char from
+OBSERVED fire only), `quality/tiers.ts` (low/medium/high config + reduced-motion override, tested) wired through a
+context (tier fixed at "high" until 3d adds auto-pick), camera fit fix (OrbitControls' minZoom 0.6 was clamping the
+fit at 1024 wide), legend key collapsed by default under 1280px wide.
+Self-critique: first forest was lovely but too busy - canopies sat on top of the forecast hatching beside roads, so I
+widened the tree-free road corridor 14 -> 26 units (legibility over decoration). At 1024x720 the legend hid ~40% of
+the map and the camera was cropped (zoom clamp); fixed both. Still off: fire cells are tiny squares lost in the
+forest (3c: flame cards, ground glow); fog still flattens the far edge.
+PR: #12 (feat/web-scene -> main) open; #8 was merged into lane/web earlier.
+Blocked: nothing. Next: 3c fire shaders + ground glow/char.

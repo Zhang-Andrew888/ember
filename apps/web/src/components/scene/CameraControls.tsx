@@ -73,7 +73,10 @@ export const CameraControls = forwardRef<CameraControlsHandle, CameraControlsPro
     if (fitted.current || width === 0 || height === 0) return;
     fitted.current = true;
     if ("zoom" in camera) {
-      camera.zoom = fitZoom(width, height);
+      const zoom = fitZoom(width, height);
+      camera.zoom = zoom;
+      // Allow zooming out a little past the fit, but never so far the scene is lost.
+      controls.minZoom = zoom * 0.85;
       camera.updateProjectionMatrix();
     }
     controls.saveState();

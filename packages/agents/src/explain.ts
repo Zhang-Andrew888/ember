@@ -21,6 +21,13 @@ export function explain(callsign: string, decision: Pick<DecisionEvent, "type" |
   }
 }
 
+/** Announcement text for a refusal or withdrawal decided by the autonomy policy (same wording crews already use). */
+export function explainCode(callsign: string, kind: "refusal" | "withdrawal", reasonCode: string): string {
+  return kind === "refusal"
+    ? explain(callsign, { type: "objective_rejected", reasonCode, actualAction: "" }, `(${reasonCode})`)
+    : explain(callsign, { type: "withdrawal_triggered", reasonCode, actualAction: "" });
+}
+
 function reasonText(code: string): string {
   switch (code) {
     case "forecast_leg_unsafe":
@@ -45,6 +52,8 @@ function reasonText(code: string): string {
       return "No mission with a safe return was found in this model.";
     case "no_unresolved_target":
       return "No unresolved site remains.";
+    case "objective_not_supported":
+      return "That kind of order is not supported.";
     case "forecast_horizon_insufficient":
       return "Forecast support is too short for any mission.";
     default:
