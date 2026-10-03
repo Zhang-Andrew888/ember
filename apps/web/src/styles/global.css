@@ -447,6 +447,13 @@ input {
   color: var(--color-background);
 }
 
+.conversation-panel__capture-notice {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--color-rejected);
+}
+
 .conversation-panel__speech-ack {
   flex-basis: 100%;
   font-size: 0.75rem;

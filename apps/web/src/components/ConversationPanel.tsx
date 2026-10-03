@@ -4,6 +4,7 @@ import type { TranscriptLine } from "../conversation/transcript.js";
 import { isNearBottom } from "../conversation/stickToBottom.js";
 import { formatIncidentClock } from "../format/time.js";
 import { createBrowserVoiceCapture, type BrowserVoiceCapture } from "../net/browserVoiceCapture.js";
+import { GROK_CAPTURE_FAILURE_MESSAGE, settleGrokCapture } from "../net/settleGrokCapture.js";
 import { createVoiceCapture, type MicPermissionState, type VoiceCaptureAdapter } from "../net/voiceCapture.js";
 import type { SpeechPlaybackSnapshot } from "../state/speechPlaybackStub.js";
 
@@ -48,6 +49,7 @@ export function ConversationPanel({
 }: ConversationPanelProps) {
   const [draft, setDraft] = useState("");
   const [captureState, setCaptureState] = useState<"idle" | "recording">("idle");
+  const [captureNotice, setCaptureNotice] = useState<string | null>(null);
   const browserCaptureRef = useRef<BrowserVoiceCapture | null>(null);
   const captureStartRef = useRef<Promise<void> | null>(null);
   const adapterRef = useRef<VoiceCaptureAdapter>(
@@ -85,6 +87,7 @@ export function ConversationPanel({
 
   const startCapture = () => {
     if (composerDisabled) return;
+    setCaptureNotice(null);
     onPttBegin();
     if (grokStt !== undefined) {
       const capture = createBrowserVoiceCapture();
@@ -110,18 +113,36 @@ export function ConversationPanel({
       const capture = browserCaptureRef.current;
       const pendingStart = captureStartRef.current;
       void (async () => {
-        const blob = await capture.stop();
-        if (blob === null) {
+        let closed = false;
+        const cancel = () => {
+          if (closed) return;
+          closed = true;
           onPttCancel();
-          // Permission may still be pending; hold this capture until tracks are stopped.
+        };
+        try {
+          const result = await settleGrokCapture({
+            stop: () => capture.stop(),
+            transcribe: grokStt,
+            onRelease(text) {
+              if (closed) return;
+              closed = true;
+              setCaptureNotice(null);
+              onPttRelease(text);
+            },
+            onCancel: cancel,
+          });
+          if (result.status === "failed") setCaptureNotice(GROK_CAPTURE_FAILURE_MESSAGE);
+          if (result.status !== "released") {
+            // Permission may still be pending; hold this capture until tracks are stopped.
+            await pendingStart?.catch(() => undefined);
+          }
+          releaseBrowserCapture(capture, pendingStart);
+        } catch {
+          setCaptureNotice(GROK_CAPTURE_FAILURE_MESSAGE);
+          cancel();
           await pendingStart?.catch(() => undefined);
           releaseBrowserCapture(capture, pendingStart);
-          return;
         }
-        releaseBrowserCapture(capture, pendingStart);
-        const text = await grokStt(blob);
-        if (text) onPttRelease(text);
-        else onPttCancel();
       })();
       return;
     }
@@ -223,7 +244,7 @@ export function ConversationPanel({
         </button>
         <button
           type="button"
-          aria-describedby="push-to-talk-status"
+          aria-describedby={captureNotice === null ? "push-to-talk-status" : "push-to-talk-status push-to-talk-failure"}
           aria-pressed={captureState === "recording"}
           className="conversation-panel__push-to-talk"
           disabled={composerDisabled}
@@ -243,6 +264,11 @@ export function ConversationPanel({
               ? "Demo capture: hold for a canned voice line (no live speech recognition)."
               : `Capture: ${micState}. Hold to send; release commits.`}
         </span>
+        {captureNotice !== null ? (
+          <p id="push-to-talk-failure" role="status" className="conversation-panel__capture-notice">
+            {captureNotice}
+          </p>
+        ) : null}
         <div aria-live="polite" className="conversation-panel__speech-ack">
           {showOutgoingAck ? `🔊 ${speechSnapshot.text}` : ""}
           {speechSnapshot.queuedUrgent ? ", urgent audio queued" : ""}
