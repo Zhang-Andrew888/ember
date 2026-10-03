@@ -157,3 +157,78 @@ fixture import, etc.) - result recorded in the next log entry.
 
 **Next:** confirm the production build, then this is a complete,
 demoable Slice 1 + Slice 6 increment on `lane/web`.
+
+## 2026-10-03 07:2x-07:3x UTC (03:2x-03:3x ET) - increment 4: real browser verification + bug fixes
+
+**`vite build` (production) is pathologically slow in this sandbox** -
+even a trivial React-only `main.tsx` with no app code took >60s and was
+still short of finishing; the non-trivial app ran 3+ minutes with steadily
+climbing memory (2.8GB -> 4GB) before I killed it. `vite dev` starts in
+270ms by contrast, so this is specific to the production bundle/minify
+step (Rollup or esbuild's minifier) under this sandbox's CPU constraints,
+not a code defect - and it isn't something CI actually runs (`ci.yml`'s
+three jobs are `pnpm typecheck`, `pnpm build:libs && pnpm lint`, and
+`pnpm build:libs && pnpm test`; none of them call `vite build`). Decision:
+stop trying to force a production build here: it isn't a CI gate, and
+repeatedly retrying a multi-minute, multi-GB build in a resource-
+constrained sandbox isn't worth it for a step nothing downstream depends
+on. Noting this as a real open question for whoever next runs a true
+production build (local machine or a less constrained CI runner) rather
+than silently declaring it "fine."
+
+**Used `vite dev` + Playwright (both pre-installed in this environment)
+instead to actually render the app**, since typecheck/lint/test can't
+catch rendering-only bugs. This caught two real defects that would have
+otherwise gone to `lane/web` unverified:
+
+1. **Label overlap**: an agent co-located with a refuge/site (e.g. Crew 2
+   idle at Refuge West) projected to the same screen point as that node's
+   label, rendering as illegible overlapping text. Fixed with a new, unit-
+   tested `stackLabels.ts` (generic screen-space collision avoidance,
+   approximate text-width heuristic, pushes later labels straight up).
+   This is exactly the kind of thing the Slice 6 exit gate calls out
+   ("all product-critical states remain legible") - and it's the sort of
+   bug no amount of type-checking would find.
+2. **Markers sinking into terrain**: `Terrain.tsx`'s procedural elevation
+   (up to ±24) was never reconciled against the fixed Y heights used for
+   roads/sites/agents/fire-cells (2-6), so depending on map position,
+   markers and fire cells were partially or fully buried in terrain bumps
+   - fire cells were invisible in the screenshot entirely. Fixed by
+   scaling terrain amplitude down to a genuinely decorative ~±2.4 and
+   raising every marker's Y with an explicit clearance-margin comment.
+
+Both fixes are commit `f2f612a`, pushed to `lane/web`.
+Before/after screenshots aren't committed to the repo (this is a code
+session, not a design-asset one) but were visually confirmed during this
+session: overlapping "Crew 2"/"Refuge West" and "Crew 1"/"Ridge Cabins"
+text became two cleanly stacked labels each; fire cells that were
+invisible became visible orange (fresh) and desaturated-grey (stale) boxes
+along their roads.
+
+**Opened `Contract change: CoordinatorView has no sanitized route/mission-
+plan field`** (issue #1, labeled `contract`, not merged/acted on - that's
+Andrew's call per AGENTS.md). docs/FRONTEND.md and the Slice 6 exit gate
+both call for route/approach-return emphasis and "explains a route change
+without exposing unknown fire," but `CoordinatorView`/`CoordinatorAgentView`
+carry no route or mission-plan reference at all, and the fixture doesn't
+either - this is a genuine schema gap, not something fixable from
+`apps/web`. Left a concrete suggested shape in the issue but deferred the
+actual sanitization-rule judgment call (what a route reveals about hidden
+fire) to whoever owns that, since it's a simulation/knowledge-lane
+question, not a web-lane one. The scene renders fully against the current
+schema otherwise; this is the one Slice 6 exit-gate clause ("route
+emphasis") that cannot be met until the contract changes.
+
+**Status:** CI on `lane/web` has been green on every push this session
+(verified via the GitHub Actions API: runs for `766df9d`, `81c530a`,
+`e794b4e`, `2d774d6`, `f7e04b8`, `f2f612a` are all `conclusion: success`).
+`pnpm typecheck && pnpm lint && pnpm test` green locally throughout (64
+web-lane tests after the latest increment - `stackLabels.test.ts` added,
+no tests removed; the earlier "76" count included `packages/domain`'s own
+suite run via the root `pnpm test`, not a regression).
+
+**Blocked:** nothing.
+
+**Next:** keep working the Slice 6 exit gate as far as it can go against
+the current fixture/mock data; watch for the next check-in or user
+message.
