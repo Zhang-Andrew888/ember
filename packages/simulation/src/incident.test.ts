@@ -267,4 +267,14 @@ describe("coordinator view sequence", () => {
     inc.advanceTo(5_000);
     expect(inc.projectCoordinator().sequence).toBe(inc.projectCoordinator().sequence);
   });
+
+  it("keeps the event count steady on quiet steps while the view sequence rises", () => {
+    const inc = new Incident({ scenario: small(farFire()), seed: "seq3", overrides: noWindShift });
+    inc.advanceTo(2_000);
+    const events = inc.eventCount;
+    const sequence = inc.projectCoordinator().sequence;
+    inc.advanceTo(12_000);
+    expect(inc.eventCount).toBe(events);
+    expect(inc.projectCoordinator().sequence).toBeGreaterThan(sequence);
+  });
 });
