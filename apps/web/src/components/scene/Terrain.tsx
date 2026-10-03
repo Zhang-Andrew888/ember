@@ -1,62 +1,92 @@
-import { useMemo } from "react";
-import { BufferGeometry, Color, Float32BufferAttribute } from "three";
-import { colors } from "../../styles/colors.js";
-
-const SIZE = 1400;
-const SEGMENTS = 28;
+import { useEffect, useMemo } from "react";
+import { BufferGeometry, Float32BufferAttribute, Uint32BufferAttribute } from "three";
+import { sceneTerrain, waterCells, waterLevel } from "./terrain/sceneTerrain.js";
+import { fuelDensity, terrainColor } from "./terrain/terrainColor.js";
+import { SCENE_SIZE } from "../../map/worldScale.js";
 
 /**
- * Low-poly ground plane with gentle procedural elevation bands, vertex-
- * colored between sage and ochre (docs/FRONTEND.md). No textures/assets,
- * so the demo scene has no external asset dependency.
+ * Low-poly ground from the scenario's public height and fuel layers
+ * (corner grid, flat-shaded, vertex-coloured by vegetation density and
+ * quiet elevation bands) plus water in the basins. No textures or assets.
  */
 export function Terrain() {
   const geometry = useMemo(() => {
-    const geo = new BufferGeometry();
-    const verticesPerSide = SEGMENTS + 1;
-    const positions: number[] = [];
-    const colorValues: number[] = [];
-    const sage = new Color(colors.terrainSage);
-    const ochre = new Color(colors.terrainOchre);
-
-    for (let iz = 0; iz < verticesPerSide; iz++) {
-      for (let ix = 0; ix < verticesPerSide; ix++) {
-        const x = (ix / SEGMENTS - 0.5) * SIZE;
-        const z = (iz / SEGMENTS - 0.5) * SIZE;
-        // Kept subtle (max ~2.4) - markers/roads/fire cells sit at fixed
-        // heights above this and must always clear it (found via a
-        // Playwright smoke check: fire cells were sinking into taller bumps).
-        const elevation =
-          (Math.sin(x / 260) * 10 + Math.cos(z / 300) * 8 + Math.sin((x + z) / 180) * 6) * 0.1;
-        positions.push(x, elevation, z);
-
-        const t = Math.max(0, Math.min(1, (elevation + 2.4) / 4.8));
-        const mixed = sage.clone().lerp(ochre, t);
-        colorValues.push(mixed.r, mixed.g, mixed.b);
+    const field = sceneTerrain;
+    const n = field.gridSize;
+    const stride = n + 1;
+    const half = SCENE_SIZE / 2;
+    const positions = new Float32Array(stride * stride * 3);
+    const colors = new Float32Array(stride * stride * 3);
+    for (let cz = 0; cz <= n; cz++) {
+      for (let cx = 0; cx <= n; cx++) {
+        const i = cz * stride + cx;
+        const height = field.corners[i]!;
+        positions.set([cx * field.cellSize - half, height, cz * field.cellSize - half], i * 3);
+        // Vegetation density at the nearest cell (clamped at the border).
+        const fx = Math.min(n - 1, cx);
+        const fz = Math.min(n - 1, cz);
+        const density = fuelDensity(field.fuel[fz * n + fx]!);
+        colors.set(terrainColor(density, field.maxHeight > 0 ? height / field.maxHeight : 0), i * 3);
       }
     }
-
-    const indices: number[] = [];
-    for (let iz = 0; iz < SEGMENTS; iz++) {
-      for (let ix = 0; ix < SEGMENTS; ix++) {
-        const a = iz * verticesPerSide + ix;
+    const indices = new Uint32Array(n * n * 6);
+    let k = 0;
+    for (let cz = 0; cz < n; cz++) {
+      for (let cx = 0; cx < n; cx++) {
+        const a = cz * stride + cx;
         const b = a + 1;
-        const c = a + verticesPerSide;
+        const c = a + stride;
         const d = c + 1;
-        indices.push(a, c, b, b, c, d);
+        indices.set([a, c, b, b, c, d], k);
+        k += 6;
       }
     }
-
-    geo.setIndex(indices);
+    const geo = new BufferGeometry();
+    geo.setIndex(new Uint32BufferAttribute(indices, 1));
     geo.setAttribute("position", new Float32BufferAttribute(positions, 3));
-    geo.setAttribute("color", new Float32BufferAttribute(colorValues, 3));
+    geo.setAttribute("color", new Float32BufferAttribute(colors, 3));
     geo.computeVertexNormals();
     return geo;
   }, []);
+  useEffect(() => () => geometry.dispose(), [geometry]);
 
   return (
-    <mesh geometry={geometry} receiveShadow rotation={[0, 0, 0]}>
-      <meshStandardMaterial vertexColors flatShading roughness={1} metalness={0} />
+    <>
+      <mesh geometry={geometry} receiveShadow>
+        <meshStandardMaterial vertexColors flatShading roughness={1} metalness={0} />
+      </mesh>
+      <Water />
+    </>
+  );
+}
+
+/** One merged quad per wet grid cell, just below the cell's surrounding shore. */
+function Water() {
+  const geometry = useMemo(() => {
+    const size = sceneTerrain.cellSize;
+    const positions = new Float32Array(waterCells.length * 12);
+    const indices = new Uint32Array(waterCells.length * 6);
+    waterCells.forEach((cell, i) => {
+      const c = sceneTerrain.cellCenter(cell);
+      const h = size / 2;
+      positions.set(
+        [c.x - h, waterLevel, c.z - h, c.x + h, waterLevel, c.z - h, c.x - h, waterLevel, c.z + h, c.x + h, waterLevel, c.z + h],
+        i * 12,
+      );
+      const v = i * 4;
+      indices.set([v, v + 2, v + 1, v + 1, v + 2, v + 3], i * 6);
+    });
+    const geo = new BufferGeometry();
+    geo.setIndex(new Uint32BufferAttribute(indices, 1));
+    geo.setAttribute("position", new Float32BufferAttribute(positions, 3));
+    geo.computeVertexNormals();
+    return geo;
+  }, []);
+  useEffect(() => () => geometry.dispose(), [geometry]);
+  if (waterCells.length === 0) return null;
+  return (
+    <mesh geometry={geometry} renderOrder={1}>
+      <meshStandardMaterial color="#2f7088" roughness={0.25} metalness={0.1} transparent opacity={0.85} />
     </mesh>
   );
 }

@@ -1,10 +1,11 @@
 import { useEffect, useMemo } from "react";
 import { BufferGeometry, Float32BufferAttribute, Uint16BufferAttribute, type Texture } from "three";
-import { buildRibbonData } from "./ribbon.js";
+import { buildRibbonData, subdividePolyline } from "./ribbon.js";
+import { sceneTerrain } from "./terrain/sceneTerrain.js";
 import { createChevronTexture, createDashTexture, createSolidTexture } from "./patternTextures.js";
 import type { RouteLine, RoutePhase } from "./sceneLayers.js";
 
-const ROUTE_Y = 8;
+const ROUTE_LIFT = 4;
 const THIN = 4.5;
 const THICK = 8;
 const TILE: Record<RoutePhase, number> = { approach: 28, work: 40, return: 22 };
@@ -31,7 +32,12 @@ function useRouteTextures(): Record<RoutePhase, Texture> {
 
 function RouteRibbon({ line, texture }: { readonly line: RouteLine; readonly texture: Texture }) {
   const geometry = useMemo(() => {
-    const data = buildRibbonData(line.points, line.selected ? THICK : THIN, ROUTE_Y, TILE[line.phase]);
+    const data = buildRibbonData(
+      subdividePolyline(line.points, 18),
+      line.selected ? THICK : THIN,
+      (x, z) => sceneTerrain.groundY(x, z) + ROUTE_LIFT,
+      TILE[line.phase],
+    );
     const geo = new BufferGeometry();
     geo.setAttribute("position", new Float32BufferAttribute(data.positions, 3));
     geo.setAttribute("uv", new Float32BufferAttribute(data.uvs, 2));

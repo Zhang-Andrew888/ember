@@ -6,6 +6,7 @@ import { SceneCanvas } from "./SceneCanvas.js";
 import { SceneLabelLayer, type LabelDescriptor } from "./SceneLabelLayer.js";
 import { SceneLegend } from "./SceneLegend.js";
 import type { CameraControlsHandle } from "./CameraControls.js";
+import { sceneTerrain } from "./terrain/sceneTerrain.js";
 import { polylineMidpoint } from "./sceneLayers.js";
 import { listRefugeNodes, type FireCellMarker, type SceneEntities } from "./sceneEntities.js";
 import { scenarioMap } from "../../map/activeScenario.js";
@@ -65,7 +66,7 @@ export function SceneView({
     const refugeLabels = listRefugeNodes(scenarioMap).map((refuge) => ({
       id: `refuge:${refuge.id}`,
       x: refuge.x,
-      y: 14,
+      y: sceneTerrain.groundY(refuge.x, refuge.z) + 14,
       z: refuge.z,
       text: refuge.label ?? "Refuge",
       variant: "refuge" as const,
@@ -80,7 +81,7 @@ export function SceneView({
       return {
         id: `site:${site.id}`,
         x: site.position.x,
-        y: 18,
+        y: sceneTerrain.groundY(site.position.x, site.position.z) + 18,
         z: site.position.z,
         text: `${site.name} — ${siteProtectionStatusLabel(site.protectionStatus)}${damageLabel ? `, ${damageLabel}` : ""}${site.stale ? " (stale)" : ""}`,
         variant: "site" as const,
@@ -89,7 +90,7 @@ export function SceneView({
     const agentLabels = entities.agents.map((agent) => ({
       id: `agent:${agent.id}`,
       x: agent.position.x,
-      y: 22,
+      y: sceneTerrain.groundY(agent.position.x, agent.position.z) + 22,
       z: agent.position.z,
       text: agent.callsign,
       variant: "agent" as const,
@@ -99,7 +100,7 @@ export function SceneView({
       return {
         id: `route:${line.key}`,
         x: mid.x,
-        y: 10,
+        y: sceneTerrain.groundY(mid.x, mid.z) + 10,
         z: mid.z,
         text: line.limitingReason ? `${line.label} — ${line.limitingReason}` : line.label,
         variant: "route" as const,
@@ -110,7 +111,7 @@ export function SceneView({
       return {
         id: `forecast:${band.key}`,
         x: mid.x,
-        y: 9,
+        y: sceneTerrain.groundY(mid.x, mid.z) + 9,
         z: mid.z,
         text: entities.forecast?.trusted ? band.label : `${band.label} (unreliable)`,
         variant: "forecast" as const,

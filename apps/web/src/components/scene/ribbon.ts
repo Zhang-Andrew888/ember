@@ -1,5 +1,28 @@
 import type { SceneVector } from "../../map/positions.js";
 
+/** Constant height, or a function of scene (x, z) so a ribbon can follow terrain. */
+export type RibbonHeight = number | ((x: number, z: number) => number);
+
+/**
+ * Splits long segments so a draped ribbon follows terrain between the
+ * original vertices. Original points are always kept.
+ */
+export function subdividePolyline(points: readonly SceneVector[], maxStep: number): SceneVector[] {
+  const out: SceneVector[] = [];
+  points.forEach((point, index) => {
+    if (index === 0) {
+      out.push(point);
+      return;
+    }
+    const prev = points[index - 1]!;
+    const steps = Math.max(1, Math.ceil(Math.hypot(point.x - prev.x, point.z - prev.z) / maxStep));
+    for (let k = 1; k <= steps; k++) {
+      out.push({ x: prev.x + ((point.x - prev.x) * k) / steps, z: prev.z + ((point.z - prev.z) * k) / steps });
+    }
+  });
+  return out;
+}
+
 export interface RibbonGeometryData {
   readonly positions: Float32Array;
   /** u = distance along the line / tileLength (for repeating patterns), v = 0..1 across. */
@@ -15,7 +38,7 @@ export interface RibbonGeometryData {
 export function buildRibbonData(
   points: readonly SceneVector[],
   halfWidth: number,
-  y: number,
+  y: RibbonHeight,
   tileLength: number,
 ): RibbonGeometryData {
   if (points.length < 2) {
@@ -37,8 +60,9 @@ export function buildRibbonData(
     // Left-hand normal in the XZ plane.
     const nx = -dz;
     const nz = dx;
-    positions.set([point.x + nx * halfWidth, y, point.z + nz * halfWidth], i * 6);
-    positions.set([point.x - nx * halfWidth, y, point.z - nz * halfWidth], i * 6 + 3);
+    const height = typeof y === "number" ? y : y(point.x, point.z);
+    positions.set([point.x + nx * halfWidth, height, point.z + nz * halfWidth], i * 6);
+    positions.set([point.x - nx * halfWidth, height, point.z - nz * halfWidth], i * 6 + 3);
     uvs.set([distance / tileLength, 0, distance / tileLength, 1], i * 4);
   }
   const indices = new Uint16Array((points.length - 1) * 6);

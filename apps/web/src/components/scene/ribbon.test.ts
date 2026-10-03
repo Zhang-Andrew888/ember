@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildRibbonData } from "./ribbon.js";
+import { buildRibbonData, subdividePolyline } from "./ribbon.js";
 
 describe("buildRibbonData", () => {
   it("builds a quad for a straight segment, offset by half width on both sides", () => {
@@ -24,5 +24,24 @@ describe("buildRibbonData", () => {
   it("does not produce NaN for repeated points", () => {
     const data = buildRibbonData([{ x: 1, z: 1 }, { x: 1, z: 1 }], 5, 0, 10);
     expect(Array.from(data.positions).some(Number.isNaN)).toBe(false);
+  });
+});
+
+describe("ribbon height and subdivision", () => {
+  it("samples a height function per vertex", () => {
+    const data = buildRibbonData([{ x: 0, z: 0 }, { x: 100, z: 0 }], 1, (x) => x / 10, 10);
+    expect(data.positions[1]).toBe(0);
+    expect(data.positions[7]).toBe(10);
+  });
+
+  it("subdivides long segments and keeps endpoints", () => {
+    const out = subdividePolyline([{ x: 0, z: 0 }, { x: 100, z: 0 }], 30);
+    expect(out).toHaveLength(5);
+    expect(out[0]).toEqual({ x: 0, z: 0 });
+    expect(out[4]).toEqual({ x: 100, z: 0 });
+  });
+
+  it("does not add points to short segments", () => {
+    expect(subdividePolyline([{ x: 0, z: 0 }, { x: 5, z: 0 }], 30)).toHaveLength(2);
   });
 });

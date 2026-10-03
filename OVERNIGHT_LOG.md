@@ -1461,3 +1461,16 @@ Self-critique (1440x900 and 1024x720): whole scenario now visible, route/forecas
 Still off: terrain is the old flat sage/ochre plane (item 3), legend is tall at 1024x720, fire cells are tiny.
 PR #8 (open, CI green, no reviews as of 13:01 ET) carries all commits since the branch is the same.
 Blocked: nothing. Next: item 3 terrain composition.
+
+### Commit 4: item 3a - terrain heightfield, water, draped roads/routes, dusk lighting
+Changed: `terrain/heightField.ts` (public height+fuel grids -> scene ground), `sceneTerrain.ts` (water level + wet
+cells that keep 60 units clear of every road/node, tested), `terrainColor.ts` (sage/ochre by vegetation density,
+quiet elevation bands), `Terrain.tsx`, draped `Roads.tsx` (constrained segments get a dashed centre marking),
+routes/forecast/markers/labels follow ground height, hemisphere fill + warm key + fog.
+PR status: #8 was MERGED into lane/web at 17:02Z by Zhang-Andrew888 (first commit only). Andrew then said PRs
+must go to main, not lane/web. Next PR: feat/web-scene -> main (branch synced by merge from main and lane/web).
+Self-critique: first render was muddy brown with an oversized dark pond and almost no relief. Raised vertical
+scale (0.55 -> 0.9), shrank the water quantile (0.07 -> 0.035), more saturated sage, cooler fill, lighter water.
+Now reads cool-dusk with ochre patches; still foggy and low-contrast at the far edge, no trees or fire light yet
+(3b/3c). Legend is still tall at 1024x720.
+Blocked: nothing. Next: merge main + lane/web, open PR to main, then trees (3b).

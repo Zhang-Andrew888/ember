@@ -12,6 +12,15 @@ import { listRefugeNodes } from "./sceneEntities.js";
 import { scenarioMap } from "../../map/activeScenario.js";
 import type { FireCellMarker, SceneEntities } from "./sceneEntities.js";
 
+const ATMOSPHERE = {
+  background: "#111a22",
+  fog: "#18242e",
+  fogNear: 650,
+  fogFar: 1900,
+  skyFill: "#8aa6d0",
+  groundFill: "#2b2a22",
+  key: "#ffbf80",
+} as const;
 const INITIAL_ZOOM = 0.72;
 // ~50 degree tilt from the ground plane (docs/FRONTEND.md "fixed initial tilt around 50 degrees").
 const INITIAL_CAMERA_POSITION: [number, number, number] = [0, 520, 440];
@@ -50,8 +59,11 @@ export const SceneCanvas = forwardRef<CameraControlsHandle, SceneCanvasProps>(fu
       // for the invalidate() calls that keep this correct.
       frameloop="demand"
     >
-      <ambientLight intensity={0.65} />
-      <directionalLight position={[300, 500, 200]} intensity={0.9} />
+      {/* Dusk: cool sky fill, one low warm key from the west, haze toward the far edge. */}
+      <color attach="background" args={[ATMOSPHERE.background]} />
+      <fog attach="fog" args={[ATMOSPHERE.fog, ATMOSPHERE.fogNear, ATMOSPHERE.fogFar]} />
+      <hemisphereLight args={[ATMOSPHERE.skyFill, ATMOSPHERE.groundFill, 0.85]} />
+      <directionalLight position={[-420, 300, 260]} color={ATMOSPHERE.key} intensity={1.0} />
       <Terrain />
       <Roads />
       {showForecast && entities.forecast ? <ForecastLayer layer={entities.forecast} /> : null}
