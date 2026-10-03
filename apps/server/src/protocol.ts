@@ -8,6 +8,8 @@ export const ClientMessage = z.discriminatedUnion("type", [
   z.object({ type: z.literal("ptt_release"), transcript: z.string().max(2000) }),
   z.object({ type: z.literal("ptt_lost_focus"), transcript: z.string().max(2000) }),
   z.object({ type: z.literal("resend") }),
+  /** Looking at an agent on the map. It never changes who messages are addressed to. */
+  z.object({ type: z.literal("inspect"), agentId: z.string().min(1).max(40) }),
 ]);
 export type ClientMessage = z.infer<typeof ClientMessage>;
 
@@ -32,6 +34,7 @@ export const ServerMessage = z.discriminatedUnion("type", [
   z.object({ type: z.literal("audio"), event: z.enum(["alert", "audio_preparing", "interrupted", "started", "audio_unavailable", "dropped"]), itemId: z.string() }),
   z.object({ type: z.literal("notice"), kind: z.enum(["still_interpreting", "unsent_utterance", "technical_failure", "bad_message"]), detail: z.string() }),
   z.object({ type: z.literal("ended"), end: IncidentEnd }),
+  z.object({ type: z.literal("inspection"), agentId: z.string(), callsign: z.string(), state: z.string(), activeRecipientId: z.string().nullable() }),
 ]);
 export type ServerMessage = z.infer<typeof ServerMessage>;
 

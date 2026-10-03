@@ -98,6 +98,26 @@ describe("wire protocol and information boundary", () => {
     expect(receipts[0]?.receipt).toMatchObject({ status: "accepted", recipientId: "crew-2" });
   });
 
+  it("lets the user inspect an agent without changing the addressed recipient", () => {
+    const { hub, bridge, live } = setup();
+    const id = hub.connect();
+    live.start();
+    hub.handle(id, JSON.stringify({ type: "say", text: "Crew 2, hold position", idempotencyKey: "a" }), 100);
+    live.pump();
+    expect(bridge.gateway.activeRecipientId).toBe("crew-2");
+    hub.drain(id);
+    hub.handle(id, JSON.stringify({ type: "inspect", agentId: "crew-3" }), 200);
+    hub.handle(id, JSON.stringify({ type: "inspect", agentId: "nobody" }), 300);
+    const msgs = hub.drain(id).map((m) => JSON.parse(m) as { type: string; agentId?: string; kind?: string });
+    expect(msgs.find((m) => m.type === "inspection")?.agentId).toBe("crew-3");
+    expect(msgs.some((m) => m.type === "notice" && m.kind === "bad_message")).toBe(true);
+    expect(bridge.gateway.activeRecipientId).toBe("crew-2");
+    // A follow-up with no name still goes to the previously addressed crew.
+    hub.handle(id, JSON.stringify({ type: "say", text: "resume your own judgment", idempotencyKey: "b" }), 400);
+    const follow = hub.drain(id).map((m) => JSON.parse(m) as { type: string; receipt?: { recipientId: string } });
+    expect(follow.find((m) => m.type === "receipt")?.receipt?.recipientId).toBe("crew-2");
+  });
+
   it("retains a half-submitted utterance as unsent and only sends it on explicit resend", () => {
     const { hub, session } = setup();
     const id = hub.connect();

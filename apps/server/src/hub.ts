@@ -92,6 +92,17 @@ export class SessionHub {
         if (utterance !== null && utterance !== undefined && utterance.text.trim() !== "") submit(utterance.text, `ptt-${id}-${utterance.releasedMs}`);
         return;
       }
+      case "inspect": {
+        // Only what the coordinator already sees; the active recipient is reported, never changed.
+        const view = this.session.incident.projectCoordinator();
+        const agent = view.agents.find((a) => a.id === msg.agentId);
+        if (agent === undefined) {
+          this.send(id, { type: "notice", kind: "bad_message", detail: "Unknown agent." });
+          return;
+        }
+        this.send(id, { type: "inspection", agentId: agent.id, callsign: agent.callsign, state: agent.state, activeRecipientId: view.activeRecipientId });
+        return;
+      }
       case "resend": {
         const u = ptt?.resend();
         if (u === null || u === undefined) return;
