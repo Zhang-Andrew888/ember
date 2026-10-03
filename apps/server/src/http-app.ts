@@ -131,8 +131,19 @@ export async function startHttpApp(options: { port?: number; clock?: MonotonicCl
   };
 
   fastify.server.on("upgrade", (request: IncomingMessage, socket: unknown, head: Uint8Array) => {
-    const rawSocket = socket as { destroy(): void; write(data: string): void };
-    const route = parseIncidentPath(request.url);
+    const rawSocket = socket as { destroy(): void; write(data: string, cb?: () => void): void };
+    let route: ReturnType<typeof parseIncidentPath>;
+    try {
+      route = parseIncidentPath(request.url);
+    } catch (err) {
+      // decodeURIComponent throws URIError for a path such as /incidents/%/events.
+      // Reject the upgrade here, before auth, so the process stays up.
+      if (!(err instanceof URIError)) throw err;
+      rawSocket.write("HTTP/1.1 400 Bad Request\r\n\r\n", () => {
+        rawSocket.destroy();
+      });
+      return;
+    }
     if (route === null) {
       rawSocket.destroy();
       return;
