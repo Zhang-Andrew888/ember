@@ -175,7 +175,7 @@ describe("losses", () => {
   const road = (inc: Incident) => new RoadIndex(inc.scenario.map);
 
   it("loses a crew that moves into an actively burning cell", () => {
-    const s = scenarioWith({ agents: [{ id: "crew-1", start: "n-rw" }], fire: [at(300, 830)] });
+    const s = scenarioWith({ agents: [{ id: "crew-1", start: "n-rw" }], fire: [at(375, 775)] });
     const inc = new Incident({ scenario: s, seed: "l", overrides: normal });
     inc.submit(
       authoredCommit({
@@ -193,8 +193,8 @@ describe("losses", () => {
     );
     inc.advanceTo(100_000);
     expect(inc.projectAgent(AgentId.parse("crew-1")).state).toBe("lost");
-    // The adjacent cell ignites the road cell at x 300-325 m as the crew arrives (~57 s).
-    expect(inc.notices.find((n) => n.kind === "agent_lost")?.tick).toBe(57_000);
+    // The adjacent cell ignites the road cell at x 375-400 m just as the crew passes (~69 s).
+    expect(inc.notices.find((n) => n.kind === "agent_lost")?.tick).toBe(69_000);
     expect(inc.end?.matchingReasons).toContain("all_protection_crews_lost");
   });
 
@@ -204,7 +204,7 @@ describe("losses", () => {
         { id: "crew-1", start: "n-rw" },
         { id: "scout", start: "n-rs" },
       ],
-      fire: [at(300, 830)],
+      fire: [at(375, 775)],
     });
     const inc = new Incident({ scenario: s, seed: "l", overrides: normal });
     inc.submit(

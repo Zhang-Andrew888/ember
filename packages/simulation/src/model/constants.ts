@@ -24,6 +24,12 @@ export const SIM_DEFAULTS = {
   refugeRadiusM: 50,
   spreadRateClamp: [0.1, 2.0],
   windCoefficient: 0.6,
+  /** Effective midflame wind speed in game units (m/s); Rothermel wind terms saturate quickly. */
+  windSpeedMps: 0.215,
+  /** Dead fuel moisture as a fraction of dry weight; the reference at which baseSpreadRate applies. */
+  fuelMoisture: 0.08,
+  /** Calibration of the Rothermel rate to game scale; keeps overall burn area near the pre-Rothermel model. */
+  rothermelGain: 1.2,
   slopeCoefficient: 1.5,
   slopeClamp: 0.5,
   fuelRange: [0.6, 1.4],
