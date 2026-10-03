@@ -1,14 +1,18 @@
 // Offline search for a rehearsable demo seed.
-// Usage: tsx src/find-demo-seed-cli.ts [count] [untilSimMs] [prefix] [overridesJson]
+// Usage: tsx src/find-demo-seed-cli.ts [count] [untilSimMs] [prefix] [overridesJson] [scriptJson]
+// scriptJson is a list of [simMs, "coordinator text"] sent through the real conversation gateway, i.e. the
+// documented coordinator objectives (docs/NAVIGATION_AGENTS.md); the beats themselves still come from the simulation.
 // Runs the uncommanded live configuration (default scenario, controlled crews and scout) and reports,
 // per seed, the sim time of the first scout fire report, withdrawal and yield. Lock a seed that has all
 // three early with DEMO_SEED=<seed>.
 import { buildSyntheticScenario, type PrivateOverrides } from "@ember/simulation";
+import { ConversationBridge } from "./conversation.js";
 import { IncidentSession } from "./session.js";
 
 const count = process.argv[2] === undefined ? 40 : Number(process.argv[2]);
 const untilMs = process.argv[3] === undefined ? 450_000 : Number(process.argv[3]);
 const prefix = process.argv[4] ?? "demo";
+const script = (process.argv[6] === undefined ? [] : JSON.parse(process.argv[6])) as [number, string][];
 const overrides = (process.argv[5] === undefined ? {} : JSON.parse(process.argv[5])) as PrivateOverrides;
 
 interface Row {
@@ -23,7 +27,12 @@ const rows: Row[] = [];
 for (let i = 1; i <= count; i++) {
   const seed = `${prefix}-${String(i).padStart(3, "0")}`;
   const session = new IncidentSession({ scenario: buildSyntheticScenario(), seed, overrides });
-  session.runUntil(untilMs);
+  const bridge = new ConversationBridge(session);
+  const pending = [...script].sort((a, b) => a[0] - b[0]);
+  session.runUntil(untilMs, () => {
+    bridge.collect();
+    while (pending.length > 0 && pending[0]![0] <= session.incident.simTimeMs) bridge.say(pending.shift()![1], session.incident.simTimeMs);
+  });
   const scoutObs = session.incident.coordinator
     .observations()
     .filter((o) => o.sourceAgentId === "scout" && o.observedFields.some((f) => f.kind === "cell" && f.burnState !== "unburned"))
