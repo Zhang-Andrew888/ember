@@ -94,20 +94,20 @@ forcing an earlier-than-prior wind shift (280 s) and every fourth-plus-one a wid
 
 | 20 held-out seeds | Dispatch baseline | Forecast, no scout | Ember Line |
 |---|---|---|---|
-| Mean protection work delivered | 802.5 | 639.4 | 633.3 |
+| Mean protection work delivered | 802.5 | 634.8 | 633.3 |
 | Mean sites protected and standing (of 3) | 1.45 | 1.00 | 1.00 |
 | Mean sites destroyed | 1.2 | 1.3 | 1.3 |
-| Crews lost (total over 20 runs) | 10 | 0 | 0 |
-| Missions started / returns / interrupted by end / superseded / lost before return | 173 / 93 / 30 / 104 / 6 | 74 / 74 / 0 / 68 / 0 | 75 / 75 / 0 / 66 / 0 |
+| Crews lost (total over 20 runs) | 11 | 0 | 0 |
+| Missions started / returns / interrupted by end / superseded / lost before return | 186 / 99 / 26 / 108 / 7 | 74 / 74 / 0 / 71 / 0 | 75 / 75 / 0 / 72 / 0 |
 | Stranded seconds (total) | 758 | 0 | 0 |
 | Runs ended by | resolved 14, expired 5, all crews lost 1 | expired 10, resolved 10 | expired 10, resolved 10 |
 
 Reading these honestly:
 
-- The no-forecast baseline delivers more work and saves more sites, but it loses crews (10 over 20 runs, 6 before
+- The no-forecast baseline delivers more work and saves more sites, but it loses crews (11 over 20 runs, 7 before
   returning) and spends time stranded; forecast planning lost none. That is a safety/productivity trade, not a win for
   either side. Final health here is an endpoint measure and runs end at different times.
-- **The scout shows no measurable benefit on this scenario** (633 vs 639 work; same sites). Three reasons visible in
+- **The scout shows no measurable benefit on this scenario** (633 vs 635 work; same sites). Three reasons visible in
   traces: all three crews independently pick the same best site at t=0 (spec: no shared knowledge), finishing it at
   about 509 s and then finding no admissible mission once the fire nears; the scout's information-value ranking mostly
   picks points near the corridor, far from the fire front; and the scripted policy only relays, it never allocates.
@@ -115,11 +115,14 @@ Reading these honestly:
 - Prior width is not the limiting factor: widening, narrowing or matching the prior to the true sampling ranges gave
   600-648 work (`prior-sensitivity-exploratory.json`, 5 dev seeds, exploratory).
 - Performance (all variants, held-out): authoritative step mean 0.12-0.15 ms, p95 1 ms, max 18 ms (target p95 < 20 ms
-  met); controller work p95 22-31 ms per simulated second; replanning (ticks that produced a plan) p50 7-12 ms and
-  p95 222-224 ms for forecast variants (target p95 < 500 ms met). Contradiction rebuilds can take 1-4 s in this
+  met); controller work p95 22-32 ms per simulated second; replanning (ticks that produced a plan) p50 7-12 ms and
+  p95 218-228 ms for forecast variants (target p95 < 500 ms met). Contradiction rebuilds can take 1-4 s in this
   single-threaded harness; the design runs them asynchronously, so a real server must run forecasts off the step loop.
-- Representative failures (15 in the held-out report): dispatch lost crews on heldout-02, 06, 10, 14, 15 (three lost
-  on 15), and spent 180 s stranded on heldout-01; see `failures` in the JSON.
+- Representative failures (15 in the held-out report): dispatch lost crews on heldout-02, 06, 10, 14, 15, 18 and 19
+  and was stranded on 01, 08, 13 and 19; the forecast variants never lost a crew but needed a best-effort retreat on
+  heldout-07 (no scout) and 01, 15, 17 (Ember Line); see `failures` in the JSON.
+- These numbers were produced after the last behaviour change (commits applied before relays within a step); the
+  earlier run, before it, differed only slightly (dispatch 10 crews lost, 173 missions).
 
 ## Calibration and scenario notes
 

@@ -84,31 +84,31 @@
           "simSeconds": 1435,
           "wallElapsedMs": 0,
           "replanLatencyMs": [
-            120,
-            66,
-            44,
+            133,
+            74,
+            52,
+            3,
+            2,
             4,
-            2,
+            37,
+            41,
+            21,
             3,
-            24,
-            20,
-            26,
             3,
             2,
-            2,
+            10,
             9,
-            8,
-            10
+            11
           ]
         }
       ],
-      "replanLatencyP50Ms": 9,
-      "replanLatencyP95Ms": 120,
-      "simStepMeanMs": 0.20418118466898955,
+      "replanLatencyP50Ms": 10,
+      "replanLatencyP95Ms": 133,
+      "simStepMeanMs": 0.20836236933797908,
       "simStepP50Ms": 0,
       "simStepP95Ms": 1,
-      "simStepMaxMs": 14,
-      "controllerTickP95Ms": 8
+      "simStepMaxMs": 6,
+      "controllerTickP95Ms": 9
     },
     {
       "variant": "forecast_no_scout",
@@ -121,7 +121,7 @@
         "totalMissionsStarted": 4,
         "totalReturnsCompleted": 4,
         "totalInterrupted": 0,
-        "totalSuperseded": 3,
+        "totalSuperseded": 4,
         "totalLostBeforeReturn": 0,
         "meanSimSeconds": 1500,
         "endingCounts": {
@@ -168,14 +168,14 @@
           "missionsStarted": 4,
           "returnsCompleted": 4,
           "lostBeforeReturn": 0,
-          "supersededMissions": 3,
+          "supersededMissions": 4,
           "interruptedByIncidentEnd": 0,
           "returnPlanFailures": 0,
           "strandedSeconds": 0,
           "withdrawals": 1,
           "retreats": 0,
           "refusals": 0,
-          "relays": 262,
+          "relays": 248,
           "endingReasons": [
             "time_expired"
           ],
@@ -183,24 +183,24 @@
           "simSeconds": 1500,
           "wallElapsedMs": 0,
           "replanLatencyMs": [
-            284,
-            137,
-            136,
-            98,
+            290,
+            158,
+            158,
+            95,
             8,
-            12,
-            2,
+            19,
+            3,
             1
           ]
         }
       ],
-      "replanLatencyP50Ms": 12,
-      "replanLatencyP95Ms": 284,
-      "simStepMeanMs": 0.13333333333333333,
+      "replanLatencyP50Ms": 19,
+      "replanLatencyP95Ms": 290,
+      "simStepMeanMs": 0.13266666666666665,
       "simStepP50Ms": 0,
       "simStepP95Ms": 1,
-      "simStepMaxMs": 2,
-      "controllerTickP95Ms": 22
+      "simStepMaxMs": 3,
+      "controllerTickP95Ms": 20
     },
     {
       "variant": "ember_line",
@@ -275,20 +275,20 @@
           "simSeconds": 1500,
           "wallElapsedMs": 0,
           "replanLatencyMs": [
-            17,
-            18,
             16,
-            148,
+            16,
+            13,
+            113,
             5,
-            0,
             1,
+            0,
             1
           ]
         }
       ],
       "replanLatencyP50Ms": 5,
-      "replanLatencyP95Ms": 148,
-      "simStepMeanMs": 0.132,
+      "replanLatencyP95Ms": 113,
+      "simStepMeanMs": 0.12733333333333333,
       "simStepP50Ms": 0,
       "simStepP95Ms": 1,
       "simStepMaxMs": 3,
