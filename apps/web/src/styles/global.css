@@ -119,6 +119,21 @@ input {
   position: relative;
   flex: 68 1 0%;
   min-width: 0;
+  /*
+   * A flex item's default min-height is `auto`, which for a block box with
+   * intrinsic/replaced content (the Canvas) means it can't shrink below its
+   * content's natural size - fine in the default row layout (min-width: 0
+   * is the one that matters there), but under the narrow-viewport
+   * @media (max-width: 1023px) override below, .app-layout__main switches
+   * to flex-direction: column, making *height* the flex-shrink axis
+   * instead. Without this, the scene refused to shrink to fit above the
+   * conversation panel, pushing the composer below the viewport - measured
+   * live: at 800x700 the composer sat ~84px past the bottom of the
+   * viewport, unreachable without scrolling, directly against
+   * docs/FRONTEND.md ("stack scene above conversation and preserve the
+   * urgent strip and composer").
+   */
+  min-height: 0;
 }
 
 .scene-view canvas {
