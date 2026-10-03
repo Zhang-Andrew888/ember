@@ -16,3 +16,9 @@ Running log for the crew increments. Newest last. (Each branch adds its own sect
 - Behaviour-preserving: the controller now asks the policy, with the same reason codes and the same announcement wording as before. All pre-existing controller tests pass unchanged.
 - Safety check caught in review of my own cut: a crew on its normal return phase must still withdraw when its route closes, so only withdrawing/retreating crews are exempt.
 - return/hold/avoid/resume are always accepted: they only reduce exposure. Survival reasons are ordered: observation, certifier, forecast reliability.
+
+## Increment 7: property test and tick-budget guard (feat/crew-7-property-bench, stacked on #15)
+- `scenarios.testkit.ts` (test support, not exported): seeded PRNG (mulberry32), `variation(n)` derived only from n, and `runWithScout`. Moved out of the increment 4 test so both tests share it.
+- Property: over 16 variations (fire spot, spread rate, seed) the crew's knowledge hash and committed plans are identical with and without the scout's coordinator-only observations. Not vacuous: asserts the scout produced coordinator-only observations each time, the crew never holds scout-sourced observations, no physical `entry_blocked` (a separate channel), and that crews commit plans in at least half the variations. Positive control: an explicit relay changes the hash.
+- Tick budget: `tick-budget.test.ts` runs the 4-agent team for 600 simulated seconds and asserts p95 < 200 ms and median < 50 ms, plus a 3 s cap on the cold start.
+- FINDING: measured locally, median ~0.06 ms, p99 ~80 ms, but the first tick of the synchronous four-controller harness is ~760 ms (cold forecast builds). That exceeds the 200 ms budget if forecasts ran inline; docs say forecast work is asynchronous, which is why the guard bounds it separately instead of at 200 ms. Worth confirming the server really runs it off the tick.
