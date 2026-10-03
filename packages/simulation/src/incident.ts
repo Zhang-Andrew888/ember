@@ -159,7 +159,9 @@ export class Incident {
   }
 
   private drainInputs(appliedAtMs: number): void {
-    const pending = this.queue.splice(0, this.queue.length);
+    // Plans were built on the knowledge the agent had before this step, so they are applied before
+    // anything that changes that knowledge (a relay) lands in the same step. Stable otherwise.
+    const pending = this.queue.splice(0, this.queue.length).sort((a, b) => (a.kind === "commit_plan" ? 0 : 1) - (b.kind === "commit_plan" ? 0 : 1));
     for (const input of pending) {
       this.applied.push({ appliedAtMs, ordinal: this.ordinal, input });
       this.ordinal += 1;

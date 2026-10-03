@@ -211,6 +211,20 @@ describe("knowledge scoping and relay", () => {
     expect(inc.projectAgent(AgentId.parse("scout")).knowledge.observations.every((o) => o.sourceAgentId !== "crew-1")).toBe(true);
   });
 
+  it("applies a plan built on earlier knowledge before a relay that lands in the same step", () => {
+    const inc = new Incident({ scenario: scoutScenario(), seed: "k", overrides: { spreadMultiplier: 1, windShiftMs: 1e9, initialWindRad: 0 } });
+    inc.advanceTo(90_000);
+    const obs = inc.coordinator.observations().filter((o) => o.sourceAgentId === "scout").at(-1)!;
+    const plan = mission(inc);
+    // The relay is queued first, but the plan was stamped with the revision the crew had.
+    inc.submit({ kind: "relay", observationId: obs.id, toAgentId: crew1 });
+    inc.submit(plan);
+    inc.advanceTo(91_000);
+    expect(inc.notices.some((n) => n.kind === "plan_rejected")).toBe(false);
+    expect(inc.projectAgent(crew1).commitment).not.toBeNull();
+    expect(inc.agentStores.get(crew1)?.provenanceOf(obs.id)).toBe("relay");
+  });
+
   it("does not create a fabricated observation for an unknown relay id", () => {
     const inc = new Incident({ scenario: scoutScenario(), seed: "k", overrides: { spreadMultiplier: 1, windShiftMs: 1e9, initialWindRad: 0 } });
     const before = inc.projectAgent(crew1).knowledge.observations.length;
