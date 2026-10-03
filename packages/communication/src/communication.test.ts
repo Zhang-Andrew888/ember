@@ -4,6 +4,7 @@ import {
   AudioScheduler,
   CommandGateway,
   FailingInterpreter,
+  IntentEnvelope,
   PushToTalk,
   RecordingSink,
   ScriptedInterpreter,
@@ -13,7 +14,7 @@ import {
   statusReply,
   type Directory,
   type GatewayEnv,
-  type IntentEnvelope,
+
   type Report,
   type SchedulerEvent,
   type SpeechItem,
@@ -186,6 +187,42 @@ describe("evidence and claims", () => {
     expect(out.receipt.status).toBe("rejected");
     expect(out.reply).toMatch(/does not do protection work/);
     expect(out.actions.some((a) => a.kind === "objective")).toBe(false);
+  });
+});
+
+describe("objective kinds", () => {
+  it("maps protect, observe, return, hold and resume onto contract objectives and actions", () => {
+    const { say } = makeGateway();
+    const obj = (text: string) => say(text).outcomes[0]!.actions.find((a) => a.kind === "objective");
+    expect(obj("Crew 1, protect Waterworks")).toMatchObject({ objective: { kind: "protect_site", targetId: "site-b", recipientId: "crew-1" } });
+    expect(obj("Scout, check the north road")).toMatchObject({ objective: { kind: "scout_location", targetId: "n-n", recipientId: "scout" } });
+    expect(obj("Crew 1, return to refuge")).toMatchObject({ objective: { kind: "return_to_refuge", targetId: null } });
+    expect(obj("Crew 1, hold position")).toMatchObject({ objective: { kind: "hold" } });
+    const resume = say("Crew 1, resume your own judgment").outcomes[0]!;
+    expect(resume.actions).toContainEqual({ kind: "resume_autonomous", agentId: "crew-1" });
+  });
+
+  it("rejects what the contract or the recipient's role cannot take, with a reason", () => {
+    const { say } = makeGateway();
+    const avoid = say("Crew 1, avoid the east corridor").outcomes[0]!;
+    expect(avoid.receipt.status).toBe("rejected");
+    expect(avoid.reply).toMatch(/not supported by the shared contract/);
+    const crewObserve = say("Crew 1, check the north road").outcomes[0]!;
+    expect(crewObserve.receipt.status).toBe("rejected");
+    expect(crewObserve.reply).toMatch(/not a scout/);
+  });
+
+  it("asks which site or point when the target is missing, unknown or ambiguous", () => {
+    const { say } = makeGateway();
+    expect(say("Crew 1, protect").outcomes[0]?.receipt.status).toBe("clarification_required");
+    const unknown = say("Crew 1, protect the harbour").outcomes[0]!;
+    expect(unknown.receipt.status).toBe("clarification_required");
+    expect(unknown.reply).toMatch(/don't know a site/);
+  });
+
+  it("validates interpreter output against the envelope schema", () => {
+    expect(() => IntentEnvelope.parse({ commandId: "x", inputSequence: 0, kind: "teleport", evidenceQueries: [], unsupportedClaims: [] })).toThrow();
+    expect(IntentEnvelope.parse({ commandId: "x", inputSequence: 0, kind: "status", evidenceQueries: [], unsupportedClaims: [] }).kind).toBe("status");
   });
 });
 
