@@ -1,4 +1,0 @@
-*.env
-*-state/
-__pycache__/
-*.log
