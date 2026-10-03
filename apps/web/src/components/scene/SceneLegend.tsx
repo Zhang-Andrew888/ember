@@ -1,10 +1,14 @@
 import { forwardRef } from "react";
 import { colors } from "../../styles/colors.js";
+import { formatIncidentClock } from "../../format/time.js";
+import type { FireCellMarker } from "./sceneEntities.js";
 
 export interface SceneLegendProps {
   readonly showFireCells: boolean;
   readonly onToggleFireCells: () => void;
   readonly onResetCamera: () => void;
+  readonly fireCells: FireCellMarker[];
+  readonly onInspectCell: (cell: FireCellMarker) => void;
 }
 
 /**
@@ -15,7 +19,7 @@ export interface SceneLegendProps {
  * scene labels from rendering underneath it.
  */
 export const SceneLegend = forwardRef<HTMLDivElement, SceneLegendProps>(function SceneLegend(
-  { showFireCells, onToggleFireCells, onResetCamera },
+  { showFireCells, onToggleFireCells, onResetCamera, fireCells, onInspectCell },
   ref,
 ) {
   return (
@@ -43,6 +47,27 @@ export const SceneLegend = forwardRef<HTMLDivElement, SceneLegendProps>(function
           Reset camera
         </button>
       </div>
+      {/*
+        Clicking a fire cell in the 3D scene inspects it (FireCells.tsx),
+        but a <canvas> has no accessible children at all - there is no
+        keyboard or screen-reader path to that otherwise. This <details>
+        is the DOM equivalent: same inspection, reachable by keyboard.
+      */}
+      {fireCells.length > 0 ? (
+        <details className="scene-legend__cells">
+          <summary>Observed cells ({fireCells.length})</summary>
+          <ul>
+            {fireCells.map((cell) => (
+              <li key={cell.key}>
+                <button type="button" onClick={() => onInspectCell(cell)}>
+                  {cell.edgeId} (cell {cell.cellIndex}) — {cell.burnState}
+                  {cell.stale ? ", stale" : ""}, last observed {formatIncidentClock(cell.lastObservedAt)}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
     </div>
   );
 });

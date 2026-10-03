@@ -111,6 +111,8 @@ export function SceneView({
         showFireCells={showFireCells}
         onToggleFireCells={() => setShowFireCells((value) => !value)}
         onResetCamera={() => controlsRef.current?.reset()}
+        fireCells={entities.fireCells}
+        onInspectCell={setInspectedCell}
       />
       {inspectedCell ? (
         <CellInspectionPanel
