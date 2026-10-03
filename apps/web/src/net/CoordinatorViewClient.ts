@@ -1,5 +1,6 @@
-import { CoordinatorView } from "@ember/domain";
+import type { CoordinatorView } from "@ember/domain";
 import { applyIncomingView } from "../state/viewReducer.js";
+import { parseCoordinatorViewFrame } from "./wireProtocol.js";
 
 /**
  * Minimal subset of the browser WebSocket API this client needs. Injectable
@@ -37,22 +38,7 @@ export interface CoordinatorViewClient {
  * rather than reject the connection over.
  */
 export function parseIncomingMessage(raw: string): CoordinatorView | null {
-  let data: unknown;
-  try {
-    data = JSON.parse(raw);
-  } catch {
-    return null;
-  }
-
-  const direct = CoordinatorView.safeParse(data);
-  if (direct.success) return direct.data;
-
-  if (data && typeof data === "object" && "view" in data) {
-    const wrapped = CoordinatorView.safeParse((data as { view: unknown }).view);
-    if (wrapped.success) return wrapped.data;
-  }
-
-  return null;
+  return parseCoordinatorViewFrame(raw);
 }
 
 const RECONNECT_DELAY_MS = 1000;

@@ -28,7 +28,7 @@ const WS_URL = import.meta.env.VITE_INCIDENT_WS_URL;
 const REST_BASE_URL = import.meta.env.VITE_INCIDENT_REST_BASE_URL;
 const IS_MOCK_MODE = !WS_URL;
 
-const EMPTY_ENTITIES = { agents: [], sites: [], fireCells: [] };
+const EMPTY_ENTITIES = { agents: [], sites: [], fireCells: [], routes: [], forecast: null };
 
 type Phase = "briefing" | "live" | "replay";
 

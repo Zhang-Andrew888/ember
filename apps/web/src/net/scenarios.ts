@@ -11,14 +11,16 @@ import { fixtureCoordinatorView } from "../../../../tests/fixtures/coordinator-v
 
 /** Before any agent has reported in: public briefing data only, nothing observed yet. */
 export const emptyScenario: CoordinatorView = {
+  ...fixtureCoordinatorView,
   sequence: 1 as CoordinatorView["sequence"],
   simTimeMs: 0 as CoordinatorView["simTimeMs"],
   wallElapsedMs: 0 as CoordinatorView["wallElapsedMs"],
   incidentStatus: "active",
   activeRecipientId: null,
   agents: [],
-  sites: fixtureCoordinatorView.sites,
   observedCells: [],
+  agentPlans: [],
+  coordinatorForecast: null,
   recentReports: [],
   incidentEnd: null,
 };

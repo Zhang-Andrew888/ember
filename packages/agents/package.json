@@ -18,6 +18,7 @@
     "@ember/domain": "workspace:*",
     "@ember/knowledge": "workspace:*",
     "@ember/forecast": "workspace:*",
-    "@ember/navigation": "workspace:*"
+    "@ember/navigation": "workspace:*",
+    "@ember/simulation": "workspace:*"
   }
 }

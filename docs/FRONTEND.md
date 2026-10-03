@@ -4,7 +4,9 @@
 
 Build an incident command desk around a tilted 3D terrain model. It should feel tactile, calm, and readable while the simulation becomes tense. The primary action is communicating; the scene explains the consequences.
 
-Use React + TypeScript + Vite with Three.js through React Three Fiber and a small selection of Drei camera/label helpers. React Three Fiber is a React renderer for Three.js; its current documentation pairs Fiber 9 with React 19. Use that stable major pairing, pin exact compatible versions when implementing, and avoid the alpha rendering path for the MVP. [Official introduction](https://r3f.docs.pmnd.rs/getting-started/introduction).
+Use React + TypeScript + Vite with Three.js through React Three Fiber. **Shipped versions:** React 19, `@react-three/fiber` 9, Three.js 0.175 (see `apps/web/package.json`). The implementation uses **`three/examples` `OrbitControls`** and a hand-rolled DOM label layer (`projectToScreen`) rather than `@react-three/drei`, to avoid an extra dependency until a helper clearly pays for itself. [Official introduction](https://r3f.docs.pmnd.rs/getting-started/introduction).
+
+**Runtime modes:** default development uses a **mock WebSocket** (`mockIncidentSocket`) and optional REST start URL; connecting to `startServer()` uses the same `CoordinatorViewClient` schema validation. **Replay/debrief** uses recorded mock event logs with a seekable timeline and “full simulated fire” toggle when replay metadata allows. Dev-only **`?scenario=`** query presets exercise product-critical UI states without live fire simulation in the browser.
 
 ## Layout
 
@@ -74,6 +76,8 @@ Urgent changes go to an accessible alert region once per event. Routine updates 
 
 ## Rendering and QA targets
 
-Aim for 60 FPS on the development laptop and at least 30 FPS at 1440 × 900 on the documented test machine. These are targets, not measured results. Cap pixel ratio at 1.5; lower decorative detail before reducing legibility. Interpolate between authoritative snapshots; never extrapolate agents through unseen hazards.
+Aim for 60 FPS on the development laptop and at least 30 FPS at 1440 × 900 on the documented test machine. Cap pixel ratio at 1.5; lower decorative detail before reducing legibility. Interpolate between authoritative snapshots; never extrapolate agents through unseen hazards.
 
-Use snapshot subscriptions and mutable mesh buffers for animation; keep simulation state out of per-frame React reconciliation. Reuse materials and geometries and dispose resources on scene teardown. Validate label overlap, audio indicators, color contrast, keyboard use, and context recovery in [validation](VALIDATION.md).
+Use snapshot subscriptions and mutable mesh buffers for animation; keep simulation state out of per-frame React reconciliation. The scene uses **`frameloop="demand"`** so idle CPU drops when the coordinator view is unchanged (~55% idle frame cost reduction measured in the web lane sandbox— not a guarantee on GPU hardware). Reuse materials and geometries and dispose resources on scene teardown (replay unmount exposed a `CameraControls` dispose path).
+
+**Not yet in UI:** route emphasis and coordinator forecast envelope layers—blocked until `CoordinatorView` gains mission-plan and forecast fields (contract issues #1, #2). Validate label overlap, audio indicators, color contrast, keyboard use, and context recovery in [validation](VALIDATION.md).

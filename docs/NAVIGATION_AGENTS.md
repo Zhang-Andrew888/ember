@@ -138,3 +138,13 @@ Emit structured decisions with reason codes, supporting observation IDs, old/new
 Examples: “Crew 2 is withdrawing. Our last eastern-road observation shortened the return window.” “Crew 1 cannot reach the lodge and return with the required margin.” “Scout is taking the west loop to check the unresolved fire edge.”
 
 Do not turn the actor into a passive approval prompt. Explain what it has done, what it knows, and the resulting estimate.
+
+## Implementation notes (2026-10-03)
+
+The planner in `packages/navigation` and forecast service in `packages/forecast` match the defaults in the tables above, with these engineering additions from the sim lane:
+
+- **Incremental forecast fitting** and cached full-horizon rollouts; out-of-order evidence triggers a full rebuild (tested).
+- **Short probe rollout** screens mission candidates before paying for a full horizon search.
+- **Backward return table** certified against forward search (property test).
+- **Conservative rollouts** treat ignition at the start of a 5 s step, which makes late-incident missions harder—reported as `idle` with reason, not hidden.
+- **Scout relevance** uses the documented ranking; relayed crew missions/deadlines for scout ranking remain a documented gap (see [OVERNIGHT_LOG.md](../OVERNIGHT_LOG.md)).

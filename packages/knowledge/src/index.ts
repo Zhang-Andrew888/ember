@@ -1,4 +1,13 @@
 // packages/knowledge - owns: observation history, scoped projections per agent
 // Must not: use implicit global synchronization
-// Status: stub - Slice 2 implementation pending
 export type { AgentKnowledgeSnapshot } from "./types.js";
+export { canonicalJson, hashText, hashValue } from "./digest.js";
+export {
+  STALE_AFTER_MS,
+  KnowledgeStore,
+  toSimTime,
+  type BurnState,
+  type CellBelief,
+  type Provenance,
+  type SiteBelief,
+} from "./store.js";

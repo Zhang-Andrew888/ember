@@ -15,7 +15,11 @@
     "@ember/communication": "workspace:*",
     "@ember/replay": "workspace:*",
     "fastify": "5.3.2",
-    "ws": "8.18.2"
+    "ws": "8.18.2",
+    "@ember/knowledge": "workspace:*",
+    "@ember/forecast": "workspace:*",
+    "@ember/navigation": "workspace:*",
+    "zod": "3.24.2"
   },
   "devDependencies": {
     "tsx": "4.19.3"

@@ -18,7 +18,18 @@ The API reference documents input commit, response cancellation, conversation it
 
 For outgoing speech, submit the exact committed report text to xAI TTS, which supports REST and streaming synthesis. Default to REST synthesis of short utterances with client playback buffering; use streaming if measured latency warrants it. [Text-to-speech guide](https://docs.x.ai/developers/model-capabilities/audio/text-to-speech?campaign=stt-tts-blog).
 
-Provider facts above were checked on 2026-10-03. No paid API request, microphone test, or latency benchmark has been run for this design. The implementation plan includes an early capability spike.
+Provider facts above were checked on 2026-10-03. No paid API request, microphone test, or latency benchmark has been run against xAI in this repo.
+
+## As implemented (no provider)
+
+For development, CI, and offline evaluation, `packages/communication` provides:
+
+- **`ScriptedInterpreter`** — deterministic keyword/parser stand-in for Grok Realtime (not a language model).
+- **`CommandGateway`** — persistent addressed recipient, clarification, evidence from received reports only, idempotent command IDs, 5 s / 10 s interpretation timeouts, incident-end rejection.
+- **`AudioScheduler`** — urgent-over-routine, recording suspends playback, relevance checks, coalescing, end-of-incident flush; reports `audio_unavailable` on playback failure.
+- **`PushToTalk`** — begin/release/lost-focus lifecycle with wall-clock timing on the server hub.
+
+The web lane wires a **mock voice capture adapter** and **exact-text speech playback stub** for UI testing. Production Grok Realtime + TTS remains the Slice 0/5 integration path described below.
 
 ## Session organization
 
