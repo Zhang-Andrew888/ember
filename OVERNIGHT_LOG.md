@@ -337,3 +337,9 @@ actual configuration, asked the user to clarify rather than guessing:
 either pivot to sim-lane paths this session was never scoped for, keep
 running the original apps/web backlog, or stop. Holding at the last
 green, fully-verified `lane/web` state (`213ee86`) until that's resolved.
+
+**Resolved:** the "you are sim-lane" message was itself the mistaken
+copy-paste; the original apps/web backlog (product-critical UI states,
+accessibility, render performance, conversation UI, replay/debrief, test
+coverage, all fixture/mock-driven, verified not just typechecked) is what
+this session should run, until 10:00 ET. Resuming it now.
