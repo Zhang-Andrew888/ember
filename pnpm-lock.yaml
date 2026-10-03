@@ -142,6 +142,9 @@ importers:
       '@ember/knowledge':
         specifier: workspace:*
         version: link:../knowledge
+      '@ember/simulation':
+        specifier: workspace:*
+        version: link:../simulation
 
   packages/replay:
     dependencies:

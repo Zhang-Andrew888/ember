@@ -1,0 +1,182 @@
+import { MissionPlan, MissionPlanId, NodeId, SequenceNumber, SimTimeMs, type EdgeId, type TimedLeg } from "@ember/domain";
+import { admitsProtection } from "@ember/forecast";
+import { hashValue } from "@ember/knowledge";
+import { HazardModel } from "./hazard.js";
+import { timeExpandedSearch, startsFromPosition, type Reach, type SearchStart } from "./search.js";
+import {
+  ALWAYS_FREE,
+  DEFAULT_NAV_CONFIG,
+  type MissionSearchResult,
+  type MissionTarget,
+  type PlanningContext,
+  type RankedMission,
+  type SiteKnowledge,
+} from "./types.js";
+
+/** Work interval candidates: 15 s minimum, 30 s increments, plus the exact remaining work. */
+export function workOptions(remainingWorkUnits: number, workRate: number, minMs = 15_000, stepMs = 30_000, bucketMs = 5000): number[] {
+  const remainingMs = Math.ceil(((remainingWorkUnits / workRate) * 1000) / bucketMs) * bucketMs;
+  if (remainingMs <= 0) return [];
+  const out = [Math.min(minMs, remainingMs)];
+  for (let w = stepMs; w < remainingMs; w += stepMs) if (w > minMs) out.push(w);
+  out.push(remainingMs);
+  return [...new Set(out)].sort((a, b) => a - b);
+}
+
+/** Protection targets from this decision-maker's own knowledge of each site. */
+export function protectionTargets(
+  sites: readonly SiteKnowledge[],
+  workRate = DEFAULT_NAV_CONFIG.crewWorkRate,
+  allowed: ReadonlySet<string> | null = null,
+): MissionTarget[] {
+  const out: MissionTarget[] = [];
+  for (const s of sites) {
+    if (s.knownResolved || (allowed !== null && !allowed.has(s.siteId))) continue;
+    const remaining = Math.max(0, s.requiredWork - s.knownCompletedWork);
+    const options = workOptions(remaining, workRate);
+    if (options.length === 0) continue;
+    out.push({
+      id: s.siteId,
+      kind: "protect",
+      nodeId: s.nodeId,
+      siteId: s.siteId,
+      value: s.value,
+      workOptionsMs: options,
+      benefit: (workMs) => (s.value * Math.min(remaining, (workMs / 1000) * workRate)) / s.requiredWork,
+    });
+  }
+  return out;
+}
+
+interface Built {
+  readonly mission: RankedMission;
+}
+
+function routeIdOf(legs: readonly TimedLeg[]): string {
+  return legs.map((l) => `${l.edgeId}${l.direction === "forward" ? "+" : "-"}`).join(">");
+}
+
+function edgeKeys(legs: readonly TimedLeg[]): EdgeId[] {
+  return [...new Set(legs.map((l) => l.edgeId))];
+}
+
+/** Plan against an explicit hazard model (also used for single-member and horizon-only checks). */
+export function planWithHazard(ctx: PlanningContext, hm: HazardModel, targets: readonly MissionTarget[]): RankedMission[] {
+  const config = ctx.config ?? DEFAULT_NAV_CONFIG;
+  const oracle = ctx.oracle ?? ALWAYS_FREE;
+  const road = ctx.road;
+  const starts = startsFromPosition(hm, ctx.position, ctx.nowMs, config);
+  if (starts.length === 0) return [];
+  const refuges = new Set(road.map.refuges.map((r) => r.nodeId));
+  const out: Built[] = [];
+  const revision = SequenceNumber.parse(ctx.ensemble.knowledgeRevision);
+
+  const search = (from: readonly SearchStart[], ban: ReadonlySet<EdgeId> | undefined): Reach =>
+    timeExpandedSearch({ hm, nowMs: ctx.nowMs, starts: from, oracle, ban, config });
+
+  const avoid = new Set<EdgeId>(ctx.avoidEdges ?? []);
+  for (const target of targets) {
+    const bases = new Map<string, { legs: TimedLeg[]; k: number }>();
+    const attempt = (ban: Set<EdgeId>): void => {
+      const reach = search(starts, ban);
+      const hit = reach.earliest(new Set([target.nodeId]));
+      if (hit === null) return;
+      const legs = reach.legsTo(hit.nodeId, hit.k);
+      const id = routeIdOf(legs);
+      if (!bases.has(id)) bases.set(id, { legs, k: hit.k });
+    };
+    attempt(avoid);
+    const first = [...bases.values()][0];
+    if (first !== undefined) {
+      for (const e of edgeKeys(first.legs)) attempt(new Set([...avoid, e]));
+    }
+    for (const approach of bases.values()) {
+      const nodeSafeLimit = hm.nodeSafeUntilMs(target.nodeId);
+      for (const w of target.workOptionsMs) {
+        const workEndK = approach.k + Math.ceil(w / config.bucketMs);
+        const arriveMs = ctx.nowMs + approach.k * config.bucketMs;
+        const endMs = ctx.nowMs + workEndK * config.bucketMs;
+        if (!(endMs < nodeSafeLimit) || !(endMs + config.bufferMs < hm.horizonEndMs)) break;
+        const back = search([{ nodeId: target.nodeId, k: workEndK, prefix: [] }], avoid);
+        const hit = back.earliest(refuges);
+        if (hit === null) continue;
+        const returnLegs = back.legsTo(hit.nodeId, hit.k);
+        const legs = [...approach.legs, ...returnLegs];
+        const returnMs = (hit.k - workEndK) * config.bucketMs;
+        const total = Math.max(1, ((hit.k * config.bucketMs) / 1000));
+        const planBody = {
+          recipientId: ctx.agentId,
+          knowledgeRevision: revision,
+          timedLegs: legs,
+          workInterval: { startMs: SimTimeMs.parse(arriveMs), endMs: SimTimeMs.parse(endMs) },
+          refugeId: NodeId.parse(hit.nodeId),
+          reservationRevision: SequenceNumber.parse(0),
+          limitingReason:
+            w < (target.workOptionsMs[target.workOptionsMs.length - 1] ?? w)
+              ? "work_interval_limited_by_forecast"
+              : null,
+        };
+        const plan = MissionPlan.parse({
+          ...planBody,
+          id: MissionPlanId.parse(`plan-${hashValue({ t: target.id, p: planBody, n: ctx.nowMs }).slice(0, 12)}`),
+        });
+        out.push({
+          mission: {
+            target,
+            plan,
+            score: target.benefit(w) / total,
+            approachMs: arriveMs - ctx.nowMs,
+            workMs: w,
+            returnMs,
+            completesAtMs: ctx.nowMs + hit.k * config.bucketMs,
+            routeId: routeIdOf(legs),
+            refugeNodeId: NodeId.parse(hit.nodeId),
+          },
+        });
+      }
+    }
+  }
+  return out
+    .map((b) => b.mission)
+    .sort(
+      (a, b) =>
+        b.score - a.score ||
+        a.completesAtMs - b.completesAtMs ||
+        (a.target.id < b.target.id ? -1 : a.target.id > b.target.id ? 1 : 0) ||
+        (a.routeId < b.routeId ? -1 : a.routeId > b.routeId ? 1 : 0),
+    );
+}
+
+/**
+ * Complete mission search: one concrete timed approach, work interval and return that passes
+ * every retained member. Rejects with a reason (and limiting members) when none exists.
+ */
+export function planMissions(ctx: PlanningContext, targets: readonly MissionTarget[]): MissionSearchResult {
+  const config = ctx.config ?? DEFAULT_NAV_CONFIG;
+  const reject = (reason: string, limiting: readonly string[] = []): MissionSearchResult => ({
+    feasible: false,
+    best: null,
+    candidates: [],
+    plan: null,
+    limitingReason: reason,
+    limitingMemberIds: limiting,
+  });
+  if (!admitsProtection(ctx.ensemble)) return reject("forecast_unreliable");
+  if (targets.length === 0) return reject("no_unresolved_target");
+
+  const hm = new HazardModel(ctx.road, ctx.ensemble, ctx.closedCells, config);
+  const candidates = planWithHazard(ctx, hm, targets);
+  const best = candidates[0] ?? null;
+  if (best !== null) {
+    return { feasible: true, best, candidates, plan: best.plan, limitingReason: best.plan.limitingReason, limitingMemberIds: [] };
+  }
+  // Why: does the horizon alone rule it out, or do specific forecast futures?
+  const open = new HazardModel(ctx.road, ctx.ensemble, new Set(), config, []);
+  if (planWithHazard(ctx, open, targets).length === 0) return reject("forecast_horizon_insufficient");
+  const limiting: string[] = [];
+  for (const member of ctx.ensemble.members) {
+    const single = new HazardModel(ctx.road, ctx.ensemble, ctx.closedCells, config, [member]);
+    if (planWithHazard(ctx, single, targets).length === 0) limiting.push(member.id);
+  }
+  return reject("no_feasible_mission_in_model", limiting);
+}

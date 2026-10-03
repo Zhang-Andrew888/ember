@@ -17,6 +17,7 @@
   "dependencies": {
     "@ember/domain": "workspace:*",
     "@ember/knowledge": "workspace:*",
-    "@ember/forecast": "workspace:*"
+    "@ember/forecast": "workspace:*",
+    "@ember/simulation": "workspace:*"
   }
 }
