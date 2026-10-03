@@ -232,3 +232,80 @@ suite run via the root `pnpm test`, not a regression).
 **Next:** keep working the Slice 6 exit gate as far as it can go against
 the current fixture/mock data; watch for the next check-in or user
 message.
+
+## 2026-10-03 07:3x UTC (03:3x ET) - increment 5: closing out the Slice 6 exit gate
+
+Systematic pass against the exact exit-gate text in
+docs/IMPLEMENTATION_PLAN.md ("terrain composition, crew/site models,
+observation/forecast layers, route emphasis, camera following, stale
+information styling, accessible controls, urgent strip, briefing, and
+debrief" / "legible at the target viewport and reduced-motion setting").
+Three more real issues found and fixed, each verified live via Playwright,
+each committed separately:
+
+1. **`f2f612a`** *(already logged above, repeating for the consolidated
+   checklist)* - label overlap, markers sinking into terrain.
+2. **`bd7a788`** - "Animate transitions over 250 ms and honor reduced-
+   motion preferences" was unmet: `CameraControls.focusOn` snapped
+   instantly always. Added a 250ms easeOutCubic tween, skipped (instant)
+   under reduced motion. Left `reset()` as OrbitControls' own instant,
+   full-fidelity reset rather than also tweening it - deliberate scope
+   boundary, not an oversight (see that commit for why).
+3. **`7dd95ee`** - two issues: site protection status was color-only on
+   the marker (violates "Do not convey ... safe/unsafe ... by color
+   alone"), fixed by adding the status as text to the site's label; and a
+   genuine continuity bug in the authored mock snapshots themselves (the
+   3rd snapshot silently dropped the 2nd's site observation since each
+   snapshot is replayed independently, not diffed) - Ridge Cabins'
+   status was flickering back to "unobserved" after the crew had already
+   started work. Both only visible by actually watching the mock play
+   through multiple snapshots, not from a single screenshot.
+4. **`0a7ed98`** - "Observed burned/active cells, with timestamps in
+   inspection" was unmet: fire cells had no inspection interaction.
+   Added click-to-inspect via `instancedMesh`'s `event.instanceId`
+   (standard R3F pattern) showing edge/cell/state/last-observed-time.
+5. **`89054f3`** - checked the smaller 1024x720 target viewport
+   explicitly (docs/VALIDATION.md names it) for the first time this
+   session, not just 1440x900. Found a label (Refuge South) rendering
+   underneath the legend's fixed corner panel at that viewport's default
+   camera framing - same underlying failure class as the first label-
+   overlap bug, just against a static UI element instead of another
+   label. Generalized `resolveLabelCollisions` to accept reserved UI
+   boxes; the legend and cell-inspection panel now participate.
+
+**Exit-gate self-assessment, against the literal text, as of `89054f3`:**
+
+| Clause | Status |
+|---|---|
+| Terrain composition | Met |
+| Crew/site models | Met |
+| Observation layer | Met (click-to-inspect timestamps included) |
+| Forecast layer | **Not met - no data.** `CoordinatorView` has no forecast field at all (issue #2, contract change opened). Nothing to render. |
+| Route emphasis | **Not met - no data.** `CoordinatorView` has no route/mission-plan field (issue #1, contract change opened). |
+| Camera following | Met, as a snap-to-and-tween on selection (not continuous dynamic tracking - see `bd7a788`'s commit message for the scope call) |
+| Stale information styling | Met (fire cells desaturated + distinct from live flame; site labels say "(stale)" in text, not just opacity) |
+| Accessible controls | Met (real DOM controls throughout; `role="alert"`/`role="status"`/`aria-live="polite"` regions; reduced-motion respected; color-alone audited and fixed where found) |
+| Urgent strip | Met |
+| Briefing | Met |
+| Debrief (EndOverlay) | Met |
+| Legible at 1440x900 and 1024x720 | Met (both viewports checked live; no horizontal overflow, no overlapping/hidden-behind-UI text) |
+| "Map explains a route change without exposing unknown fire" | **Not met** - same root cause as route emphasis; there is no route to explain yet |
+| "Meet measured rendering targets" | **Not measured.** This sandbox's headless Chromium runs software WebGL (no GPU), so any FPS number captured here would be meaningless as a performance claim, and `vite build`'s own pathological slowness (see increment 4) made even reasoning about bundle size weigh-ins unreliable. Needs a real machine - not fabricating a number to fill this row. |
+
+Everything achievable against the current fixture and domain schema is
+done and verified live, not just typechecked. The two genuinely blocked
+items (route emphasis, forecast layer) both have contract-change issues
+open (#1, #2) with concrete suggested shapes, and nothing in `apps/web`
+can close them without that schema landing first.
+
+**Status:** CI green on every push this session (12 pushes, all
+`conclusion: success` per the GitHub Actions API - verified after each
+one, not just assumed). `pnpm typecheck && pnpm lint && pnpm test` green
+locally throughout; 68 web-lane tests as of `89054f3`.
+
+**Blocked:** route emphasis and forecast layer, on issues #1 and #2
+respectively (Andrew's call, per AGENTS.md's contract-change process).
+
+**Next:** nothing further is achievable against the current fixture
+without those contract changes. Will keep watching for new instructions;
+otherwise this is a stable, green, fully live-verified stopping point.
