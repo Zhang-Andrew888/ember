@@ -38,6 +38,16 @@ describe("components/scene/sceneEntities - buildSceneEntities", () => {
     expect(entities.fireCells.filter((c) => !c.stale)).toHaveLength(2);
   });
 
+  it("carries edgeId/cellIndex/lastObservedAt through for inspection", () => {
+    const freshCell = entities.fireCells.find((c) => c.edgeId === "placeholder-edge-north-spread-1");
+    expect(freshCell).toMatchObject({
+      edgeId: "placeholder-edge-north-spread-1",
+      cellIndex: 3,
+      lastObservedAt: 85_000,
+      stale: false,
+    });
+  });
+
   it("skips agents/sites/cells whose id isn't in the scene map", () => {
     const viewWithUnknownIds = {
       ...fixtureCoordinatorView,

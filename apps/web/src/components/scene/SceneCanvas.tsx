@@ -8,7 +8,7 @@ import { AgentMarkers } from "./AgentMarkers.js";
 import { CameraControls, type CameraControlsHandle } from "./CameraControls.js";
 import { listRefugeNodes } from "./sceneEntities.js";
 import { scenarioMap } from "../../map/scenarioMap.js";
-import type { SceneEntities } from "./sceneEntities.js";
+import type { FireCellMarker, SceneEntities } from "./sceneEntities.js";
 
 const INITIAL_ZOOM = 1.1;
 // ~50 degree tilt from the ground plane (docs/FRONTEND.md "fixed initial tilt around 50 degrees").
@@ -19,12 +19,13 @@ export interface SceneCanvasProps {
   readonly showFireCells: boolean;
   readonly selectedAgentId: string | null;
   readonly onInspectAgent: (agentId: string) => void;
+  readonly onInspectCell: (cell: FireCellMarker) => void;
   readonly onReady: (state: RootState) => void;
   readonly reducedMotion: boolean;
 }
 
 export const SceneCanvas = forwardRef<CameraControlsHandle, SceneCanvasProps>(function SceneCanvas(
-  { entities, showFireCells, selectedAgentId, onInspectAgent, onReady, reducedMotion },
+  { entities, showFireCells, selectedAgentId, onInspectAgent, onInspectCell, onReady, reducedMotion },
   controlsRef,
 ) {
   const refuges = listRefugeNodes(scenarioMap);
@@ -42,7 +43,9 @@ export const SceneCanvas = forwardRef<CameraControlsHandle, SceneCanvasProps>(fu
       <Roads />
       <RefugeMarkers refuges={refuges} />
       <SiteMarkers sites={entities.sites} />
-      {showFireCells ? <FireCells cells={entities.fireCells} reducedMotion={reducedMotion} /> : null}
+      {showFireCells ? (
+        <FireCells cells={entities.fireCells} reducedMotion={reducedMotion} onInspectCell={onInspectCell} />
+      ) : null}
       <AgentMarkers
         agents={entities.agents}
         selectedAgentId={selectedAgentId}

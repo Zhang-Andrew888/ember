@@ -5,15 +5,18 @@ import { SceneCanvas } from "./SceneCanvas.js";
 import { SceneLabelLayer, type LabelDescriptor } from "./SceneLabelLayer.js";
 import { SceneLegend } from "./SceneLegend.js";
 import type { CameraControlsHandle } from "./CameraControls.js";
-import { listRefugeNodes, type SceneEntities } from "./sceneEntities.js";
+import { listRefugeNodes, type FireCellMarker, type SceneEntities } from "./sceneEntities.js";
 import { scenarioMap } from "../../map/scenarioMap.js";
 import { siteProtectionStatusLabel } from "../../format/reports.js";
+import { formatIncidentClock } from "../../format/time.js";
 
 export interface SceneViewProps {
   readonly entities: SceneEntities;
   readonly selectedAgentId: string | null;
   readonly onInspectAgent: (agentId: string) => void;
   readonly reducedMotion: boolean;
+  /** For the fire-cell inspection panel's age readout; null before the first snapshot. */
+  readonly simTimeMs: number | null;
 }
 
 interface RenderContext {
@@ -22,9 +25,16 @@ interface RenderContext {
 }
 
 /** Combines the 3D canvas, DOM label overlay, and legend into one scene region. */
-export function SceneView({ entities, selectedAgentId, onInspectAgent, reducedMotion }: SceneViewProps) {
+export function SceneView({
+  entities,
+  selectedAgentId,
+  onInspectAgent,
+  reducedMotion,
+  simTimeMs,
+}: SceneViewProps) {
   const [renderContext, setRenderContext] = useState<RenderContext | null>(null);
   const [showFireCells, setShowFireCells] = useState(true);
+  const [inspectedCell, setInspectedCell] = useState<FireCellMarker | null>(null);
   const controlsRef = useRef<CameraControlsHandle>(null);
 
   const handleReady = useCallback((state: RootState) => {
@@ -82,6 +92,7 @@ export function SceneView({ entities, selectedAgentId, onInspectAgent, reducedMo
         showFireCells={showFireCells}
         selectedAgentId={selectedAgentId}
         onInspectAgent={onInspectAgent}
+        onInspectCell={setInspectedCell}
         onReady={handleReady}
         reducedMotion={reducedMotion}
       />
@@ -95,6 +106,47 @@ export function SceneView({ entities, selectedAgentId, onInspectAgent, reducedMo
         onToggleFireCells={() => setShowFireCells((value) => !value)}
         onResetCamera={() => controlsRef.current?.reset()}
       />
+      {inspectedCell ? (
+        <CellInspectionPanel cell={inspectedCell} simTimeMs={simTimeMs} onClose={() => setInspectedCell(null)} />
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * "Observed burned/active cells, with timestamps in inspection"
+ * (docs/FRONTEND.md scene layer 3) - clicking a fire cell shows when it was
+ * last observed, not just its current color.
+ */
+function CellInspectionPanel({
+  cell,
+  simTimeMs,
+  onClose,
+}: {
+  readonly cell: FireCellMarker;
+  readonly simTimeMs: number | null;
+  readonly onClose: () => void;
+}) {
+  const ageMs = simTimeMs === null ? null : Math.max(0, simTimeMs - cell.lastObservedAt);
+  return (
+    <div className="cell-inspection-panel" role="status">
+      <button type="button" className="cell-inspection-panel__close" onClick={onClose} aria-label="Close">
+        ×
+      </button>
+      <dl>
+        <dt>Edge</dt>
+        <dd>
+          {cell.edgeId} (cell {cell.cellIndex})
+        </dd>
+        <dt>State</dt>
+        <dd>{cell.burnState}</dd>
+        <dt>Last observed</dt>
+        <dd>
+          {formatIncidentClock(cell.lastObservedAt)}
+          {ageMs !== null ? ` (${Math.round(ageMs / 1000)}s ago)` : ""}
+          {cell.stale ? " — stale" : ""}
+        </dd>
+      </dl>
     </div>
   );
 }

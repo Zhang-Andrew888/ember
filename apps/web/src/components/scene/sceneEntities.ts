@@ -30,9 +30,13 @@ export interface SiteMarker {
 
 export interface FireCellMarker {
   readonly key: string;
+  readonly edgeId: string;
+  readonly cellIndex: number;
   readonly position: SceneVector;
   readonly burnState: "unburned" | "burning" | "burned";
   readonly stale: boolean;
+  /** simTimeMs the cell was last observed at - for inspection timestamps (docs/FRONTEND.md). */
+  readonly lastObservedAt: number;
 }
 
 export interface SceneEntities {
@@ -91,9 +95,12 @@ export function buildSceneEntities(view: CoordinatorView, map: ScenarioMap): Sce
     if (!position) continue;
     fireCells.push({
       key: `${cell.edgeId}:${cell.cellIndex}`,
+      edgeId: cell.edgeId,
+      cellIndex: cell.cellIndex,
       position,
       burnState: cell.burnState,
       stale: cell.stale,
+      lastObservedAt: cell.lastObservedAt as number,
     });
   }
 

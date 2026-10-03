@@ -107,6 +107,7 @@ export function App() {
           selectedAgentId={selectedAgentId}
           onInspectAgent={setSelectedAgentId}
           reducedMotion={reducedMotion}
+          simTimeMs={view ? (view.simTimeMs as number) : null}
         />
         <ConversationPanel
           reports={view ? routineReports(view) : []}

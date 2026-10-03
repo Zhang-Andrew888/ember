@@ -1,5 +1,5 @@
 import { useLayoutEffect, useMemo, useRef } from "react";
-import { useFrame } from "@react-three/fiber";
+import { useFrame, type ThreeEvent } from "@react-three/fiber";
 import { Color, Object3D, type InstancedMesh } from "three";
 import type { FireCellMarker } from "./sceneEntities.js";
 import { colors } from "../../styles/colors.js";
@@ -18,9 +18,11 @@ const CELL_Y = 9;
 export function FireCells({
   cells,
   reducedMotion,
+  onInspectCell,
 }: {
   readonly cells: FireCellMarker[];
   readonly reducedMotion: boolean;
+  readonly onInspectCell: (cell: FireCellMarker) => void;
 }) {
   const fresh = useMemo(
     () => cells.filter((c) => c.burnState === "burning" && !c.stale),
@@ -30,8 +32,20 @@ export function FireCells({
 
   return (
     <>
-      <FireCellGroup cells={fresh} color={colors.observedFire} opacity={1} pulsing={!reducedMotion} />
-      <FireCellGroup cells={stale} color={colors.staleOutline} opacity={0.5} pulsing={false} />
+      <FireCellGroup
+        cells={fresh}
+        color={colors.observedFire}
+        opacity={1}
+        pulsing={!reducedMotion}
+        onInspectCell={onInspectCell}
+      />
+      <FireCellGroup
+        cells={stale}
+        color={colors.staleOutline}
+        opacity={0.5}
+        pulsing={false}
+        onInspectCell={onInspectCell}
+      />
     </>
   );
 }
@@ -41,11 +55,13 @@ function FireCellGroup({
   color,
   opacity,
   pulsing,
+  onInspectCell,
 }: {
   readonly cells: FireCellMarker[];
   readonly color: string;
   readonly opacity: number;
   readonly pulsing: boolean;
+  readonly onInspectCell: (cell: FireCellMarker) => void;
 }) {
   const meshRef = useRef<InstancedMesh>(null);
   const dummy = useMemo(() => new Object3D(), []);
@@ -77,8 +93,19 @@ function FireCellGroup({
 
   if (cells.length === 0) return null;
 
+  const handleClick = (event: ThreeEvent<MouseEvent>) => {
+    event.stopPropagation();
+    const cell = event.instanceId === undefined ? undefined : cells[event.instanceId];
+    if (cell) onInspectCell(cell);
+  };
+
   return (
-    <instancedMesh ref={meshRef} args={[undefined, undefined, cells.length]} frustumCulled={false}>
+    <instancedMesh
+      ref={meshRef}
+      args={[undefined, undefined, cells.length]}
+      frustumCulled={false}
+      onClick={handleClick}
+    >
       <boxGeometry args={[CELL_SIZE, CELL_SIZE * 0.6, CELL_SIZE]} />
       <meshStandardMaterial color={new Color(color)} transparent opacity={opacity} />
     </instancedMesh>
