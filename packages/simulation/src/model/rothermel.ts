@@ -19,6 +19,8 @@ export interface FuelModel {
   readonly depth: number;
   /** Moisture of extinction, fraction of dry weight. */
   readonly mx: number;
+  /** Whether the fuel carries a tree canopy that can crown. */
+  readonly canopy: boolean;
 }
 
 /** Index into FUEL_MODELS; stored per cell as a byte. */
@@ -28,9 +30,9 @@ export const FUEL_TIMBER = 2;
 
 /** Simplified single-class analogues of Anderson models 1 (short grass), 5 (brush) and 8 (timber litter). */
 export const FUEL_MODELS: readonly FuelModel[] = [
-  { name: "grass", sigma: 3500, w0: 0.034, depth: 1.0, mx: 0.15 },
-  { name: "shrub", sigma: 2000, w0: 0.046, depth: 2.0, mx: 0.2 },
-  { name: "timber", sigma: 2000, w0: 0.12, depth: 0.6, mx: 0.3 },
+  { name: "grass", sigma: 3500, w0: 0.034, depth: 1.0, mx: 0.15, canopy: false },
+  { name: "shrub", sigma: 2000, w0: 0.046, depth: 2.0, mx: 0.2, canopy: false },
+  { name: "timber", sigma: 2000, w0: 0.12, depth: 0.6, mx: 0.3, canopy: true },
 ];
 
 const PARTICLE_DENSITY = 32; // lb/ft^3
@@ -77,6 +79,16 @@ export function firelineIntensityKwM(fuel: FuelModel, moisture: number, rateMps:
   const residenceMin = 384 / fuel.sigma;
   const btuPerFtMin = reactionIntensity(fuel, moisture) * residenceMin * (Math.max(0, rateMps) * FT_PER_MIN_PER_MPS);
   return (btuPerFtMin / 60) * BTU_FT_S_TO_KW_M;
+}
+
+/** Van Wagner (1977) critical surface intensity in kW/m that lifts fire into the canopy. */
+export function crownInitiationKwM(canopyBaseHeightM: number, foliarMoisturePct: number): number {
+  return (0.01 * canopyBaseHeightM * (460 + 25.9 * foliarMoisturePct)) ** 1.5;
+}
+
+/** Fireline intensity in kW/m per m/s of spread rate for a fuel and moisture (intensity is linear in rate). */
+export function intensityPerMps(fuel: FuelModel, moisture: number): number {
+  return firelineIntensityKwM(fuel, moisture, 1);
 }
 
 /** Byram flame length in meters from fireline intensity in kW/m (L = 0.0775 I^0.46). */
