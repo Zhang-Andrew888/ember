@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { mockBriefing } from "../briefing/briefingInfo.js";
 import { Briefing } from "./Briefing.js";
 import { TopBar } from "./TopBar.js";
 import { UrgentStrip } from "./UrgentStrip.js";
@@ -10,10 +11,24 @@ import { DemoBanner } from "./DemoBanner.js";
 describe("components markup", () => {
   it("Briefing exposes start control and site list", () => {
     const html = renderToStaticMarkup(
-      createElement(Briefing, { onStart: () => {}, starting: false, demoMode: false, transportMode: "live" }),
+      createElement(Briefing, { onStart: () => {}, starting: false, content: mockBriefing, demoMode: false, transportMode: "live" }),
     );
     expect(html).toContain("Start incident");
     expect(html).toContain("Sites to protect");
+  });
+
+  it("Briefing lists the callsigns it is given", () => {
+    const html = renderToStaticMarkup(
+      createElement(Briefing, {
+        onStart: () => {},
+        starting: false,
+        content: { sites: [{ name: "Test Site", value: 1 }], callsigns: ["Crew 1", "Crew 3", "Scout"] },
+        demoMode: false,
+        transportMode: "live",
+      }),
+    );
+    expect(html).toContain("Crew 3");
+    expect(html).toContain("Test Site");
   });
 
   it("TopBar shows connection and audio status", () => {

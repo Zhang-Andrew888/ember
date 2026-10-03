@@ -129,7 +129,7 @@ describe("labelledBands", () => {
 
 describe("humanizeReason", () => {
   it("turns machine reasons into words", () => {
-    expect(humanizeReason("work_interval_limited_by_forecast")).toBe("work interval limited by forecast");
+    expect(humanizeReason("work_interval_limited_by_forecast")).toBe("work window limited by forecast");
     expect(humanizeReason("single-capacity")).toBe("single capacity");
   });
 });

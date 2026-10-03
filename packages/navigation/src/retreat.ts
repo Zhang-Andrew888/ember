@@ -40,6 +40,7 @@ export function planReturn(ctx: PlanningContext): ReturnPlan | null {
   const hm = new HazardModel(ctx.road, ctx.ensemble, ctx.closedCells, config);
   const starts = startsFromPosition(hm, ctx.position, ctx.nowMs, config);
   if (starts.length === 0) return null;
+  const refuges = new Set(ctx.road.map.refuges.map((r) => r.nodeId));
   const reach = timeExpandedSearch({
     hm,
     nowMs: ctx.nowMs,
@@ -47,8 +48,9 @@ export function planReturn(ctx: PlanningContext): ReturnPlan | null {
     oracle: ctx.oracle ?? ALWAYS_FREE,
     ban: ctx.avoidEdges,
     config,
+    stopAt: refuges,
   });
-  const hit = reach.earliest(new Set(ctx.road.map.refuges.map((r) => r.nodeId)));
+  const hit = reach.earliest(refuges);
   if (hit === null) return null;
   const legs = reach.legsTo(hit.nodeId, hit.k);
   return {

@@ -48,6 +48,8 @@ export interface ScenarioMap {
   readonly worldMeters: number;
   /** Public terrain layers; null when the scenario file carries none. */
   readonly terrain: ScenarioTerrain | null;
+  /** Public briefing roster: site names/values and agent callsigns (empty when the file has none). */
+  readonly briefing: { readonly sites: readonly { readonly name: string; readonly value: number }[]; readonly callsigns: readonly string[] };
 }
 
 export function buildScenarioMap(file: ScenarioFile, source: ScenarioSource): ScenarioMap {
@@ -98,5 +100,9 @@ export function buildScenarioMap(file: ScenarioFile, source: ScenarioSource): Sc
     initialFireCells: file.map.initialFireCells,
     worldMeters,
     terrain: file.terrain ?? null,
+    briefing: {
+      sites: file.map.sites.map((site) => ({ name: site.name, value: site.value })),
+      callsigns: file.agents.map((agent) => agent.callsign),
+    },
   };
 }

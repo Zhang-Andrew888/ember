@@ -1,6 +1,7 @@
 import type { CoordinatorView } from "@ember/domain";
 import type { ScenarioMap } from "../../map/scenarioMap.js";
 import { resolveEdgePolyline, type SceneVector } from "../../map/positions.js";
+import { limitingReasonDisplayText } from "../../format/limitingReason.js";
 import { formatIncidentClock } from "../../format/time.js";
 
 /**
@@ -174,7 +175,6 @@ export function labelledBands(bands: readonly ForecastBand[], max = MAX_FORECAST
   return [...bands].sort((a, b) => key(a) - key(b)).slice(0, max);
 }
 
-/** "work_interval_limited_by_forecast" -> "work interval limited by forecast". */
 export function humanizeReason(reason: string): string {
-  return reason.replace(/[_-]+/g, " ").trim();
+  return limitingReasonDisplayText(reason);
 }

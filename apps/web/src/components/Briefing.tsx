@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { briefingCallsigns, briefingIncidentLabel, briefingSites } from "../briefing/briefingInfo.js";
+import { briefingIncidentLabel, type BriefingContent } from "../briefing/briefingInfo.js";
 import { colors } from "../styles/colors.js";
 import { MicCheck } from "./MicCheck.js";
 import { createVoiceCapture } from "../net/voiceCapture.js";
@@ -12,6 +12,7 @@ export interface BriefingProps {
   readonly starting: boolean;
   /** Why the last Start attempt failed, if it did; shown so Start never fails silently. */
   readonly error?: string | null;
+  readonly content: BriefingContent;
   readonly demoMode: boolean;
   readonly transportMode: TransportMode;
 }
@@ -23,7 +24,7 @@ export interface BriefingProps {
  * pressed - App.tsx only begins snapshot playback / calls the start
  * endpoint from onStart.
  */
-export function Briefing({ onStart, starting, demoMode, transportMode, error = null }: BriefingProps) {
+export function Briefing({ onStart, starting, content, demoMode, transportMode, error = null }: BriefingProps) {
   const probeMic = useCallback(() => createVoiceCapture({ preferMicrophone: true }).probeMicrophone(), []);
 
   return (
@@ -38,7 +39,7 @@ export function Briefing({ onStart, starting, demoMode, transportMode, error = n
       <section aria-labelledby="briefing-sites-heading">
         <h2 id="briefing-sites-heading">Sites to protect</h2>
         <ul className="briefing__sites">
-          {briefingSites.map((site) => (
+          {content.sites.map((site) => (
             <li key={site.name}>
               <span>{site.name}</span>
               <span className="briefing__site-value">value {site.value}</span>
@@ -50,7 +51,7 @@ export function Briefing({ onStart, starting, demoMode, transportMode, error = n
       <section aria-labelledby="briefing-callsigns-heading">
         <h2 id="briefing-callsigns-heading">Callsigns</h2>
         <ul className="briefing__callsigns">
-          {briefingCallsigns.map((callsign) => (
+          {content.callsigns.map((callsign) => (
             <li key={callsign}>{callsign}</li>
           ))}
         </ul>

@@ -22,6 +22,19 @@ A five-minute wildfire coordination simulation with autonomous ground crews, inc
 
 Architectural decisions are in [docs/adr](docs/adr/README.md). The product specification consolidates the interview decisions; technical details live in the focused documents above.
 
+## Run the demo
+
+Requires **Node.js ≥ 22** and **pnpm** (enable via `corepack enable` — version pinned in root `package.json`).
+
+```sh
+pnpm install
+scripts/demo.sh              # live: server :3000 + web http://127.0.0.1:5173/
+scripts/demo.sh mock         # web-only mock incident (no server)
+scripts/demo.sh --smoke      # start live stack, run scripts/smoke.mjs, exit
+```
+
+`pnpm install` runs `build:libs` so workspace packages resolve from `dist/` before `vite dev` or tests. Use a different backend port with `PORT=4000 scripts/demo.sh` and `EMBER_SERVER_PORT=4000` when starting the web dev server separately.
+
 ## Local development
 
 See **[DEVELOPMENT.md](DEVELOPMENT.md)** for install, mock vs live server, optional Grok Voice/intent, offline evaluation (`evaluate-cli`, `sensitivity-cli`, `nav-calibration-cli`), and troubleshooting. Env templates: [apps/web/.env.example](apps/web/.env.example), [apps/server/.env.example](apps/server/.env.example).

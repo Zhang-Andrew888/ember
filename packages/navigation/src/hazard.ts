@@ -12,7 +12,9 @@ import type { NavConfig } from "./types.js";
 export class HazardModel {
   readonly horizonEndMs: number;
   private readonly earliest: Float64Array;
-  private readonly departCache = new Map<string, number>();
+  private readonly departForward = new Map<EdgeId, number>();
+  private readonly departReverse = new Map<EdgeId, number>();
+  private safeUntilTable: Float64Array | null = null;
 
   constructor(
     readonly road: RoadIndex,
@@ -48,14 +50,22 @@ export class HazardModel {
    * checked against every crossed road cell's exit time.
    */
   latestDepartMs(edge: RoadEdge, direction: "forward" | "reverse"): number {
-    const key = `${edge.id}:${direction}`;
-    const hit = this.departCache.get(key);
+    const cache = direction === "forward" ? this.departForward : this.departReverse;
+    const hit = cache.get(edge.id);
     if (hit !== undefined) return hit;
     const from = direction === "forward" ? 0 : edge.length;
     const to = direction === "forward" ? edge.length : 0;
     const bound = this.partialLatestMs(edge, from, to);
-    this.departCache.set(key, bound);
+    cache.set(edge.id, bound);
     return bound;
+  }
+
+  /** nodeSafeUntilMs for every node of `nodes`, in that order; computed once per model. */
+  nodeSafeUntilTable(nodes: readonly NodeId[]): Float64Array {
+    if (this.safeUntilTable === null) {
+      this.safeUntilTable = Float64Array.from(nodes, (n) => this.nodeSafeUntilMs(n));
+    }
+    return this.safeUntilTable;
   }
 
   /**
