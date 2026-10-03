@@ -1,5 +1,7 @@
-import { FireField, SIM_DEFAULTS, createTerrain, refugeCells, RoadIndex, type FireParams, type PublicMap, type Terrain } from "@ember/simulation/model";
+import { FireField, SIM_DEFAULTS, createTerrain, refugeCells, RoadIndex, type PublicMap, type Terrain } from "@ember/simulation/model";
 import { hashValue } from "@ember/knowledge";
+import { forecastStep } from "./dynamics.js";
+import type { ForecastParams } from "./types.js";
 
 /** Public inputs a rollout needs. Contains no truth: terrain and patch are briefed. */
 export interface RolloutContext {
@@ -37,9 +39,9 @@ const ROUND_MS = 300_000;
 /** Roll out once to cover the whole incident plus the forecast horizon, so refreshes hit the cache. */
 const ROLLOUT_FLOOR_MS = 3_300_000;
 
-function paramKey(ctx: RolloutContext, p: FireParams, stepMs: number): string {
+function paramKey(ctx: RolloutContext, p: ForecastParams, stepMs: number): string {
   const r = (v: number): string => (Number.isFinite(v) ? v.toFixed(5) : "inf");
-  return [ctx.key, r(p.spreadMultiplier), r(p.initialWindRad), r(p.windShiftMs), r(p.postShiftWindRad), r(p.initialProgress ?? 0), stepMs].join("|");
+  return [ctx.key, r(p.spreadMultiplier), r(p.initialWindRad), r(p.windShiftMs), r(p.postShiftWindRad), r(p.initialProgress ?? 0), r(p.moistureMultiplier ?? 1), r(p.spotDistanceCells ?? 0), r(p.spotTimeMs ?? Infinity), stepMs].join("|");
 }
 
 /**
@@ -47,7 +49,7 @@ function paramKey(ctx: RolloutContext, p: FireParams, stepMs: number): string {
  * Ignition is recorded at the start of the step in which it happens, so timing errs early
  * (conservative). Results are cached per parameter set and extended on demand.
  */
-export function rolloutIgnition(ctx: RolloutContext, params: FireParams, endMs: number, stepMs: number, exact = false): Float64Array {
+export function rolloutIgnition(ctx: RolloutContext, params: ForecastParams, endMs: number, stepMs: number, exact = false): Float64Array {
   const key = paramKey(ctx, params, stepMs);
   const hit = cache.get(key);
   if (hit !== undefined && hit.endMs >= endMs) return hit.ign;
@@ -55,7 +57,7 @@ export function rolloutIgnition(ctx: RolloutContext, params: FireParams, endMs: 
   const target = exact ? Math.ceil(endMs / stepMs) * stepMs : Math.max(ROLLOUT_FLOOR_MS, Math.ceil(endMs / ROUND_MS) * ROUND_MS);
   const field = new FireField(ctx.terrain, ctx.nonburnable);
   field.ignite(ctx.initialCells, 0, params.initialProgress ?? 0);
-  for (let t = stepMs; t <= target; t += stepMs) field.step(t, stepMs, params);
+  for (let t = stepMs; t <= target; t += stepMs) forecastStep(field, t, stepMs, params);
   const ign = new Float64Array(field.ignitedAtMs.length);
   for (let i = 0; i < ign.length; i++) {
     const v = field.ignitedAtMs[i]!;
