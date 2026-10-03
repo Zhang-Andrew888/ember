@@ -97,6 +97,7 @@ export type SimNotice =
   | { tick: number; kind: "plan_cancelled"; agentId: AgentId; planId: string; reason: string }
   | { tick: number; kind: "plan_complete"; agentId: AgentId; planId: string }
   | { tick: number; kind: "entry_blocked"; agentId: AgentId; edgeId: EdgeId }
+  | { tick: number; kind: "plan_interrupted_by_end"; agentId: AgentId; planId: string }
   | { tick: number; kind: "agent_lost"; agentId: AgentId }
   | { tick: number; kind: "site_resolved"; siteId: SiteId; how: "protected" | "destroyed" }
   | { tick: number; kind: "edge_closed"; edgeId: EdgeId };
@@ -446,6 +447,14 @@ export class World {
       agent.state = "retreating";
     } else {
       agent.state = "approaching";
+    }
+  }
+
+  /** At the terminal step: record missions still under way as interrupted, never as returns. */
+  interruptCommitments(): void {
+    for (const agent of this.agents) {
+      if (agent.state === "lost" || agent.commitment === null) continue;
+      this.notices.push({ tick: this.timeMs, kind: "plan_interrupted_by_end", agentId: agent.id, planId: agent.commitment.plan.id });
     }
   }
 

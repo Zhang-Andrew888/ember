@@ -89,7 +89,10 @@ describe("incident basics", () => {
     expect(inc.end?.displayReason).toBe("all_sites_resolved");
     // Work starts at ~ tick 335 and needs 300 s, so the end is well before the return completes.
     expect(inc.end?.tick).toBeLessThan(700_000);
-    expect(inc.projectAgent(crew1).position.kind).not.toBe("undefined");
+    // The mission was cut off by the incident ending: it is recorded as interrupted, and no
+    // successful return is invented for it.
+    expect(inc.notices.some((n) => n.kind === "plan_interrupted_by_end" && n.agentId === "crew-1")).toBe(true);
+    expect(inc.notices.some((n) => n.kind === "plan_complete")).toBe(false);
   });
 
   it("rejects a plan built on stale knowledge and keeps the previous state", () => {

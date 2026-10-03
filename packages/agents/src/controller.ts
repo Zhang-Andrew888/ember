@@ -24,6 +24,8 @@ import {
   type CertifyFailure,
   type PlanningContext,
   type MissionSearchResult,
+  type PriorityClass,
+  type RankedMission as RankedMissionT,
 } from "@ember/navigation";
 import type { AgentProjection, SimInput } from "@ember/simulation";
 import { RoadIndex, type PublicMap } from "@ember/simulation/model";
@@ -91,6 +93,10 @@ export class CrewController implements AgentController {
   private seenObjectives = new Set<string>();
   private lastIdleReason: string | null = null;
   private autonomousForced = false;
+  private lastProj: AgentProjection | null = null;
+  private lastEnv: ControllerEnvironment = {};
+  private pendingRevision: MissionPlanT | null = null;
+  private yieldCandidate: MissionPlanT | null = null;
 
   constructor(options: ControllerOptions) {
     this.agentId = options.agentId;
@@ -134,6 +140,8 @@ export class CrewController implements AgentController {
   tick(proj: AgentProjection, env: ControllerEnvironment = {}): TickOutput {
     const out: TickOutput = { state: "HOLDING", orders: [], decisions: [], reports: [], forecastEvents: [] };
     const now = proj.simTimeMs;
+    this.lastProj = proj;
+    this.lastEnv = env;
     if (proj.state === "lost") {
       this.currentState = "LOST";
       this.active = null;
@@ -154,8 +162,19 @@ export class CrewController implements AgentController {
       this.active = null;
     }
     if (proj.position.kind === "node" && this.active === null) this.stranded = this.stranded && !this.atRefuge(proj.position);
+    if (this.active === null) env.reservations?.release(this.agentId);
 
-    const ctx = this.context(proj, ensemble, env);
+    const ctx = this.context(proj, ensemble, env, this.classOfActive());
+
+    if (this.pendingRevision !== null) {
+      const revised = this.pendingRevision;
+      this.pendingRevision = null;
+      const cls = this.classOfActive();
+      this.commit(proj, revised, this.active?.mode ?? "normal", this.active?.kind ?? "mission", this.active?.targetId ?? null, this.active?.workSiteId ?? null, this.active?.score ?? 0, out, cls, true);
+      this.decide(out, proj, "mission_update", "yielded_to_higher_priority", "revised plan to give up a road slot");
+    } else if (this.active !== null && env.reservations !== undefined && !env.reservations.stillValid(this.agentId, now)) {
+      this.replanForReservation(proj, ctx, out);
+    }
 
     if (this.pendingObjective !== null) this.handleObjective(this.pendingObjective, proj, ctx, out);
     this.pendingObjective = null;
@@ -194,7 +213,12 @@ export class CrewController implements AgentController {
     return ensemble;
   }
 
-  protected context(proj: AgentProjection, ensemble: ForecastEnsemble, env: ControllerEnvironment): PlanningContext {
+  protected context(
+    proj: AgentProjection,
+    ensemble: ForecastEnsemble,
+    env: ControllerEnvironment,
+    cls: PriorityClass = "approach",
+  ): PlanningContext {
     const avoid = new Set<EdgeId>();
     return {
       agentId: this.agentId,
@@ -203,7 +227,7 @@ export class CrewController implements AgentController {
       closedCells: this.evidence.closed,
       position: proj.position,
       nowMs: proj.simTimeMs,
-      oracle: env.oracle ?? ALWAYS_FREE,
+      oracle: env.reservations?.oracle(this.agentId, cls, proj.simTimeMs) ?? env.oracle ?? ALWAYS_FREE,
       config: this.cfg.nav ?? DEFAULT_NAV_CONFIG,
       avoidEdges: avoid,
       diagnose: false,
@@ -285,12 +309,55 @@ export class CrewController implements AgentController {
     return false;
   }
 
+  // ---------- reservations ----------
+
+  /** A physical occupant now overlaps a future slot: replan from the actual position. */
+  private replanForReservation(proj: AgentProjection, ctx: PlanningContext, out: TickOutput): void {
+    const a = this.active;
+    if (a === null) return;
+    if (a.mode !== "normal") {
+      this.replanEmergency("reservation_conflict", proj, ctx, out, false);
+      return;
+    }
+    if (a.kind === "mission" && a.targetId !== null) {
+      const result = this.candidateSearch(ctx, new Set([a.targetId]));
+      const chosen = result.best !== null ? this.commitFirst(proj, result, out) : null;
+      if (chosen !== null) {
+        this.decide(out, proj, "mission_update", "reservation_conflict", `${this.missionVerb(chosen.target.id)} with a revised road slot`);
+        return;
+      }
+    }
+    this.returnNow("reservation_conflict", proj, ctx, out);
+  }
+
+  proposeYield(nowMs: number): MissionPlanT | null {
+    const proj = this.lastProj;
+    const a = this.active;
+    const ens = this.forecast.current;
+    if (proj === null || a === null || ens === null || !admitsProtection(ens)) return null;
+    if (a.mode === "retreating" || a.kind === "halt") return null;
+    // Planned against the oracle, which already holds the requester's tentative slot.
+    const ctx = this.context({ ...proj, simTimeMs: Math.max(proj.simTimeMs, 0) }, ens, this.lastEnv, this.classOfActive());
+    void nowMs;
+    let plan: MissionPlanT | null = null;
+    if (a.kind === "mission" && a.targetId !== null) {
+      plan = this.candidateSearch(ctx, new Set([a.targetId])).best?.plan ?? null;
+    } else {
+      plan = planReturn(ctx)?.plan ?? null;
+    }
+    this.yieldCandidate = plan;
+    return plan;
+  }
+
+  adoptRevision(plan: MissionPlanT): void {
+    this.pendingRevision = plan;
+  }
+
   // ---------- survival responses ----------
 
   private withdraw(reason: string, proj: AgentProjection, ctx: PlanningContext, out: TickOutput): void {
     const ret = planReturn(ctx);
-    if (ret !== null) {
-      this.commit(proj, ret.plan, "withdrawing", "emergency", null, null, 0, out);
+    if (ret !== null && this.commit(proj, ret.plan, "withdrawing", "emergency", null, null, 0, out)) {
       this.decide(out, proj, "withdrawal_triggered", reason, `withdrawing to ${ret.refugeNodeId}`);
       this.report(out, explain(this.callsign, { type: "withdrawal_triggered", reasonCode: reason, actualAction: "" }), true);
       return;
@@ -300,8 +367,7 @@ export class CrewController implements AgentController {
 
   private returnNow(reason: string, proj: AgentProjection, ctx: PlanningContext, out: TickOutput): void {
     const ret = planReturn(ctx);
-    if (ret !== null) {
-      this.commit(proj, ret.plan, "normal", "return", null, null, 0, out);
+    if (ret !== null && this.commit(proj, ret.plan, "normal", "return", null, null, 0, out)) {
       this.decide(out, proj, "mission_update", reason, `returning to ${ret.refugeNodeId}`);
       this.report(out, explain(this.callsign, { type: "mission_update", reasonCode: reason, actualAction: "returning to refuge" }), false);
       return;
@@ -315,8 +381,7 @@ export class CrewController implements AgentController {
       return;
     }
     const ret = planReturn(ctx);
-    if (ret !== null) {
-      this.commit(proj, ret.plan, "withdrawing", "emergency", null, null, 0, out);
+    if (ret !== null && this.commit(proj, ret.plan, "withdrawing", "emergency", null, null, 0, out)) {
       this.decide(out, proj, "withdrawal_triggered", reason, `withdrawing to ${ret.refugeNodeId}`);
       return;
     }
@@ -367,7 +432,7 @@ export class CrewController implements AgentController {
     return position.kind === "node" && this.road.refugeNodes.has(position.nodeId);
   }
 
-  protected candidateSearch(ctx: PlanningContext, allowed: ReadonlySet<string> | null): MissionSearchResult {
+  candidateSearch(ctx: PlanningContext, allowed: ReadonlySet<string> | null): MissionSearchResult {
     const targets = protectionTargets(this.evidence.siteKnowledge(), this.cfg.nav?.crewWorkRate ?? 1, allowed);
     return planMissions(ctx, targets);
   }
@@ -400,12 +465,16 @@ export class CrewController implements AgentController {
       return;
     }
     const result = this.candidateSearch(ctx, allowed);
-    if (result.best !== null) {
+    const chosen = result.best !== null ? this.commitFirst(proj, result, out) : null;
+    if (chosen !== null) {
       this.lastIdleReason = null;
-      const t = result.best.target;
-      this.commit(proj, result.best.plan, "normal", "mission", t.id, t.siteId, result.best.score, out);
-      this.decide(out, proj, "mission_start", "mission_admitted", `heading to ${this.siteName(t.id)} (work ${Math.round(result.best.workMs / 1000)} s, return to ${result.best.refugeNodeId})`);
-      this.report(out, explain(this.callsign, { type: "mission_start", reasonCode: "mission_admitted", actualAction: `heading to ${this.siteName(t.id)}` }), false);
+      const t = chosen.target;
+      this.decide(out, proj, "mission_start", "mission_admitted", `${this.missionVerb(t.id)} (work ${Math.round(chosen.workMs / 1000)} s, return to ${chosen.refugeNodeId})`);
+      this.report(out, explain(this.callsign, { type: "mission_start", reasonCode: "mission_admitted", actualAction: this.missionVerb(t.id) }), false);
+      return;
+    }
+    if (result.best !== null) {
+      this.noteIdle(proj, "reservation_unavailable", out);
       return;
     }
     if (allowed !== null && this.objective !== null) {
@@ -440,8 +509,8 @@ export class CrewController implements AgentController {
     const best = result.best;
     if (best === null || best.target.id === active.targetId) return;
     if (best.score < active.score * this.cfg.switchMargin) return;
+    if (!this.commit(proj, best.plan, "normal", "mission", best.target.id, best.target.siteId, best.score, out)) return;
     this.lastSwitchMs = now;
-    this.commit(proj, best.plan, "normal", "mission", best.target.id, best.target.siteId, best.score, out);
     this.decide(out, proj, "mission_update", "better_mission_found", `switching to ${this.siteName(best.target.id)}`);
   }
 
@@ -465,9 +534,12 @@ export class CrewController implements AgentController {
         const hadPlan = this.active !== null;
         this.objective = obj;
         this.holding = false;
-        const t = result.best.target;
-        this.commit(proj, result.best.plan, "normal", "mission", t.id, t.siteId, result.best.score, out);
-        this.decide(out, proj, hadPlan ? "mission_update" : "mission_start", "objective_accepted", `heading to ${this.siteName(t.id)} on coordinator objective`);
+        const chosen = this.commitFirst(proj, result, out);
+        if (chosen === null) {
+          this.objective = null;
+          return reject("reservation_unavailable");
+        }
+        this.decide(out, proj, hadPlan ? "mission_update" : "mission_start", "objective_accepted", `${this.missionVerb(chosen.target.id)} on coordinator objective`);
         return;
       }
       case "return_to_refuge":
@@ -479,9 +551,9 @@ export class CrewController implements AgentController {
         }
         const ret = planReturn(ctx);
         if (ret === null) return reject("no_normal_return");
+        if (!this.commit(proj, ret.plan, "normal", "return", null, null, 0, out)) return reject("reservation_unavailable");
         this.holding = obj.kind === "hold";
         this.objective = obj.kind === "hold" ? obj : null;
-        this.commit(proj, ret.plan, "normal", "return", null, null, 0, out);
         this.decide(out, proj, "mission_update", "objective_accepted", `returning to ${ret.refugeNodeId} on coordinator objective`);
         return;
       }
@@ -492,10 +564,32 @@ export class CrewController implements AgentController {
 
   // ---------- helpers ----------
 
-  private siteName(id: string): string {
+  protected missionVerb(id: string): string {
+    return `heading to ${this.siteName(id)}`;
+  }
+
+  protected siteName(id: string): string {
     return this.map.sites.find((s) => s.id === id)?.name ?? id;
   }
 
+  protected classOfActive(): PriorityClass {
+    const a = this.active;
+    if (a !== null && a.mode !== "normal") return "emergency";
+    if (a !== null && a.kind === "return") return "return";
+    return this.role === "scout" ? "scout" : "approach";
+  }
+
+  private classFor(mode: "normal" | "withdrawing" | "retreating", kind: PlanKind): PriorityClass {
+    if (mode !== "normal") return "emergency";
+    if (kind === "return") return "return";
+    return this.role === "scout" ? "scout" : "approach";
+  }
+
+  /**
+   * Commit a plan to the simulator. When a reservation service is present the plan's
+   * single-capacity slots are reserved first; a denied normal plan is not committed. Emergency
+   * plans are best effort: physical occupancy still rules, and nothing is invented.
+   */
   protected commit(
     proj: AgentProjection,
     plan: MissionPlanT,
@@ -505,7 +599,14 @@ export class CrewController implements AgentController {
     workSiteId: SiteId | null,
     score: number,
     out: TickOutput,
-  ): void {
+    cls: PriorityClass = this.classFor(mode, kind),
+    alreadyReserved = false,
+  ): boolean {
+    const hooks = this.lastEnv.reservations;
+    if (hooks !== undefined && !alreadyReserved) {
+      const res = hooks.reserve(this.agentId, plan, cls, proj.simTimeMs);
+      if (!res.ok && mode !== "retreating" && kind !== "halt") return false;
+    }
     const stamped = MissionPlan.parse({ ...plan, knowledgeRevision: SequenceNumber.parse(proj.knowledgeRevision) });
     const hasWork = stamped.workInterval.endMs > stamped.workInterval.startMs;
     const approachCount = hasWork
@@ -515,6 +616,16 @@ export class CrewController implements AgentController {
     const order: SimInput = { kind: "commit_plan", agentId: this.agentId, plan: stamped, workSiteId, mode };
     out.orders.push(order);
     this.evalDirty = false;
+    return true;
+  }
+
+  /** Commit the first admissible candidate whose reservations can be granted. */
+  protected commitFirst(proj: AgentProjection, result: MissionSearchResult, out: TickOutput): RankedMissionT | null {
+    for (const cand of result.candidates.slice(0, 20)) {
+      const t = cand.target;
+      if (this.commit(proj, cand.plan, "normal", "mission", t.id, t.siteId, cand.score, out)) return cand;
+    }
+    return null;
   }
 
   protected decide(out: TickOutput, proj: AgentProjection, type: DecisionType, reasonCode: string, actualAction: string): void {

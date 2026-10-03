@@ -1,6 +1,6 @@
-import type { AgentId, DecisionEvent, Objective } from "@ember/domain";
+import type { AgentId, DecisionEvent, MissionPlan, Objective } from "@ember/domain";
 import type { ForecastConfig, ForecastEvent } from "@ember/forecast";
-import type { NavConfig, ReservationOracle } from "@ember/navigation";
+import type { NavConfig, PriorityClass, ReservationOracle, ReserveResult } from "@ember/navigation";
 import type { AgentProjection, SimInput } from "@ember/simulation";
 
 export type ControllerState =
@@ -46,9 +46,22 @@ export interface TickOutput {
   readonly forecastEvents: ForecastEvent[];
 }
 
+/**
+ * Reservation access handed to a controller. It exposes allocated windows and unavailable
+ * slots only: never another agent's observations, forecast or complete task plan.
+ */
+export interface ReservationHooks {
+  oracle(agentId: AgentId, cls: PriorityClass, nowMs: number): ReservationOracle;
+  reserve(agentId: AgentId, plan: MissionPlan, cls: PriorityClass, nowMs: number): ReserveResult;
+  release(agentId: AgentId): void;
+  stillValid(agentId: AgentId, nowMs: number): boolean;
+  readonly revision: number;
+}
+
 /** What a controller needs from the outside world each tick. */
 export interface ControllerEnvironment {
   readonly oracle?: ReservationOracle;
+  readonly reservations?: ReservationHooks;
 }
 
 /**
@@ -61,4 +74,10 @@ export interface AgentController {
   tick(projection: AgentProjection, env?: ControllerEnvironment): TickOutput;
   receiveObjective(objective: Objective): void;
   resumeAutonomous(): void;
+  /**
+   * A reservation service asks this agent to give up a future slot. It returns a verified
+   * revised complete plan, or null if it cannot yield safely. State changes only on adopt.
+   */
+  proposeYield(nowMs: number): MissionPlan | null;
+  adoptRevision(plan: MissionPlan): void;
 }

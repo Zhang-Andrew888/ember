@@ -254,6 +254,8 @@ export class Incident {
     this.events.push({ kind: "incident_end", payload: this.endRecord });
     this.eventSequence += 1;
     this.queue.length = 0;
+    this.world.interruptCommitments();
+    this.truthNotices.push(...this.world.notices.splice(0, this.world.notices.length));
   }
 
   // ---------- observation ----------

@@ -16,16 +16,17 @@ export class EvidenceTracker {
 
   constructor(private readonly map: PublicMap) {}
 
-  /** Returns true when new cell evidence arrived (relevant to forecasts and routes). */
+  /**
+   * Returns true when new evidence of burning or burned cells arrived: the only evidence that
+   * changes routes at once. Unburned-only sightings are checked at the normal forecast refresh.
+   */
   ingest(observations: readonly Observation[]): boolean {
     let fireChanged = false;
     for (; this.pointer < observations.length; this.pointer++) {
       const obs = observations[this.pointer]!;
       let hasFire = false;
-      let hasCell = false;
       for (const f of obs.observedFields) {
         if (f.kind === "cell" && f.edgeId === GRID_EDGE) {
-          hasCell = true;
           if (f.burnState !== "unburned") {
             hasFire = true;
             this.closed.add(f.cellIndex);
@@ -42,7 +43,7 @@ export class EvidenceTracker {
           }
         }
       }
-      if (hasCell) fireChanged = true;
+      if (hasFire) fireChanged = true;
       if (hasFire) {
         this.fireObservationIds.push(obs.id);
         if (this.fireObservationIds.length > 3) this.fireObservationIds.shift();

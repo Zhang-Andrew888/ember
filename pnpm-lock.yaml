@@ -35,6 +35,15 @@ importers:
       '@ember/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@ember/forecast':
+        specifier: workspace:*
+        version: link:../../packages/forecast
+      '@ember/knowledge':
+        specifier: workspace:*
+        version: link:../../packages/knowledge
+      '@ember/navigation':
+        specifier: workspace:*
+        version: link:../../packages/navigation
       '@ember/replay':
         specifier: workspace:*
         version: link:../../packages/replay
