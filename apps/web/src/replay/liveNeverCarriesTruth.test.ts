@@ -2,7 +2,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { CoordinatorView } from "@ember/domain";
 import { fixtureCoordinatorView } from "../../../../tests/fixtures/coordinator-view.fixture.js";
 import { adaptToScenarioIds } from "../net/mockBase.js";
-import { authoredSnapshots, createMockIncidentSocket } from "../net/mockIncidentSocket.js";
+import {
+  authoredSnapshots,
+  createMockIncidentSocket,
+  type MockIncidentSocketOptions,
+} from "../net/mockIncidentSocket.js";
 import { SCENARIO_NAMES, resolveScenario } from "../net/scenarioSelection.js";
 import { modelStatesScenario, runEndedScenarios } from "../net/scenarios.js";
 import { parseCoordinatorViewFrame } from "../net/wireProtocol.js";
@@ -91,11 +95,11 @@ describe("live payloads carry no truth", () => {
 describe("what the mock socket actually emits", () => {
   afterEach(() => vi.useRealTimers());
 
-  async function emitted(options: Parameters<typeof createMockIncidentSocket>[0]): Promise<string[]> {
+  async function emitted(options: MockIncidentSocketOptions = {}): Promise<string[]> {
     vi.useFakeTimers();
     const socket = createMockIncidentSocket({
-      intervalMs: options.intervalMs ?? 10,
       ...options,
+      intervalMs: options.intervalMs ?? 10,
     });
     const frames: string[] = [];
     socket.onmessage = (event) => frames.push(event.data as string);
