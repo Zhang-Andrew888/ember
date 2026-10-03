@@ -165,11 +165,13 @@ describe("wire protocol and information boundary", () => {
   });
 
   it("does not submit or retain a half-captured utterance when the socket closes", () => {
-    const { hub, session } = setup();
+    const { hub, session, bridge } = setup();
     const id = hub.connect();
     hub.drain(id);
     hub.handle(id, JSON.stringify({ type: "ptt_begin" }), 1000);
+    expect(bridge.scheduler.isRecording).toBe(true);
     hub.disconnect(id, 2500, "Crew 2, protect the");
+    expect(bridge.scheduler.isRecording).toBe(false);
     expect(session.incident.inputLog).toHaveLength(0);
     expect(hub.unsentUtterance(id)).toBeNull();
     expect(hub.retainedClients()).toEqual({ capture: 0, outboxes: 0, backpressure: 0 });
