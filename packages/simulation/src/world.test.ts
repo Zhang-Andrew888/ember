@@ -166,7 +166,8 @@ describe("destroyed sites", () => {
     const a = inc.truth().sites.find((s) => s.id === "site-a")!;
     expect(a.destroyed).toBe(true);
     expect(a.completedWork).toBe(0);
-    expect(inc.end).toBeNull(); // site B is unresolved, so the incident goes on
+    // Site B is unresolved, so only the lone burning cell burning out (240 s) ends the incident.
+    expect(inc.end?.matchingReasons).toEqual(["fire_extinguished"]);
   });
 });
 
