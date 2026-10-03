@@ -29,6 +29,7 @@ import {
 } from "@ember/navigation";
 import type { AgentProjection, SimInput } from "@ember/simulation";
 import { RoadIndex, type PublicMap } from "@ember/simulation/model";
+import { decideContinuation, decideOrder } from "./autonomy.js";
 import { EvidenceTracker } from "./evidence.js";
 import { explain } from "./explain.js";
 import {
@@ -254,7 +255,7 @@ export class CrewController implements AgentController {
       if (active.mode !== "normal" || active.kind === "halt") {
         this.replanEmergency("route_closed_by_observation", proj, ctx, out, active.mode === "normal");
       } else {
-        this.withdraw("route_closed_by_observation", proj, ctx, out);
+        this.withdrawPer(this.continuation(active, proj, ctx, true, null), proj, ctx, out);
       }
       return;
     }
@@ -280,10 +281,25 @@ export class CrewController implements AgentController {
       ...(this.cfg.nav === undefined ? {} : { config: this.cfg.nav }),
     });
     if (!certified.ok) {
-      this.withdraw(reasonOf(certified.failure), proj, ctx, out);
+      this.withdrawPer(this.continuation(active, proj, ctx, false, reasonOf(certified.failure)), proj, ctx, out);
       return;
     }
     this.maybeSwitch(proj, ctx, out);
+  }
+
+  /** The autonomy policy's verdict on carrying on with the committed plan. */
+  private continuation(active: ActivePlan, proj: AgentProjection, ctx: PlanningContext, routeBlocked: boolean, certifyFailure: string | null) {
+    return decideContinuation(this.callsign, {
+      phase: this.phaseOf(active, proj),
+      mode: active.mode,
+      routeBlocked,
+      certifyFailure,
+      forecastReliable: ctx.ensemble.reliability !== "unreliable",
+    });
+  }
+
+  private withdrawPer(verdict: ReturnType<CrewController["continuation"]>, proj: AgentProjection, ctx: PlanningContext, out: TickOutput): void {
+    if (verdict.action === "withdraw") this.withdraw(verdict.reason, proj, ctx, out);
   }
 
   private phaseOf(active: ActivePlan, proj: AgentProjection): "approach" | "work" | "return" {
@@ -544,7 +560,13 @@ export class CrewController implements AgentController {
         if (site === undefined) return reject("unknown_site");
         if (site.knownResolved) return reject("target_resolved");
         const result = this.candidateSearch(ctx, new Set([obj.targetId]));
-        if (result.best === null) return reject(result.limitingReason ?? "no_feasible_mission_in_model");
+        const verdict = decideOrder(this.callsign, {
+          kind: obj.kind,
+          forecastReliable: ctx.ensemble.reliability !== "unreliable",
+          feasible: result.best !== null,
+          limitingReason: result.limitingReason,
+        });
+        if (verdict.action === "refuse") return reject(verdict.reason);
         const hadPlan = this.active !== null;
         this.objective = obj;
         this.holding = false;
