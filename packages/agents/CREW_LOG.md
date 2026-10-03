@@ -8,3 +8,10 @@ Running log for the crew increments. Newest last. (Each branch adds its own sect
 - Behaviour-preserving: the controller now asks the policy, with the same reason codes and the same announcement wording as before. All pre-existing controller tests pass unchanged.
 - Safety check caught in review of my own cut: a crew on its normal return phase must still withdraw when its route closes, so only withdrawing/retreating crews are exempt.
 - return/hold/avoid/resume are always accepted: they only reduce exposure. Survival reasons are ordered: observation, certifier, forecast reliability.
+
+## Increment 6: callsigns and communication style (feat/crew-6-callsigns, from main)
+- `callsigns.ts`: `CallsignDirectory.resolve` is total (match / ambiguous / unknown, never throws) and deterministic regardless of directory order. Normalizes case, punctuation and number words ("Crew-Two" = "crew 2"); strips spoken filler ("the", "please"). Exact normalized match wins, else all heard tokens must appear in a callsign. Crew 1 never matches Crew 10. Identical callsigns are always ambiguous. `clarification()` gives the question to ask.
+- `defaultCallsign` derives the documented fictional callsigns (Crew N, Scout) from authored ids.
+- `style.ts`: `plain` (default) or `radio` (callsign-first, shorter opening). Never changes the reason or uncertainty; test pins that the reason text is kept verbatim.
+- `ControllerOptions.style` per crew; the stored last report is the styled text, i.e. what was actually said.
+- The communication package already resolves explicit names itself (matchName); I did not touch it (out of lane). This directory is the crew-side source of truth callers can adopt.

@@ -31,6 +31,7 @@ import type { AgentProjection, SimInput } from "@ember/simulation";
 import { RoadIndex, type PublicMap } from "@ember/simulation/model";
 import { decideContinuation, decideOrder } from "./autonomy.js";
 import { EvidenceTracker } from "./evidence.js";
+import { applyStyle, type CommStyle } from "./style.js";
 import { explain } from "./explain.js";
 import {
   DEFAULT_CONTROLLER_CONFIG,
@@ -62,6 +63,8 @@ export interface ControllerOptions {
   readonly role: "protection_crew" | "scout";
   readonly map: PublicMap;
   readonly config?: Partial<ControllerConfig>;
+  /** How this agent words its reports; plain by default. */
+  readonly style?: CommStyle;
 }
 
 /**
@@ -74,6 +77,7 @@ export class CrewController implements AgentController {
   readonly agentId: AgentId;
   readonly callsign: string;
   protected readonly role: "protection_crew" | "scout";
+  readonly style: CommStyle;
   protected readonly map: PublicMap;
   protected readonly road: RoadIndex;
   protected readonly cfg: ControllerConfig;
@@ -106,6 +110,7 @@ export class CrewController implements AgentController {
     this.agentId = options.agentId;
     this.callsign = options.callsign;
     this.role = options.role;
+    this.style = options.style ?? "plain";
     this.map = options.map;
     this.road = new RoadIndex(options.map);
     this.cfg = { ...DEFAULT_CONTROLLER_CONFIG, ...options.config };
@@ -692,8 +697,9 @@ export class CrewController implements AgentController {
   }
 
   protected report(out: TickOutput, text: string, urgent: boolean): void {
-    this.lastReportText = text;
-    const entry: CoordinatorReport = { text, urgent };
+    const styled = applyStyle(this.callsign, text, this.style);
+    this.lastReportText = styled;
+    const entry: CoordinatorReport = { text: styled, urgent };
     out.reports.push(entry);
   }
 
