@@ -38,7 +38,9 @@ export type SchedulerEvent =
   | { readonly kind: "audio_preparing"; readonly itemId: string }
   | { readonly kind: "dropped"; readonly itemId: string; readonly reason: "superseded" | "duplicate" | "incident_ended" | "flushed" }
   | { readonly kind: "interrupted"; readonly itemId: string }
-  | { readonly kind: "started"; readonly itemId: string };
+  | { readonly kind: "started"; readonly itemId: string }
+  /** Speech synthesis or playback failed. The exact text stays in the transcript and the alert stays visible. */
+  | { readonly kind: "audio_unavailable"; readonly itemId: string };
 
 export interface SchedulerOptions {
   readonly sink: SpeechSink;
@@ -183,6 +185,13 @@ export class AudioScheduler {
     this.queue = this.queue.filter((q) => q.id !== head.id);
     this.playing = head;
     this.emit({ kind: "started", itemId: head.id });
-    this.opts.sink.play(head);
+    try {
+      this.opts.sink.play(head);
+    } catch {
+      // A failed speaker must never freeze the incident or block later items.
+      this.playing = null;
+      this.emit({ kind: "audio_unavailable", itemId: head.id });
+      this.pump();
+    }
   }
 }

@@ -403,6 +403,28 @@ describe("audio scheduler", () => {
     expect(sink.spoken).toHaveLength(2);
   });
 
+  it("reports audio unavailable when playback fails and carries on with the next item", () => {
+    const events: SchedulerEvent[] = [];
+    const spoken: string[] = [];
+    let broken = true;
+    const sink = {
+      play: (i: SpeechItem) => {
+        if (broken) throw new Error("speaker offline");
+        spoken.push(i.text);
+      },
+      stop: () => undefined,
+    };
+    const s = new AudioScheduler({ sink, currentPlanRevision: () => 1, onEvent: (e) => events.push(e) });
+    s.enqueue(item("u1", 2, "Crew 2 is withdrawing.", 1, "crew-2"));
+    expect(events.some((e) => e.kind === "audio_unavailable" && e.itemId === "u1")).toBe(true);
+    // The urgent alert was still shown, and the incident is untouched.
+    expect(events.some((e) => e.kind === "alert" && e.itemId === "u1")).toBe(true);
+    expect(s.nowPlaying).toBeNull();
+    broken = false;
+    s.enqueue(item("r1", 4, "Crew 1 is holding.", 2));
+    expect(spoken).toEqual(["Crew 1 is holding."]);
+  });
+
   it("flush drops every queued sample immediately", () => {
     const { s, sink } = scheduler();
     s.enqueue(item("r1", 4, "one", 1));
