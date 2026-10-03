@@ -19,6 +19,7 @@
     "@ember/knowledge": "workspace:*",
     "@ember/forecast": "workspace:*",
     "@ember/navigation": "workspace:*",
-    "@ember/simulation": "workspace:*"
+    "@ember/simulation": "workspace:*",
+    "zod": "3.24.2"
   }
 }
