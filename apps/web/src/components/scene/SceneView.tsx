@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { RefObject } from "react";
 import type { RootState } from "@react-three/fiber";
 import type { Camera } from "three";
 import { SceneCanvas } from "./SceneCanvas.js";
@@ -36,6 +37,9 @@ export function SceneView({
   const [showFireCells, setShowFireCells] = useState(true);
   const [inspectedCell, setInspectedCell] = useState<FireCellMarker | null>(null);
   const controlsRef = useRef<CameraControlsHandle>(null);
+  const legendRef = useRef<HTMLDivElement>(null);
+  const cellPanelRef = useRef<HTMLDivElement>(null);
+  const reservedElementRefs = useMemo(() => [legendRef, cellPanelRef], []);
 
   const handleReady = useCallback((state: RootState) => {
     setRenderContext({ camera: state.camera, canvasElement: state.gl.domElement });
@@ -100,14 +104,21 @@ export function SceneView({
         camera={renderContext?.camera ?? null}
         canvasElement={renderContext?.canvasElement ?? null}
         labels={labels}
+        reservedElementRefs={reservedElementRefs}
       />
       <SceneLegend
+        ref={legendRef}
         showFireCells={showFireCells}
         onToggleFireCells={() => setShowFireCells((value) => !value)}
         onResetCamera={() => controlsRef.current?.reset()}
       />
       {inspectedCell ? (
-        <CellInspectionPanel cell={inspectedCell} simTimeMs={simTimeMs} onClose={() => setInspectedCell(null)} />
+        <CellInspectionPanel
+          panelRef={cellPanelRef}
+          cell={inspectedCell}
+          simTimeMs={simTimeMs}
+          onClose={() => setInspectedCell(null)}
+        />
       ) : null}
     </div>
   );
@@ -122,14 +133,16 @@ function CellInspectionPanel({
   cell,
   simTimeMs,
   onClose,
+  panelRef,
 }: {
   readonly cell: FireCellMarker;
   readonly simTimeMs: number | null;
   readonly onClose: () => void;
+  readonly panelRef: RefObject<HTMLDivElement | null>;
 }) {
   const ageMs = simTimeMs === null ? null : Math.max(0, simTimeMs - cell.lastObservedAt);
   return (
-    <div className="cell-inspection-panel" role="status">
+    <div ref={panelRef} className="cell-inspection-panel" role="status">
       <button type="button" className="cell-inspection-panel__close" onClick={onClose} aria-label="Close">
         ×
       </button>

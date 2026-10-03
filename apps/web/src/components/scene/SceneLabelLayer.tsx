@@ -1,8 +1,9 @@
 import { useEffect, useRef } from "react";
 import type { Camera } from "three";
 import { Vector3 } from "three";
+import type { RefObject } from "react";
 import { projectToScreen } from "./projectToScreen.js";
-import { resolveLabelCollisions, type SizedLabelPoint } from "./stackLabels.js";
+import { resolveLabelCollisions, type ReservedBox, type SizedLabelPoint } from "./stackLabels.js";
 
 const LABEL_HEIGHT_PX = 20;
 /** Rough glyph width estimate so two co-located labels don't overlap; not pixel-exact. */
@@ -22,6 +23,8 @@ export interface SceneLabelLayerProps {
   readonly camera: Camera | null;
   readonly canvasElement: HTMLCanvasElement | null;
   readonly labels: LabelDescriptor[];
+  /** Fixed UI overlays (legend, inspection panel) that scene labels must not render underneath. */
+  readonly reservedElementRefs?: ReadonlyArray<RefObject<HTMLElement | null>>;
 }
 
 /**
@@ -31,7 +34,12 @@ export interface SceneLabelLayerProps {
  * (docs/FRONTEND.md: "keep simulation state out of per-frame React
  * reconciliation").
  */
-export function SceneLabelLayer({ camera, canvasElement, labels }: SceneLabelLayerProps) {
+export function SceneLabelLayer({
+  camera,
+  canvasElement,
+  labels,
+  reservedElementRefs = [],
+}: SceneLabelLayerProps) {
   const elementsRef = useRef(new Map<string, HTMLDivElement>());
   const worldPoint = useRef(new Vector3());
 
@@ -53,7 +61,16 @@ export function SceneLabelLayer({ camera, canvasElement, labels }: SceneLabelLay
             height: LABEL_HEIGHT_PX,
           };
         });
-        const placed = resolveLabelCollisions(sized);
+        const reservedBoxes: ReservedBox[] = reservedElementRefs
+          .map((ref) => ref.current?.getBoundingClientRect())
+          .filter((box): box is DOMRect => box !== undefined)
+          .map((box) => ({
+            left: box.left - rect.left,
+            right: box.right - rect.left,
+            top: box.top - rect.top,
+            bottom: box.bottom - rect.top,
+          }));
+        const placed = resolveLabelCollisions(sized, undefined, reservedBoxes);
 
         for (const point of placed) {
           const element = elementsRef.current.get(point.id);

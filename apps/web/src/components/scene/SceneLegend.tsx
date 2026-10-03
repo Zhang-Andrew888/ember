@@ -1,3 +1,4 @@
+import { forwardRef } from "react";
 import { colors } from "../../styles/colors.js";
 
 export interface SceneLegendProps {
@@ -10,10 +11,15 @@ export interface SceneLegendProps {
  * Upper scene-corner overlay: layer legend and reset camera
  * (docs/FRONTEND.md). These are inspection/view controls only - never
  * command controls (nothing here issues a task or addresses a crew).
+ * Forwards a ref to its root element so SceneView can measure it and keep
+ * scene labels from rendering underneath it.
  */
-export function SceneLegend({ showFireCells, onToggleFireCells, onResetCamera }: SceneLegendProps) {
+export const SceneLegend = forwardRef<HTMLDivElement, SceneLegendProps>(function SceneLegend(
+  { showFireCells, onToggleFireCells, onResetCamera },
+  ref,
+) {
   return (
-    <div className="scene-legend" role="group" aria-label="Map layers and camera">
+    <div ref={ref} className="scene-legend" role="group" aria-label="Map layers and camera">
       <ul className="scene-legend__key">
         <li>
           <span className="scene-legend__swatch" style={{ background: colors.observedFire }} />
@@ -39,4 +45,4 @@ export function SceneLegend({ showFireCells, onToggleFireCells, onResetCamera }:
       </div>
     </div>
   );
-}
+});

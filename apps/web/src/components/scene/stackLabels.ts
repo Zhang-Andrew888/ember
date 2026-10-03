@@ -14,6 +14,13 @@ export interface PlacedLabel {
   readonly visible: boolean;
 }
 
+export interface ReservedBox {
+  readonly left: number;
+  readonly right: number;
+  readonly top: number;
+  readonly bottom: number;
+}
+
 /**
  * Two entities at the same node (an agent idle at a refuge, a crew working
  * on-site) project to the same screen point and their labels overlap
@@ -22,9 +29,19 @@ export interface PlacedLabel {
  * later label straight up, in input order, until its box clears every box
  * already placed. Pure/testable: no DOM measurement, approximate box sizes
  * passed in by the caller.
+ *
+ * `reservedBoxes` seeds the collision set with fixed UI regions (the scene
+ * legend, an inspection panel) that don't move with the camera - a label
+ * can still render underneath one of those as the camera pans, which is
+ * just as illegible as two labels overlapping each other (also found via
+ * a Playwright smoke check, at the smaller 1024x720 target viewport).
  */
-export function resolveLabelCollisions(points: SizedLabelPoint[], verticalGap = 3): PlacedLabel[] {
-  const placedBoxes: Array<{ left: number; right: number; top: number; bottom: number }> = [];
+export function resolveLabelCollisions(
+  points: SizedLabelPoint[],
+  verticalGap = 3,
+  reservedBoxes: ReservedBox[] = [],
+): PlacedLabel[] {
+  const placedBoxes: Array<{ left: number; right: number; top: number; bottom: number }> = [...reservedBoxes];
   const result: PlacedLabel[] = [];
 
   for (const point of points) {
