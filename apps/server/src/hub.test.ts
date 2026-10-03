@@ -142,7 +142,8 @@ describe("wire protocol and information boundary", () => {
     expect(session.incident.inputLog).toHaveLength(0);
     hub.reconnect(id);
     const back = hub.drain(id).map(wire);
-    expect(back.find((m) => m.type === "notice" && m.kind === "unsent_utterance")?.detail).toBe("Crew 2, protect the");
+    const unsentNotice = back.find((m) => m.type === "notice" && m.kind === "unsent_utterance");
+    expect(unsentNotice?.type === "notice" ? unsentNotice.detail : undefined).toBe("Crew 2, protect the");
     hub.handle(id, JSON.stringify({ type: "resend" }), 9000);
     const after = hub.drain(id).map(wire);
     expect(after.some((m) => m.type === "receipt")).toBe(true);
