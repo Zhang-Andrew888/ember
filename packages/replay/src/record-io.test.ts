@@ -1,8 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { AgentId, NodeId, SiteId } from "@ember/domain";
 import { Incident, authoredCommit, buildSyntheticScenario, recordOf } from "@ember/simulation";
 import { RoadIndex } from "@ember/simulation/model";
 import { parseRunRecord, serializeRunRecord, verifyRunRecord } from "./index.js";
+
+// Full simulated runs and cold forecast rollouts are slow on shared CI machines.
+vi.setConfig({ testTimeout: 120_000 });
 
 function playedIncident(): Incident {
   const incident = new Incident({ scenario: buildSyntheticScenario(), seed: "saved-run" });

@@ -1,0 +1,574 @@
+import {
+  DecisionEvent,
+  MissionPlan,
+  NodeId,
+  SequenceNumber,
+  SimTimeMs,
+  type AgentId,
+  type AgentPosition,
+  type DecisionType,
+  type EdgeId,
+  type MissionPlan as MissionPlanT,
+  type Objective,
+  type SiteId,
+} from "@ember/domain";
+import { ForecastService, admitsProtection, type ForecastEnsemble, type ForecastEvent } from "@ember/forecast";
+import {
+  ALWAYS_FREE,
+  DEFAULT_NAV_CONFIG,
+  certifyPlan,
+  planMissions,
+  planRetreat,
+  planReturn,
+  protectionTargets,
+  type CertifyFailure,
+  type PlanningContext,
+  type MissionSearchResult,
+} from "@ember/navigation";
+import type { AgentProjection, SimInput } from "@ember/simulation";
+import { RoadIndex, type PublicMap } from "@ember/simulation/model";
+import { EvidenceTracker } from "./evidence.js";
+import { explain } from "./explain.js";
+import {
+  DEFAULT_CONTROLLER_CONFIG,
+  type AgentController,
+  type ControllerConfig,
+  type ControllerEnvironment,
+  type ControllerState,
+  type CoordinatorReport,
+  type TickOutput,
+} from "./types.js";
+
+type PlanKind = "mission" | "return" | "emergency" | "halt";
+
+interface ActivePlan {
+  readonly plan: MissionPlanT;
+  readonly mode: "normal" | "withdrawing" | "retreating";
+  readonly kind: PlanKind;
+  readonly targetId: string | null;
+  readonly workSiteId: SiteId | null;
+  readonly score: number;
+  readonly committedAtMs: number;
+  readonly approachCount: number;
+}
+
+export interface ControllerOptions {
+  readonly agentId: AgentId;
+  readonly callsign: string;
+  readonly role: "protection_crew" | "scout";
+  readonly map: PublicMap;
+  readonly config?: Partial<ControllerConfig>;
+}
+
+/**
+ * Autonomous protection-crew decision-maker. Every tick it rechecks the committed plan against
+ * its own forecast and directly observed closures; on failure it withdraws, retreats or reports
+ * itself stranded without waiting for approval. Coordinator objectives restrict its choices but
+ * never override survival action.
+ */
+export class CrewController implements AgentController {
+  readonly agentId: AgentId;
+  readonly callsign: string;
+  protected readonly role: "protection_crew" | "scout";
+  protected readonly map: PublicMap;
+  protected readonly road: RoadIndex;
+  protected readonly cfg: ControllerConfig;
+  protected readonly forecast: ForecastService;
+  protected readonly evidence: EvidenceTracker;
+  protected active: ActivePlan | null = null;
+  protected objective: Objective | null = null;
+  protected pendingObjective: Objective | null = null;
+  protected holding = false;
+  protected stranded = false;
+  private currentState: ControllerState = "HOLDING";
+  private seq = 0;
+  private fireDirty = true;
+  private evalDirty = true;
+  private lastEvalMs = -Infinity;
+  private lastSwitchMs = -Infinity;
+  private rebuildDueAt: number | null = null;
+  private eventPointer = 0;
+  private seenObjectives = new Set<string>();
+  private lastIdleReason: string | null = null;
+  private autonomousForced = false;
+
+  constructor(options: ControllerOptions) {
+    this.agentId = options.agentId;
+    this.callsign = options.callsign;
+    this.role = options.role;
+    this.map = options.map;
+    this.road = new RoadIndex(options.map);
+    this.cfg = { ...DEFAULT_CONTROLLER_CONFIG, ...options.config };
+    this.forecast = new ForecastService(options.agentId, options.map, this.cfg.forecast);
+    this.evidence = new EvidenceTracker(options.map);
+  }
+
+  get state(): ControllerState {
+    return this.currentState;
+  }
+
+  get currentEnsemble(): ForecastEnsemble | null {
+    return this.forecast.current;
+  }
+
+  get activePlanId(): string | null {
+    return this.active?.plan.id ?? null;
+  }
+
+  receiveObjective(objective: Objective): void {
+    if (objective.recipientId !== this.agentId || this.seenObjectives.has(objective.id)) return;
+    this.seenObjectives.add(objective.id);
+    this.pendingObjective = objective;
+  }
+
+  resumeAutonomous(): void {
+    this.objective = null;
+    this.pendingObjective = null;
+    this.holding = false;
+    this.autonomousForced = true;
+    this.evalDirty = true;
+  }
+
+  // ---------- tick ----------
+
+  tick(proj: AgentProjection, env: ControllerEnvironment = {}): TickOutput {
+    const out: TickOutput = { state: "HOLDING", orders: [], decisions: [], reports: [], forecastEvents: [] };
+    const now = proj.simTimeMs;
+    if (proj.state === "lost") {
+      this.currentState = "LOST";
+      this.active = null;
+      return { ...out, state: "LOST" };
+    }
+    const fire = this.evidence.ingest(proj.knowledge.observations);
+    if (fire) {
+      this.fireDirty = true;
+      this.evalDirty = true;
+    }
+
+    const ensemble = this.refreshForecast(proj, now);
+    out.forecastEvents.push(...this.forecast.events.slice(this.eventPointer));
+    this.eventPointer = this.forecast.events.length;
+
+    // Reconcile with the simulator: a missing commitment means done, cancelled or rejected.
+    if (proj.commitment === null && this.active !== null && now > this.active.committedAtMs) {
+      this.active = null;
+    }
+    if (proj.position.kind === "node" && this.active === null) this.stranded = this.stranded && !this.atRefuge(proj.position);
+
+    const ctx = this.context(proj, ensemble, env);
+
+    if (this.pendingObjective !== null) this.handleObjective(this.pendingObjective, proj, ctx, out);
+    this.pendingObjective = null;
+
+    if (this.active !== null) {
+      this.monitor(proj, ctx, out);
+    } else {
+      this.chooseWhenIdle(proj, ctx, out);
+    }
+    this.currentState = this.computeState(proj);
+    return { ...out, state: this.currentState };
+  }
+
+  // ---------- forecast ----------
+
+  private refreshForecast(proj: AgentProjection, now: number): ForecastEnsemble {
+    const cur = this.forecast.current;
+    const due = cur === null || this.fireDirty || now - cur.builtAtMs >= (this.cfg.forecast?.refreshMs ?? 25_000);
+    let ensemble = cur;
+    if (due || ensemble === null) {
+      ensemble = this.forecast.update(proj.knowledge, now);
+      this.fireDirty = false;
+    }
+    if (ensemble.reliability === "unreliable") {
+      if (this.rebuildDueAt === null && this.forecast.needsRebuild(proj.knowledge)) {
+        this.rebuildDueAt = now + this.cfg.rebuildLatencyMs;
+      }
+      if (this.rebuildDueAt !== null && now >= this.rebuildDueAt) {
+        ensemble = this.forecast.rebuild(proj.knowledge, now);
+        this.rebuildDueAt = null;
+        this.evalDirty = true;
+      }
+    } else {
+      this.rebuildDueAt = null;
+    }
+    return ensemble;
+  }
+
+  protected context(proj: AgentProjection, ensemble: ForecastEnsemble, env: ControllerEnvironment): PlanningContext {
+    const avoid = new Set<EdgeId>();
+    return {
+      agentId: this.agentId,
+      road: this.road,
+      ensemble,
+      closedCells: this.evidence.closed,
+      position: proj.position,
+      nowMs: proj.simTimeMs,
+      oracle: env.oracle ?? ALWAYS_FREE,
+      config: this.cfg.nav ?? DEFAULT_NAV_CONFIG,
+      avoidEdges: avoid,
+      diagnose: false,
+    };
+  }
+
+  // ---------- monitoring an active plan ----------
+
+  private monitor(proj: AgentProjection, ctx: PlanningContext, out: TickOutput): void {
+    const active = this.active;
+    if (active === null) return;
+    const legIndex = proj.commitment?.legIndex ?? 0;
+
+    if (this.routeBlocked(active.plan, legIndex, proj.position)) {
+      if (active.mode !== "normal" || active.kind === "halt") {
+        this.replanEmergency("route_closed_by_observation", proj, ctx, out, active.mode === "normal");
+      } else {
+        this.withdraw("route_closed_by_observation", proj, ctx, out);
+      }
+      return;
+    }
+    if (active.mode !== "normal" || active.kind === "halt") return;
+
+    if (active.workSiteId !== null) {
+      const site = this.evidence.siteKnowledge().find((s) => s.siteId === active.workSiteId);
+      const phase = this.phaseOf(active, proj);
+      if (site?.knownResolved === true && phase !== "return") {
+        this.returnNow("target_resolved", proj, ctx, out);
+        return;
+      }
+    }
+
+    const certified = certifyPlan({
+      road: this.road,
+      ensemble: ctx.ensemble,
+      closedCells: this.evidence.closed,
+      plan: active.plan,
+      position: proj.position,
+      legIndex,
+      nowMs: proj.simTimeMs,
+      ...(this.cfg.nav === undefined ? {} : { config: this.cfg.nav }),
+    });
+    if (!certified.ok) {
+      this.withdraw(reasonOf(certified.failure), proj, ctx, out);
+      return;
+    }
+    this.maybeSwitch(proj, ctx, out);
+  }
+
+  private phaseOf(active: ActivePlan, proj: AgentProjection): "approach" | "work" | "return" {
+    const c = proj.commitment;
+    if (c === null) return "approach";
+    if (c.working) return "work";
+    const w = active.plan.workInterval;
+    return w.endMs > w.startMs && c.legIndex >= active.approachCount && proj.simTimeMs >= w.endMs ? "return" : "approach";
+  }
+
+  /** True when any cell the agent still has to cross was directly observed burning or burned. */
+  private routeBlocked(plan: MissionPlanT, legIndex: number, position: AgentPosition): boolean {
+    const closed = this.evidence.closed;
+    if (closed.size === 0) return false;
+    for (let i = legIndex; i < plan.timedLegs.length; i++) {
+      const leg = plan.timedLegs[i]!;
+      const edge = this.road.mustEdge(leg.edgeId);
+      let lo = 0;
+      let hi = edge.length;
+      if (i === legIndex && position.kind === "edge" && position.edgeId === edge.id) {
+        const d = position.distanceAlongPolyline;
+        if (leg.direction === "forward") lo = d;
+        else hi = d;
+      }
+      for (const c of edge.cells) {
+        if (c.endDist < lo || c.startDist > hi) continue;
+        // The cell the agent stands in is not ahead of it.
+        if (i === legIndex && position.kind === "edge" && c.startDist <= position.distanceAlongPolyline && position.distanceAlongPolyline <= c.endDist) continue;
+        if (closed.has(c.cell)) return true;
+      }
+    }
+    return false;
+  }
+
+  // ---------- survival responses ----------
+
+  private withdraw(reason: string, proj: AgentProjection, ctx: PlanningContext, out: TickOutput): void {
+    const ret = planReturn(ctx);
+    if (ret !== null) {
+      this.commit(proj, ret.plan, "withdrawing", "emergency", null, null, 0, out);
+      this.decide(out, proj, "withdrawal_triggered", reason, `withdrawing to ${ret.refugeNodeId}`);
+      this.report(out, explain(this.callsign, { type: "withdrawal_triggered", reasonCode: reason, actualAction: "" }), true);
+      return;
+    }
+    this.retreatOrStrand(reason, proj, ctx, out);
+  }
+
+  private returnNow(reason: string, proj: AgentProjection, ctx: PlanningContext, out: TickOutput): void {
+    const ret = planReturn(ctx);
+    if (ret !== null) {
+      this.commit(proj, ret.plan, "normal", "return", null, null, 0, out);
+      this.decide(out, proj, "mission_update", reason, `returning to ${ret.refugeNodeId}`);
+      this.report(out, explain(this.callsign, { type: "mission_update", reasonCode: reason, actualAction: "returning to refuge" }), false);
+      return;
+    }
+    this.retreatOrStrand("no_normal_return", proj, ctx, out);
+  }
+
+  private replanEmergency(reason: string, proj: AgentProjection, ctx: PlanningContext, out: TickOutput, wasNormal: boolean): void {
+    if (wasNormal) {
+      this.withdraw(reason, proj, ctx, out);
+      return;
+    }
+    const ret = planReturn(ctx);
+    if (ret !== null) {
+      this.commit(proj, ret.plan, "withdrawing", "emergency", null, null, 0, out);
+      this.decide(out, proj, "withdrawal_triggered", reason, `withdrawing to ${ret.refugeNodeId}`);
+      return;
+    }
+    this.retreatOrStrand(reason, proj, ctx, out);
+  }
+
+  private retreatOrStrand(reason: string, proj: AgentProjection, ctx: PlanningContext, out: TickOutput): void {
+    const retreat = planRetreat(ctx);
+    if (retreat !== null) {
+      this.stranded = false;
+      this.commit(proj, retreat.plan, "retreating", "emergency", null, null, 0, out);
+      this.decide(out, proj, "retreat_triggered", "no_normal_return", `retreating to ${retreat.refugeNodeId} (best effort)`);
+      this.report(out, explain(this.callsign, { type: "retreat_triggered", reasonCode: "no_normal_return", actualAction: "" }), true);
+      return;
+    }
+    if (!this.stranded) {
+      this.stranded = true;
+      this.halt(proj, out);
+      this.decide(out, proj, "stranded_reported", "no_known_passable_route", "holding position and observing");
+      this.report(out, explain(this.callsign, { type: "stranded_reported", reasonCode: "no_known_passable_route", actualAction: "" }), true);
+    }
+    void reason;
+  }
+
+  /** Stop where the agent is. A mid-edge emergency stop is allowed only when stranded. */
+  private halt(proj: AgentProjection, out: TickOutput): void {
+    if (proj.position.kind === "node") {
+      this.active = null;
+      return;
+    }
+    const refuge = this.map.refuges[0]?.nodeId ?? proj.position.edgeId;
+    const plan = MissionPlan.parse({
+      id: `halt-${this.agentId}-${proj.simTimeMs}`,
+      recipientId: this.agentId,
+      knowledgeRevision: SequenceNumber.parse(proj.knowledgeRevision),
+      timedLegs: [],
+      workInterval: { startMs: SimTimeMs.parse(proj.simTimeMs), endMs: SimTimeMs.parse(proj.simTimeMs) },
+      refugeId: NodeId.parse(refuge),
+      reservationRevision: 0,
+      limitingReason: "stranded_halt",
+    });
+    this.commit(proj, plan, "retreating", "halt", null, null, 0, out);
+  }
+
+  // ---------- choosing work ----------
+
+  private atRefuge(position: AgentPosition): boolean {
+    return position.kind === "node" && this.road.refugeNodes.has(position.nodeId);
+  }
+
+  protected candidateSearch(ctx: PlanningContext, allowed: ReadonlySet<string> | null): MissionSearchResult {
+    const targets = protectionTargets(this.evidence.siteKnowledge(), this.cfg.nav?.crewWorkRate ?? 1, allowed);
+    return planMissions(ctx, targets);
+  }
+
+  private chooseWhenIdle(proj: AgentProjection, ctx: PlanningContext, out: TickOutput): void {
+    const now = proj.simTimeMs;
+    const dirty = this.evalDirty || now - this.lastEvalMs >= this.cfg.reassessEveryMs;
+    if (!dirty) return;
+
+    if (!this.atRefuge(proj.position)) {
+      // Not safe at a refuge and nothing committed: get to one (stranded agents retry on evidence).
+      this.evalDirty = false;
+      this.lastEvalMs = now;
+      this.withdraw(this.stranded ? "no_known_passable_route" : "forecast_wait_unsafe", proj, ctx, out);
+      return;
+    }
+    this.stranded = false;
+
+    if (this.holding) {
+      this.evalDirty = false;
+      this.lastEvalMs = now;
+      return;
+    }
+    this.evalDirty = false;
+    this.lastEvalMs = now;
+
+    const allowed = this.objective?.kind === "protect_site" && this.objective.targetId !== null ? new Set([this.objective.targetId]) : null;
+    if (!admitsProtection(ctx.ensemble)) {
+      this.noteIdle(proj, "forecast_unreliable", out);
+      return;
+    }
+    const result = this.candidateSearch(ctx, allowed);
+    if (result.best !== null) {
+      this.lastIdleReason = null;
+      const t = result.best.target;
+      this.commit(proj, result.best.plan, "normal", "mission", t.id, t.siteId, result.best.score, out);
+      this.decide(out, proj, "mission_start", "mission_admitted", `heading to ${this.siteName(t.id)} (work ${Math.round(result.best.workMs / 1000)} s, return to ${result.best.refugeNodeId})`);
+      this.report(out, explain(this.callsign, { type: "mission_start", reasonCode: "mission_admitted", actualAction: `heading to ${this.siteName(t.id)}` }), false);
+      return;
+    }
+    if (allowed !== null && this.objective !== null) {
+      // Reassessed once at refuge: still failing, so reject this revision and resume autonomy.
+      const reason = result.limitingReason ?? "no_feasible_mission_in_model";
+      this.decide(out, proj, "objective_rejected", reason, `objective ${this.objective.id} cannot be satisfied`);
+      this.report(out, explain(this.callsign, { type: "objective_rejected", reasonCode: reason, actualAction: "" }, `(${reason})`), true);
+      this.objective = null;
+      this.evalDirty = true;
+      return;
+    }
+    this.noteIdle(proj, result.limitingReason ?? "no_feasible_mission_in_model", out);
+  }
+
+  private noteIdle(proj: AgentProjection, reason: string, out: TickOutput): void {
+    if (this.lastIdleReason === reason) return;
+    this.lastIdleReason = reason;
+    this.decide(out, proj, "idle", reason, "holding at refuge and reassessing on new evidence");
+  }
+
+  private maybeSwitch(proj: AgentProjection, ctx: PlanningContext, out: TickOutput): void {
+    const active = this.active;
+    if (active === null || active.kind !== "mission" || this.objective !== null || this.holding) return;
+    const c = proj.commitment;
+    if (c === null || c.working || c.legIndex >= active.approachCount) return;
+    const now = proj.simTimeMs;
+    if (now - this.lastSwitchMs < this.cfg.switchCooldownMs) return;
+    if (!this.evalDirty && now - this.lastEvalMs < this.cfg.reassessEveryMs) return;
+    this.lastEvalMs = now;
+    this.evalDirty = false;
+    const result = this.candidateSearch(ctx, null);
+    const best = result.best;
+    if (best === null || best.target.id === active.targetId) return;
+    if (best.score < active.score * this.cfg.switchMargin) return;
+    this.lastSwitchMs = now;
+    this.commit(proj, best.plan, "normal", "mission", best.target.id, best.target.siteId, best.score, out);
+    this.decide(out, proj, "mission_update", "better_mission_found", `switching to ${this.siteName(best.target.id)}`);
+  }
+
+  // ---------- objectives ----------
+
+  private handleObjective(obj: Objective, proj: AgentProjection, ctx: PlanningContext, out: TickOutput): void {
+    const reject = (reason: string): void => {
+      this.decide(out, proj, "objective_rejected", reason, `objective ${obj.id} rejected; current plan kept`);
+      this.report(out, explain(this.callsign, { type: "objective_rejected", reasonCode: reason, actualAction: "" }, `(${reason})`), true);
+    };
+    this.autonomousForced = false;
+    switch (obj.kind) {
+      case "protect_site": {
+        if (obj.targetId === null) return reject("missing_target");
+        const sites = this.evidence.siteKnowledge();
+        const site = sites.find((s) => s.siteId === obj.targetId);
+        if (site === undefined) return reject("unknown_site");
+        if (site.knownResolved) return reject("target_resolved");
+        const result = this.candidateSearch(ctx, new Set([obj.targetId]));
+        if (result.best === null) return reject(result.limitingReason ?? "no_feasible_mission_in_model");
+        const hadPlan = this.active !== null;
+        this.objective = obj;
+        this.holding = false;
+        const t = result.best.target;
+        this.commit(proj, result.best.plan, "normal", "mission", t.id, t.siteId, result.best.score, out);
+        this.decide(out, proj, hadPlan ? "mission_update" : "mission_start", "objective_accepted", `heading to ${this.siteName(t.id)} on coordinator objective`);
+        return;
+      }
+      case "return_to_refuge":
+      case "hold": {
+        if (this.atRefuge(proj.position) && this.active === null) {
+          this.holding = obj.kind === "hold";
+          this.objective = obj.kind === "hold" ? obj : null;
+          return;
+        }
+        const ret = planReturn(ctx);
+        if (ret === null) return reject("no_normal_return");
+        this.holding = obj.kind === "hold";
+        this.objective = obj.kind === "hold" ? obj : null;
+        this.commit(proj, ret.plan, "normal", "return", null, null, 0, out);
+        this.decide(out, proj, "mission_update", "objective_accepted", `returning to ${ret.refugeNodeId} on coordinator objective`);
+        return;
+      }
+      default:
+        return reject("objective_not_supported");
+    }
+  }
+
+  // ---------- helpers ----------
+
+  private siteName(id: string): string {
+    return this.map.sites.find((s) => s.id === id)?.name ?? id;
+  }
+
+  protected commit(
+    proj: AgentProjection,
+    plan: MissionPlanT,
+    mode: "normal" | "withdrawing" | "retreating",
+    kind: PlanKind,
+    targetId: string | null,
+    workSiteId: SiteId | null,
+    score: number,
+    out: TickOutput,
+  ): void {
+    const stamped = MissionPlan.parse({ ...plan, knowledgeRevision: SequenceNumber.parse(proj.knowledgeRevision) });
+    const hasWork = stamped.workInterval.endMs > stamped.workInterval.startMs;
+    const approachCount = hasWork
+      ? stamped.timedLegs.filter((l) => l.departMs < stamped.workInterval.startMs).length
+      : stamped.timedLegs.length;
+    this.active = { plan: stamped, mode, kind, targetId, workSiteId, score, committedAtMs: proj.simTimeMs, approachCount };
+    const order: SimInput = { kind: "commit_plan", agentId: this.agentId, plan: stamped, workSiteId, mode };
+    out.orders.push(order);
+    this.evalDirty = false;
+  }
+
+  protected decide(out: TickOutput, proj: AgentProjection, type: DecisionType, reasonCode: string, actualAction: string): void {
+    out.decisions.push(
+      DecisionEvent.parse({
+        sequence: SequenceNumber.parse(this.seq++),
+        tick: SimTimeMs.parse(proj.simTimeMs),
+        agentId: this.agentId,
+        type,
+        reasonCode,
+        evidenceIds: this.evidence.supportingObservationIds(),
+        actualAction,
+      }),
+    );
+  }
+
+  protected report(out: TickOutput, text: string, urgent: boolean): void {
+    const entry: CoordinatorReport = { text, urgent };
+    out.reports.push(entry);
+  }
+
+  private computeState(proj: AgentProjection): ControllerState {
+    if (proj.state === "lost") return "LOST";
+    const a = this.active;
+    if (a === null) {
+      if (this.stranded) return "STRANDED";
+      return this.atRefuge(proj.position) ? "HOLDING" : "PLANNING";
+    }
+    if (a.mode === "withdrawing") return "WITHDRAWING";
+    if (a.mode === "retreating") return a.kind === "halt" ? "STRANDED" : "RETREATING";
+    if (a.kind === "return") return "RETURNING";
+    const c = proj.commitment;
+    if (c !== null && c.working) return "WORKING";
+    const hasWork = a.plan.workInterval.endMs > a.plan.workInterval.startMs;
+    if (hasWork && c !== null && c.legIndex >= a.approachCount) return "RETURNING";
+    return "APPROACHING";
+  }
+}
+
+function reasonOf(failure: CertifyFailure | null): string {
+  switch (failure?.kind) {
+    case "leg":
+      return "forecast_leg_unsafe";
+    case "wait":
+      return "forecast_wait_unsafe";
+    case "work":
+      return "forecast_work_unsafe";
+    case "horizon":
+      return "forecast_horizon";
+    case "forecast_unreliable":
+      return "forecast_unreliable";
+    default:
+      return "forecast_leg_unsafe";
+  }
+}
+
+export type { ForecastEvent };

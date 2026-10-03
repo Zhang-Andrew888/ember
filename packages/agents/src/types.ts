@@ -1,7 +1,64 @@
-import type { AgentId, DecisionEvent, Objective, SimTimeMs } from "@ember/domain";
+import type { AgentId, DecisionEvent, Objective } from "@ember/domain";
+import type { ForecastConfig, ForecastEvent } from "@ember/forecast";
+import type { NavConfig, ReservationOracle } from "@ember/navigation";
+import type { AgentProjection, SimInput } from "@ember/simulation";
 
+export type ControllerState =
+  | "HOLDING"
+  | "PLANNING"
+  | "APPROACHING"
+  | "WORKING"
+  | "RETURNING"
+  | "WITHDRAWING"
+  | "RETREATING"
+  | "STRANDED"
+  | "LOST";
+
+export interface ControllerConfig {
+  readonly forecast?: ForecastConfig;
+  readonly nav?: NavConfig;
+  /** Simulated ms a contradiction rebuild takes to become available; the crew never waits for it. */
+  readonly rebuildLatencyMs: number;
+  /** Optional switching needs this much better score and this long since the last switch. */
+  readonly switchMargin: number;
+  readonly switchCooldownMs: number;
+  /** Reassess idle crews at least this often even without new evidence. */
+  readonly reassessEveryMs: number;
+}
+
+export const DEFAULT_CONTROLLER_CONFIG: ControllerConfig = {
+  rebuildLatencyMs: 10_000,
+  switchMargin: 1.2,
+  switchCooldownMs: 30_000,
+  reassessEveryMs: 25_000,
+};
+
+export interface CoordinatorReport {
+  readonly text: string;
+  readonly urgent: boolean;
+}
+
+export interface TickOutput {
+  readonly state: ControllerState;
+  readonly orders: SimInput[];
+  readonly decisions: DecisionEvent[];
+  readonly reports: CoordinatorReport[];
+  readonly forecastEvents: ForecastEvent[];
+}
+
+/** What a controller needs from the outside world each tick. */
+export interface ControllerEnvironment {
+  readonly oracle?: ReservationOracle;
+}
+
+/**
+ * An independent decision-maker. It sees only its own projection (position, state, own
+ * knowledge) plus the public map; never the world seed, remote fire or other agents' knowledge.
+ */
 export interface AgentController {
   readonly agentId: AgentId;
-  tick(simTimeMs: SimTimeMs): Promise<DecisionEvent | null>;
+  readonly state: ControllerState;
+  tick(projection: AgentProjection, env?: ControllerEnvironment): TickOutput;
   receiveObjective(objective: Objective): void;
+  resumeAutonomous(): void;
 }
