@@ -1503,3 +1503,21 @@ tiny. Switched to a smooth radial falloff over 3 cells, halved the emissive gain
 1.9 cells tall. Now: soft warm pool, readable flame cards, grey ghosts clearly distinct. Still off: flame/glow have
 no bloom yet; far fog flattens the north edge; only 2 live cells in the mock so the effect is modest.
 PR: #14 open (3b). Blocked: nothing. Next: 3d post-processing (bloom/vignette/AA), auto quality, dev-only debug panel.
+
+### Commit 7: item 3d - post-processing, auto quality tier, dev-only debug panel
+Changed: `RenderPipeline.tsx` (owns rendering at useFrame priority 1; half-float EffectComposer with MSAA, bloom,
+OutputPass tone mapping, vignette; plain render when the tier/reduced-motion turns them off), `quality/autoTier.ts`
+(p75 of timed frames: down above 36 ms, up below 14 ms after a 6 s cooldown, 60 s ban on a tier just fled; tested),
+`quality/qualityStore.ts` (external store for tier mode + scene params), `DebugPanel.tsx` (tier override, colours,
+light position, fog, bloom, vignette), soft shadows on the high tier only.
+Bloom on fire only: no extra pass; threshold 1.0 on linear HDR, and only the additive fire shaders exceed 1.
+No new dependency (three's own examples/postprocessing). Reduced motion and low tier skip bloom + vignette.
+Debug panel: loaded only via `import.meta.env.DEV ? lazy(() => import(...)) : null` in SceneView; the guard test
+checks that shape and that nothing else writes params/mode. NOT verified against a real production bundle (the brief
+forbids a production vite build here) - Andrew should confirm the prod bundle has no `Scene debug` string.
+Self-critique: shadows + vignette made it dark and contrasty (ground nearly navy) -> fill light 1.05 -> 1.3. The open
+panel covered the map in dev screenshots -> collapsed by default. Result is moody but routes, forecast, crews, labels
+stay readable at 1440x900 and 1024x720.
+Caveat: the in-app frame timer reads ~2-3 ms in this software-GL VM, which looks too low to trust (GPU process async
+even with finish()). Item 7 measures frame time independently with a Playwright script instead.
+Blocked: nothing. Next: sync main, PR for 3c/3d, then item 4 (crew + site models).

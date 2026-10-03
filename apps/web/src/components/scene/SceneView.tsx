@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { RefObject } from "react";
 import type { RootState } from "@react-three/fiber";
 import type { Camera } from "three";
@@ -12,6 +12,13 @@ import { listRefugeNodes, type FireCellMarker, type SceneEntities } from "./scen
 import { scenarioMap } from "../../map/activeScenario.js";
 import { siteProtectionStatusLabel, siteDamageLabel } from "../../format/reports.js";
 import { formatIncidentClock } from "../../format/time.js";
+
+/**
+ * Dev-only scene tuning panel. `import.meta.env.DEV` is a build-time
+ * constant, so in a production build this whole expression (including the
+ * dynamic import and the panel module) is eliminated.
+ */
+const DebugPanel = import.meta.env.DEV ? lazy(() => import("./DebugPanel.js")) : null;
 
 export interface SceneViewProps {
   readonly entities: SceneEntities;
@@ -153,6 +160,11 @@ export function SceneView({
         fireCells={entities.fireCells}
         onInspectCell={setInspectedCell}
       />
+      {DebugPanel ? (
+        <Suspense fallback={null}>
+          <DebugPanel />
+        </Suspense>
+      ) : null}
       {inspectedCell ? (
         <CellInspectionPanel
           panelRef={cellPanelRef}
