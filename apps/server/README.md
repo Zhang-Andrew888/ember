@@ -11,10 +11,22 @@ no-provider test adapter (`ScriptedInterpreter`, `RecordingSink`).
 | `session.ts` | `IncidentSession`: incident + one controller per agent + reservation service |
 | `conversation.ts` | `ConversationBridge`: gateway, audio scheduler and transcript over a session |
 | `hub.ts`, `protocol.ts` | `SessionHub` (validated client messages, sanitized server messages) and `LiveRun` |
-| `ws-server.ts` | `startServer`: loopback WebSocket server driving the hub every 200 ms |
+| `http-app.ts`, `incident-registry.ts` | `startHttpApp`: `POST /incidents`, auth token, `POST …/start`, replay export, WS `/events` and `/voice` |
+| `ws-server.ts` | `startServer`: loopback WebSocket server driving the hub every 200 ms (dev harness) |
 | `policy.ts` | `ScriptedCoordinatorPolicy`: the deterministic relay-only coordinator used in comparisons |
 | `evaluation.ts` | `runVariant` / `runEvaluation`: dispatch baseline vs forecast planning vs Ember Line |
 | `evaluate-cli.ts`, `sensitivity-cli.ts` | offline runners that write JSON reports |
+
+## HTTP + WebSocket transport (protocol v1)
+
+`startHttpApp` is the browser-facing entry point:
+
+1. `POST /incidents` — creates an incident, returns `{ incidentId, token, websocket: { events, voice } }`.
+2. Open the events URL (token in query or `x-incident-token` header on upgrade).
+3. `POST /incidents/:id/start` with header `x-incident-token` — starts the simulation clock.
+4. All WebSocket frames are `{ protocolVersion: 1, message: … }` (see `protocol.ts`).
+
+Voice uses the same JSON push-to-talk client messages as events; provider audio is not wired yet.
 
 ## Commands
 
