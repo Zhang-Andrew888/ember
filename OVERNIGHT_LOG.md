@@ -1487,3 +1487,37 @@ the map and the camera was cropped (zoom clamp); fixed both. Still off: fire cel
 forest (3c: flame cards, ground glow); fog still flattens the far edge.
 PR: #12 (feat/web-scene -> main) open; #8 was merged into lane/web earlier.
 Blocked: nothing. Next: 3c fire shaders + ground glow/char.
+
+### Commit 6: item 3c - fire as light (flame cards, embers, smoke, ground glow and char)
+Changed: `fire/shaders.ts` (hand-written GLSL; no library), `Fire.tsx` (instanced crossed flame cards with additive
+blending, rising ember points, faint smoke puffs), `fire/fireMap.ts` + `fireLight.ts` (64x64 observed-only light/char
+texture sampled by the terrain and tree materials), `anim/sceneClock.tsx` (one capped 66 ms clock for all decorative
+motion under frameloop="demand"), `FireCells.tsx` reduced to flat inspectable ember-bed tiles (the old pulse is gone).
+Observed fire only: flames come from observed burning cells, the glow map from observed cells, embers/smoke from fresh
+burning cells only. Stale burning = grey hatched static ghost and a quarter of the ground light. Burned = char, no
+light. Tests cover: nothing observed -> fully dark map, stale < fresh, burned lights nothing, no flames for
+burned/unburned. Fire toggle now governs flames, glow and tree char together. Reduced motion: clock stopped
+(uMotion 0), no embers/smoke, flames held steady.
+Self-critique (3x crop of the patch): first pass glowed too hot (trees washed pale yellow), pool was boxy, flames
+tiny. Switched to a smooth radial falloff over 3 cells, halved the emissive gain (0.55 -> 0.3), raised flames to
+1.9 cells tall. Now: soft warm pool, readable flame cards, grey ghosts clearly distinct. Still off: flame/glow have
+no bloom yet; far fog flattens the north edge; only 2 live cells in the mock so the effect is modest.
+PR: #14 open (3b). Blocked: nothing. Next: 3d post-processing (bloom/vignette/AA), auto quality, dev-only debug panel.
+
+### Commit 7: item 3d - post-processing, auto quality tier, dev-only debug panel
+Changed: `RenderPipeline.tsx` (owns rendering at useFrame priority 1; half-float EffectComposer with MSAA, bloom,
+OutputPass tone mapping, vignette; plain render when the tier/reduced-motion turns them off), `quality/autoTier.ts`
+(p75 of timed frames: down above 36 ms, up below 14 ms after a 6 s cooldown, 60 s ban on a tier just fled; tested),
+`quality/qualityStore.ts` (external store for tier mode + scene params), `DebugPanel.tsx` (tier override, colours,
+light position, fog, bloom, vignette), soft shadows on the high tier only.
+Bloom on fire only: no extra pass; threshold 1.0 on linear HDR, and only the additive fire shaders exceed 1.
+No new dependency (three's own examples/postprocessing). Reduced motion and low tier skip bloom + vignette.
+Debug panel: loaded only via `import.meta.env.DEV ? lazy(() => import(...)) : null` in SceneView; the guard test
+checks that shape and that nothing else writes params/mode. NOT verified against a real production bundle (the brief
+forbids a production vite build here) - Andrew should confirm the prod bundle has no `Scene debug` string.
+Self-critique: shadows + vignette made it dark and contrasty (ground nearly navy) -> fill light 1.05 -> 1.3. The open
+panel covered the map in dev screenshots -> collapsed by default. Result is moody but routes, forecast, crews, labels
+stay readable at 1440x900 and 1024x720.
+Caveat: the in-app frame timer reads ~2-3 ms in this software-GL VM, which looks too low to trust (GPU process async
+even with finish()). Item 7 measures frame time independently with a Playwright script instead.
+Blocked: nothing. Next: sync main, PR for 3c/3d, then item 4 (crew + site models).
