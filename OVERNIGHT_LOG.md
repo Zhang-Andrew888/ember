@@ -1722,3 +1722,22 @@ right order of magnitude and over budget. (2) a fast path in `autoTier`: 4 conse
 because a 1 fps machine would otherwise take minutes to fill the 24-sample window (3 new tests, 2 old ones updated for the new
 intent). Verified end to end in auto mode on this VM: high -> medium at 13 s -> low at 23 s (before: stayed on high).
 Also checked: PR #30 CI all green (Lint, Typecheck, Test).
+
+### Debugging pass 2: start-flow fixes, tested against the REAL apps/server
+Re-checked the three `App.tsx` issues against the current code: the "Received:" speech one was already fixed by someone else's
+refactor (speech is receipt-driven now). Fixed the other two plus the third bug in that file:
+- Pre-configured WebSocket ignored: `net/startPlan.ts` (`planStart`, tested) - a `VITE_INCIDENT_WS_URL` means "skip POST /incidents"
+  as `.env.example` says; the REST base is then only used for `POST /incidents/:id/start`.
+- Silent failure: a failed `createIncident` now shows a `role="alert"` message on the briefing screen.
+- `crypto.randomUUID()` threw on plain-http pages: `net/commandId.ts` falls back to `getRandomValues`, then `Math.random` (tested).
+Integration test (apps/server `src/dev-http.ts` on :3000 + three Vite instances, Playwright recording the actual requests):
+  A REST only            -> POST /incidents, POST /incidents/<new>/start, WS to the new incident, reached live  (unchanged)
+  B pre-configured WS    -> NO POST /incidents; POST /incidents/<configured id>/start; WS to the configured incident, live
+  C unreachable REST     -> alert "Could not create the incident...", stayed on the briefing screen
+Real-server scene check: server node ids (n-rw, ...) match the snapshot, so crews, 4-leg routes, forecast bands and sites all
+resolve; console clean. It also exposed two legibility problems the mock never showed, both fixed:
+- the real forecast has ~10 bands each with a very wide window label ("7:00-30:35"), burying the map -> only the 3 soonest bands
+  are labelled (`labelledBands`, tested); the rest stay as hatching;
+- route labels showed raw `work_interval_limited_by_forecast` -> `humanizeReason`.
+Observation, not a bug: sites read "stale, seen 0:49 ago" at t~1 min because their briefed observation (t=0) is >30 sim-s old.
+That is the staleness rule working; whether briefed site data should ever count as stale is a product question for Andrew.

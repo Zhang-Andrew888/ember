@@ -10,6 +10,8 @@ import {
   resolveWebSocketUrl,
   startIncident,
 } from "./net/incidentRestClient.js";
+import { newCommandId } from "./net/commandId.js";
+import { planStart, START_FAILED_MESSAGE } from "./net/startPlan.js";
 import { createProtocolWebSocket, type ProtocolWebSocket } from "./net/protocolWebSocket.js";
 import { mockWireRepliesForSay } from "./net/mockCommandSimulator.js";
 import { useCoordinatorView } from "./state/useCoordinatorView.js";
@@ -40,7 +42,8 @@ const WS_URL = import.meta.env.VITE_INCIDENT_WS_URL as string | undefined;
 /** Set to any value (including empty) to use `POST /incidents` + proxied REST/WS instead of mock. */
 const REST_BASE_URL = import.meta.env.VITE_INCIDENT_REST_BASE_URL as string | undefined;
 const HAS_LIVE_REST = REST_BASE_URL !== undefined;
-const IS_MOCK_MODE = !WS_URL && !HAS_LIVE_REST;
+const START_PLAN = planStart({ wsUrl: WS_URL, restBase: REST_BASE_URL });
+const IS_MOCK_MODE = START_PLAN.kind === "mock";
 const USE_GROK_VOICE = import.meta.env.VITE_GROK_VOICE === "1";
 const GROK_LIVE = USE_GROK_VOICE && HAS_LIVE_REST;
 
@@ -52,6 +55,7 @@ export function App() {
   const demoMode = isDemoMode(typeof window !== "undefined" ? window.location.search : "");
   const [phase, setPhase] = useState<Phase>("briefing");
   const [starting, setStarting] = useState(false);
+  const [startError, setStartError] = useState<string | null>(null);
   const [client, setClient] = useState<CoordinatorViewClient | null>(null);
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const mockSocketRef = useRef<MockIncidentSocket | null>(null);
@@ -135,10 +139,13 @@ export function App() {
 
   const handleStart = useCallback(async () => {
     setStarting(true);
-    if (HAS_LIVE_REST) {
+    setStartError(null);
+    // A pre-configured WebSocket URL skips incident creation (see net/startPlan.ts).
+    if (START_PLAN.kind === "create-incident") {
       const created = await createIncident(REST_BASE_URL ?? "");
       if (created === null) {
         setStarting(false);
+        setStartError(START_FAILED_MESSAGE);
         return;
       }
       liveSessionRef.current = { incidentId: created.incidentId, token: created.token };
@@ -169,7 +176,7 @@ export function App() {
 
   const dispatchSay = useCallback(
     (text: string) => {
-      const commandId = crypto.randomUUID();
+      const commandId = newCommandId();
       const simTimeMs = view ? (view.simTimeMs as number) : 0;
 
       const socket = protocolSocketRef.current;
@@ -238,7 +245,7 @@ export function App() {
   const composerDisabled = connectionStatus !== "open" || Boolean(view?.incidentEnd);
 
   if (phase === "briefing") {
-    return <Briefing onStart={handleStart} starting={starting} demoMode={demoMode} />;
+    return <Briefing onStart={handleStart} starting={starting} demoMode={demoMode} error={startError} />;
   }
 
   if (phase === "replay") {

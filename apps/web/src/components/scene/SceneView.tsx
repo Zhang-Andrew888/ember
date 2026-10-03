@@ -9,7 +9,7 @@ import type { CameraControlsHandle } from "./CameraControls.js";
 import { sceneTerrain } from "./terrain/sceneTerrain.js";
 import { agentLabelText } from "./models/markerCues.js";
 import { freshness } from "./staleness.js";
-import { polylineMidpoint } from "./sceneLayers.js";
+import { humanizeReason, labelledBands, polylineMidpoint } from "./sceneLayers.js";
 import { listRefugeNodes, type FireCellMarker, type SceneEntities } from "./sceneEntities.js";
 import { scenarioMap } from "../../map/activeScenario.js";
 import { siteProtectionStatusLabel, siteDamageLabel } from "../../format/reports.js";
@@ -132,11 +132,11 @@ export function SceneView({
         x: mid.x,
         y: sceneTerrain.groundY(mid.x, mid.z) + 10,
         z: mid.z,
-        text: line.limitingReason ? `${line.label} — ${line.limitingReason}` : line.label,
+        text: line.limitingReason ? `${line.label} — ${humanizeReason(line.limitingReason)}` : line.label,
         variant: "route" as const,
       };
     });
-    const forecastLabels = (entities.forecast?.bands ?? []).map((band) => {
+    const forecastLabels = labelledBands(entities.forecast?.bands ?? []).map((band) => {
       const mid = polylineMidpoint(band.points);
       return {
         id: `forecast:${band.key}`,

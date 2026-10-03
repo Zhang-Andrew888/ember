@@ -3,7 +3,7 @@ import { CoordinatorView } from "@ember/domain";
 import { fixtureCoordinatorView } from "../../../../../tests/fixtures/coordinator-view.fixture.js";
 import { adaptToScenarioIds } from "../../net/mockBase.js";
 import { scenarioMap } from "../../map/activeScenario.js";
-import { bandWidthForSpread, buildForecastLayer, buildRouteLines } from "./sceneLayers.js";
+import { type ForecastBand, bandWidthForSpread, buildForecastLayer, buildRouteLines, humanizeReason, labelledBands, MAX_FORECAST_LABELS } from "./sceneLayers.js";
 
 const view = CoordinatorView.parse(adaptToScenarioIds(fixtureCoordinatorView));
 
@@ -94,5 +94,42 @@ describe("buildForecastLayer", () => {
       scenarioMap,
     )!;
     expect(layer.bands[0]?.label).toBe("no modeled fire arrival");
+  });
+});
+
+describe("labelledBands", () => {
+  const band = (id: string, earliestMs: number | null, latestMs: number | null = null): ForecastBand => ({
+    key: id,
+    edgeId: id,
+    points: [],
+    earliestMs,
+    latestMs,
+    spreadMs: null,
+    widthUnits: 6,
+    label: id,
+  });
+
+  it("labels only the soonest few, soonest first", () => {
+    const bands = [band("late", 900_000), band("soon", 100_000), band("mid", 400_000), band("later", 600_000), band("sooner", 50_000)];
+    expect(labelledBands(bands).map((b) => b.edgeId)).toEqual(["sooner", "soon", "mid"]);
+    expect(labelledBands(bands)).toHaveLength(MAX_FORECAST_LABELS);
+  });
+
+  it("bands with no modeled arrival sort last, and nothing is dropped when there are few", () => {
+    const bands = [band("none", null), band("a", 5000)];
+    expect(labelledBands(bands).map((b) => b.edgeId)).toEqual(["a", "none"]);
+  });
+
+  it("does not mutate its input", () => {
+    const bands = [band("b", 2), band("a", 1)];
+    labelledBands(bands);
+    expect(bands.map((b) => b.edgeId)).toEqual(["b", "a"]);
+  });
+});
+
+describe("humanizeReason", () => {
+  it("turns machine reasons into words", () => {
+    expect(humanizeReason("work_interval_limited_by_forecast")).toBe("work interval limited by forecast");
+    expect(humanizeReason("single-capacity")).toBe("single capacity");
   });
 });
