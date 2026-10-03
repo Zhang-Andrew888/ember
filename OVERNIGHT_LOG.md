@@ -935,3 +935,65 @@ existing + this new one) clean, zero page errors.
 from 120; 5 new `siteDamageLabel` tests, 2 new scenario tests).
 
 **Status:** CI green on `08d4c2e` (verified via the GitHub Actions API).
+
+## 2026-10-03 09:0x-09:1x UTC (05:0x-05:1x ET) - stale routine audio kept playing past the debrief overlay
+
+Third real finding from the same "re-check docs against what actually
+ships" pass, this time against `docs/COMMUNICATION.md`: "At incident
+end, stop capture, cancel unapplied commands and stale routine audio...
+The debrief does not auto-play a backlog of obsolete radio traffic."
+
+`App.tsx`'s `incidentEnd` handling only ever drove the `inert` wrapper
+and `EndOverlay`'s render - nothing cancelled an in-progress
+`SpeechPlaybackStub` playback. Every existing `ended-*` scenario is
+already ended on its very first snapshot, so none of them could exercise
+the actual active-to-ended *transition* this rule describes - this bug
+was unreachable through any scenario that existed before this entry.
+Added `net/scenarioSelection.ts`'s `ends-while-active`
+(`fixtureCoordinatorView`, then `runEndedScenarios.time_expired` 1.5s
+later - the only scenario that starts live) specifically to make the
+transition reproducible, rather than reason about it from code alone.
+
+Added `SpeechPlaybackStub.cancel()` (drops to idle, clears timers,
+*doesn't* clear subscribers the way `dispose()` does - `App.tsx` keeps
+reusing the same stub instance all session) and called it from a new
+effect watching `view?.incidentEnd`.
+
+**Verified live in both directions**, matching this session's standard
+for every fix: with the new effect temporarily neutered (`if (false &&
+...)` inline, not a git stash - stashing would also have reverted the
+new scenario this test depends on), a routine "Received: hi"
+acknowledgement visibly persisted for ~400ms after the debrief overlay
+appeared, only disappearing once its own unrelated timer happened to
+expire - the actual bug, caught live, not inferred. With the fix
+restored: the same acknowledgement is gone within the very next ~150ms
+poll after the debrief appears, every time re-run. Full 8-scenario
+regression smoke test still clean.
+
+**Verified:** typecheck/lint/test all green (132 tests, 17 files - 4 new
+`cancel()` unit tests, 1 new scenario-resolution test).
+
+**Status:** CI green on `602f8b0` (verified via the GitHub Actions API).
+
+**Investigated and deliberately not shipped: the matching "stop capture"
+half of the same rule.** Implemented it the same shape as the audio fix
+(a new `incidentEnded` prop on `ConversationPanel`, an effect calling the
+mock voice adapter's existing `cancel()` and resetting `captureState`),
+then went to prove it the same bidirectional way. Using the new
+`ends-while-active` scenario, held push-to-talk (both a keyboard Space
+hold and a pointer/mouse hold, tried separately) straight through the
+active-to-ended transition without ever releasing it, with the new fix
+temporarily disabled - and the capture state reset to idle anyway, every
+time, exactly when the debrief appeared. Root cause: the push-to-talk
+button already has `onBlur={cancelCapture}` (from backlog item 4), and
+the HTML `inert` attribute's own spec'd behavior is to blur whatever was
+focused inside a subtree the moment it becomes inert - which the
+`app-layout__content` wrapper already does on `incidentEnd`. That blur
+was already firing `cancelCapture()` on its own, in both input
+modalities tested, with no code change needed. Reverted the new prop and
+effect rather than ship unverifiable defensive code for a requirement
+already met through this existing (spec-backed, not a browser quirk)
+mechanism - consistent with this session's standing rule of only
+shipping changes caught by a real reproduction, not speculation. Noting
+the investigation here since it took real effort and reached a real
+(negative) conclusion, not because anything shipped from it.
