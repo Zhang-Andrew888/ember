@@ -997,3 +997,48 @@ mechanism - consistent with this session's standing rule of only
 shipping changes caught by a real reproduction, not speculation. Noting
 the investigation here since it took real effort and reached a real
 (negative) conclusion, not because anything shipped from it.
+
+## 2026-10-03 09:1x UTC (05:1x ET) - two more checks from docs/VALIDATION.md's frontend list, both clean
+
+Continued down `docs/VALIDATION.md`'s "Frontend and information checks"
+list (most of that document is sim-lane/evaluation-protocol territory -
+navigation determinism, reservation cases, policy comparison - out of
+scope here; this section is the one that's actually web-lane's).
+
+1. **"Long transcript"** - never exercised live before (the richest
+   existing mock data has 3-4 reports). Injected 80 synthetic transcript
+   entries directly into the live DOM (a CSS/layout question, not app
+   logic - `.map()` over an array - so this doesn't need a new named
+   scenario the way a logic bug would). Result: clean. The transcript
+   list scrolls internally (`scrollHeight` 5802 vs `clientHeight` 572),
+   stays fully within the conversation panel's own bounds, the document
+   itself shows zero page-level overflow (`scrollWidth`/`scrollHeight`
+   exactly match the viewport), and the composer stays visible
+   underneath. `flex: 1` + `overflow-y: auto` on `.conversation-panel__transcript`
+   was already doing exactly what it needed to.
+2. **"High-DPI"** - also never exercised (every check this session used
+   the default `deviceScaleFactor: 1`). Loaded at `deviceScaleFactor: 2`
+   (`devicePixelRatio` confirmed 2 in-page) and measured the Canvas
+   element's actual internal resolution against its CSS size: ratio
+   exactly 1.5 (1650/1100), matching docs/FRONTEND.md's "Cap pixel ratio
+   at 1.5" to the pixel. R3F's `dpr={[1, 1.5]}` prop (set from the very
+   first scene commit this session) was already doing its job correctly
+   under a real high-DPI device pixel ratio, not just the usual 1x
+   sandbox default.
+
+Both are genuine negative results, not unexamined assumptions - recording
+them for the same reason a passing test is still worth keeping: next time
+something nearby changes, these are two more guardrails already in place.
+
+**Status:** no code changes from this entry; nothing to push.
+
+**Running total of real, live-verified fixes since the 6-item backlog
+and the first self-review completed:** 5 (replay focus-on-mount,
+Escape-to-cancel push-to-talk, narrow-viewport composer overflow, site
+damage was color-only, stale routine audio outliving the debrief),
+1 real architectural gap investigated and correctly *not* shipped
+(push-to-talk capture already protected by `onBlur` + `inert`'s own
+spec'd behavior - proven, not assumed), 3 clean negative results (long
+transcript, high-DPI, and this round's push-to-talk pointer/keyboard
+reproductions). Will keep watching for further instructions and
+re-checking periodically until 10:00 ET.
