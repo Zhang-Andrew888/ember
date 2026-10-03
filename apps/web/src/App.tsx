@@ -33,7 +33,11 @@ import { EndOverlay } from "./components/EndOverlay.js";
 import { ReplayView } from "./components/ReplayView.js";
 import { ConnectionBanner } from "./components/ConnectionBanner.js";
 import { DemoBanner } from "./components/DemoBanner.js";
-import { playPreparedSpeech } from "./net/grokSpeechPlayback.js";
+import {
+  applySpeechAudioCue,
+  createPreparedSpeechPlayer,
+  type PreparedSpeechPlayer,
+} from "./net/grokSpeechPlayback.js";
 import { transcribeViaServer } from "./net/grokStt.js";
 
 const INCIDENT_ID = import.meta.env.VITE_INCIDENT_ID ?? "demo";
@@ -51,6 +55,21 @@ const EMPTY_ENTITIES = { agents: [], sites: [], fireCells: [], routes: [], forec
 
 type Phase = "briefing" | "live" | "replay";
 
+function ensureSpeechPlayer(
+  holder: { current: PreparedSpeechPlayer | null },
+  session: { readonly incidentId: string; readonly token: string },
+): PreparedSpeechPlayer {
+  const existing = holder.current;
+  if (existing !== null) return existing;
+  const created = createPreparedSpeechPlayer({
+    apiBase: REST_BASE_URL ?? "",
+    incidentId: session.incidentId,
+    token: session.token,
+  });
+  holder.current = created;
+  return created;
+}
+
 export function App() {
   const demoMode = isDemoMode(typeof window !== "undefined" ? window.location.search : "");
   const [phase, setPhase] = useState<Phase>("briefing");
@@ -67,7 +86,14 @@ export function App() {
   const { status: connectionStatus, view, sideband } = useCoordinatorView(client);
 
   const speechStubRef = useRef(createSpeechPlaybackStub());
-  useEffect(() => () => speechStubRef.current.dispose(), []);
+  const speechPlayerRef = useRef<PreparedSpeechPlayer | null>(null);
+  useEffect(
+    () => () => {
+      speechStubRef.current.dispose();
+      speechPlayerRef.current?.stopAll();
+    },
+    [],
+  );
   const speechSnapshot = useSpeechPlaybackStub(speechStubRef.current);
 
   const lastSpokenUrgentSequence = useRef<number | null>(null);
@@ -102,10 +128,8 @@ export function App() {
     if (sideband.audioCues.length <= lastAudioCueCount.current) return;
     const cues = sideband.audioCues.slice(lastAudioCueCount.current);
     lastAudioCueCount.current = sideband.audioCues.length;
-    for (const cue of cues) {
-      if (cue.event !== "started") continue;
-      void playPreparedSpeech(REST_BASE_URL ?? "", session.incidentId, session.token, cue.itemId);
-    }
+    const player = ensureSpeechPlayer(speechPlayerRef, session);
+    for (const cue of cues) applySpeechAudioCue(player, cue);
   }, [sideband.audioCues]);
 
   const grokStt = useMemo(() => {
