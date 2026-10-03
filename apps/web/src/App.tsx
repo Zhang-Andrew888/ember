@@ -12,6 +12,7 @@ import {
 } from "./net/incidentRestClient.js";
 import { newCommandId } from "./net/commandId.js";
 import { planStart, START_FAILED_MESSAGE } from "./net/startPlan.js";
+import { transportModeFromStartPlan } from "./net/transportMode.js";
 import { createProtocolWebSocket, type ProtocolWebSocket } from "./net/protocolWebSocket.js";
 import { mockWireRepliesForSay } from "./net/mockCommandSimulator.js";
 import { useCoordinatorView } from "./state/useCoordinatorView.js";
@@ -43,6 +44,7 @@ const WS_URL = import.meta.env.VITE_INCIDENT_WS_URL as string | undefined;
 const REST_BASE_URL = import.meta.env.VITE_INCIDENT_REST_BASE_URL as string | undefined;
 const HAS_LIVE_REST = REST_BASE_URL !== undefined;
 const START_PLAN = planStart({ wsUrl: WS_URL, restBase: REST_BASE_URL });
+const TRANSPORT_MODE = transportModeFromStartPlan(START_PLAN);
 const IS_MOCK_MODE = START_PLAN.kind === "mock";
 const USE_GROK_VOICE = import.meta.env.VITE_GROK_VOICE === "1";
 const GROK_LIVE = USE_GROK_VOICE && HAS_LIVE_REST;
@@ -245,7 +247,15 @@ export function App() {
   const composerDisabled = connectionStatus !== "open" || Boolean(view?.incidentEnd);
 
   if (phase === "briefing") {
-    return <Briefing onStart={handleStart} starting={starting} demoMode={demoMode} error={startError} />;
+    return (
+      <Briefing
+        onStart={handleStart}
+        starting={starting}
+        demoMode={demoMode}
+        transportMode={TRANSPORT_MODE}
+        error={startError}
+      />
+    );
   }
 
   if (phase === "replay") {
@@ -260,6 +270,7 @@ export function App() {
       <ConnectionBanner status={connectionStatus} />
       <div className="app-layout__content" inert={hasEnded || undefined}>
         <TopBar
+          transportMode={TRANSPORT_MODE}
           simTimeMs={view ? (view.simTimeMs as number) : null}
           wallElapsedMs={view ? (view.wallElapsedMs as number) : null}
           connectionStatus={connectionStatus}

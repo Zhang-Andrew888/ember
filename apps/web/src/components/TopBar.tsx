@@ -1,8 +1,11 @@
 import type { ConnectionStatus } from "../net/CoordinatorViewClient.js";
+import type { TransportMode } from "../net/transportMode.js";
 import type { SpeechPlaybackSnapshot } from "../state/speechPlaybackStub.js";
 import { formatIncidentClock, formatRemainingWallTime } from "../format/time.js";
+import { TransportModeBadge } from "./TransportModeBadge.js";
 
 export interface TopBarProps {
+  readonly transportMode: TransportMode;
   readonly simTimeMs: number | null;
   readonly wallElapsedMs: number | null;
   readonly connectionStatus: ConnectionStatus;
@@ -27,10 +30,11 @@ function audioStatusLabel(snapshot: SpeechPlaybackSnapshot): string {
   return "Audio active";
 }
 
-export function TopBar({ simTimeMs, wallElapsedMs, connectionStatus, speechSnapshot }: TopBarProps) {
+export function TopBar({ transportMode, simTimeMs, wallElapsedMs, connectionStatus, speechSnapshot }: TopBarProps) {
   return (
     <header className="top-bar">
       <span className="top-bar__title">EMBER LINE</span>
+      <TransportModeBadge mode={transportMode} />
       <span className="top-bar__clock" aria-label="Incident clock">
         {simTimeMs === null ? "—:—" : formatIncidentClock(simTimeMs)}
       </span>
