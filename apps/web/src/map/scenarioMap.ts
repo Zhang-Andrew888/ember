@@ -1,13 +1,12 @@
+import type { ScenarioFile, ScenarioTerrain } from "./scenarioSchema.js";
+import { DEFAULT_WORLD_METERS, worldToScene, type SceneVector } from "./worldScale.js";
+
 /**
- * Local scene geometry for the demo scenario.
- *
- * packages/domain only carries topological positions (edgeId + distance, or
- * nodeId) - never x/y coordinates. The real road extract lands in Slice 0
- * (see docs/IMPLEMENTATION_PLAN.md); until then this module supplies a
- * placeholder layout, keyed by the same placeholder edge/node IDs used in
- * tests/fixtures/coordinator-view.fixture.ts, so the scene has something
- * concrete to render. Replacing this file is how a real OSM extract gets
- * wired in later - nothing outside apps/web depends on these coordinates.
+ * Scene geometry derived from a validated scenario file (see
+ * scenarioSchema.ts / activeScenario.ts). packages/domain only carries
+ * topological positions (edgeId + distance, or nodeId), never x/y, so the
+ * scenario file is the single source of coordinates for roads, sites,
+ * refuges and terrain.
  */
 
 export interface SceneNode {
@@ -23,76 +22,81 @@ export interface SceneEdge {
   readonly id: string;
   readonly fromNodeId: string;
   readonly toNodeId: string;
+  /** Polyline length in sim metres (the unit of AgentPosition.distanceAlongPolyline). */
   readonly lengthMeters: number;
-  /** Number of equal-length fire cells this edge is divided into. */
-  readonly cellCount: number;
+  /** Full polyline in scene units, endpoints included. */
+  readonly points: readonly SceneVector[];
+  /** Cumulative sim metres at each point (same length as points). */
+  readonly cumulativeMeters: readonly number[];
+  readonly singleCapacity: boolean;
+}
+
+export interface ScenarioSource {
+  readonly kind: "scenarios-dir" | "local-snapshot";
+  readonly name: string;
+  /** Files in scenarios/ that were skipped, with the reason. */
+  readonly skipped: ReadonlyArray<{ readonly name: string; readonly reason: string }>;
 }
 
 export interface ScenarioMap {
+  readonly version: string;
+  readonly source: ScenarioSource;
   readonly nodes: ReadonlyMap<string, SceneNode>;
   readonly edges: ReadonlyMap<string, SceneEdge>;
+  readonly terrainSeed: string;
+  readonly initialFireCells: readonly number[];
+  readonly worldMeters: number;
+  /** Public terrain layers; null when the scenario file carries none. */
+  readonly terrain: ScenarioTerrain | null;
 }
 
-const nodeList: SceneNode[] = [
-  { id: "placeholder-node-refuge-west", x: -260, z: 20, kind: "refuge", label: "Refuge West" },
-  { id: "placeholder-node-refuge-south", x: -220, z: -200, kind: "refuge", label: "Refuge South" },
-  { id: "placeholder-node-site-a", x: 180, z: 60, kind: "site", label: "Ridge Cabins" },
-  { id: "placeholder-node-site-b", x: 40, z: 220, kind: "site", label: "Waterworks" },
-  { id: "placeholder-node-site-c", x: -140, z: 260, kind: "site", label: "Community Lodge" },
-  { id: "junction-north-sector", x: -40, z: -40, kind: "junction" },
-  { id: "junction-upwind-a", x: 60, z: -140, kind: "junction" },
-  { id: "junction-upwind-b", x: 110, z: -110, kind: "junction" },
-  { id: "junction-upwind-c", x: 160, z: -80, kind: "junction" },
-  { id: "junction-north-spread-a", x: 0, z: 40, kind: "junction" },
-  { id: "junction-north-spread-b", x: 20, z: 90, kind: "junction" },
-];
+export function buildScenarioMap(file: ScenarioFile, source: ScenarioSource): ScenarioMap {
+  const worldMeters = file.terrain ? file.terrain.gridSize * file.terrain.cellMeters : DEFAULT_WORLD_METERS;
+  const refugeNodes = new Map(file.map.refuges.map((refuge) => [refuge.nodeId as string, refuge.name]));
+  const siteNodes = new Map(file.map.sites.map((site) => [site.nodeId as string, site.name]));
 
-const edgeList: SceneEdge[] = [
-  {
-    id: "placeholder-edge-refuge-west-site-a",
-    fromNodeId: "placeholder-node-refuge-west",
-    toNodeId: "placeholder-node-site-a",
-    lengthMeters: 500,
-    cellCount: 5,
-  },
-  {
-    id: "placeholder-edge-refuge-south-north-sector",
-    fromNodeId: "placeholder-node-refuge-south",
-    toNodeId: "junction-north-sector",
-    lengthMeters: 320,
-    cellCount: 4,
-  },
-  {
-    id: "placeholder-edge-fire-patch-1",
-    fromNodeId: "junction-upwind-a",
-    toNodeId: "junction-upwind-b",
-    lengthMeters: 80,
-    cellCount: 2,
-  },
-  {
-    id: "placeholder-edge-fire-patch-2",
-    fromNodeId: "junction-upwind-b",
-    toNodeId: "junction-upwind-c",
-    lengthMeters: 80,
-    cellCount: 2,
-  },
-  {
-    id: "placeholder-edge-north-spread-1",
-    fromNodeId: "junction-north-sector",
-    toNodeId: "junction-north-spread-a",
-    lengthMeters: 200,
-    cellCount: 4,
-  },
-  {
-    id: "placeholder-edge-north-spread-2",
-    fromNodeId: "junction-north-spread-a",
-    toNodeId: "junction-north-spread-b",
-    lengthMeters: 60,
-    cellCount: 2,
-  },
-];
+  const nodes = new Map<string, SceneNode>();
+  const meterPoints = new Map<string, { x: number; y: number }>();
+  for (const node of file.map.nodes) {
+    meterPoints.set(node.id, { x: node.x, y: node.y });
+    const refugeName = refugeNodes.get(node.id);
+    const siteName = siteNodes.get(node.id);
+    const kind = refugeName !== undefined ? "refuge" : siteName !== undefined ? "site" : "junction";
+    const label = refugeName ?? siteName;
+    const position = worldToScene(node.x, node.y, worldMeters);
+    nodes.set(node.id, { id: node.id, x: position.x, z: position.z, kind, ...(label !== undefined ? { label } : {}) });
+  }
 
-export const scenarioMap: ScenarioMap = {
-  nodes: new Map(nodeList.map((node) => [node.id, node])),
-  edges: new Map(edgeList.map((edge) => [edge.id, edge])),
-};
+  const edges = new Map<string, SceneEdge>();
+  for (const edge of file.map.edges) {
+    const from = meterPoints.get(edge.from)!;
+    const to = meterPoints.get(edge.to)!;
+    const polyline = [from, ...edge.via, to];
+    const cumulativeMeters = [0];
+    for (let i = 1; i < polyline.length; i++) {
+      const a = polyline[i - 1]!;
+      const b = polyline[i]!;
+      cumulativeMeters.push(cumulativeMeters[i - 1]! + Math.hypot(b.x - a.x, b.y - a.y));
+    }
+    edges.set(edge.id, {
+      id: edge.id,
+      fromNodeId: edge.from,
+      toNodeId: edge.to,
+      lengthMeters: cumulativeMeters[cumulativeMeters.length - 1]!,
+      points: polyline.map((point) => worldToScene(point.x, point.y, worldMeters)),
+      cumulativeMeters,
+      singleCapacity: edge.singleCapacity,
+    });
+  }
+
+  return {
+    version: file.version,
+    source,
+    nodes,
+    edges,
+    terrainSeed: file.map.terrainSeed,
+    initialFireCells: file.map.initialFireCells,
+    worldMeters,
+    terrain: file.terrain ?? null,
+  };
+}

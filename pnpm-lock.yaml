@@ -81,6 +81,9 @@ importers:
       three:
         specifier: 0.175.0
         version: 0.175.0
+      zod:
+        specifier: 3.24.2
+        version: 3.24.2
     devDependencies:
       '@types/react':
         specifier: 19.1.2

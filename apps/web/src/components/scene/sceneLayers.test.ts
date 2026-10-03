@@ -1,19 +1,21 @@
 import { describe, expect, it } from "vitest";
 import { CoordinatorView } from "@ember/domain";
 import { fixtureCoordinatorView } from "../../../../../tests/fixtures/coordinator-view.fixture.js";
-import { scenarioMap } from "../../map/scenarioMap.js";
+import { adaptToScenarioIds } from "../../net/mockBase.js";
+import { scenarioMap } from "../../map/activeScenario.js";
 import { bandWidthForSpread, buildForecastLayer, buildRouteLines } from "./sceneLayers.js";
 
-const view = CoordinatorView.parse(fixtureCoordinatorView);
+const view = CoordinatorView.parse(adaptToScenarioIds(fixtureCoordinatorView));
 
 describe("buildRouteLines", () => {
   it("builds a polyline from the fixture plan, oriented by leg direction", () => {
     const [line] = buildRouteLines(view, scenarioMap, null);
     expect(line?.agentId).toBe("crew-1");
     expect(line?.phase).toBe("approach");
-    expect(line?.points).toHaveLength(2);
-    expect(line?.points[0]).toEqual({ x: -260, z: 20 });
-    expect(line?.points[1]).toEqual({ x: 180, z: 60 });
+    // rw -> j1 -> s -> h -> sa, in scene units (see map/worldScale.ts).
+    expect(line?.points).toHaveLength(5);
+    expect(line?.points[0]).toEqual({ x: -612.5, z: 0 });
+    expect(line?.points[1]).toEqual({ x: -350, z: 0 });
     expect(line?.label).toBe("Crew 1 approaching");
   });
 
@@ -24,7 +26,7 @@ describe("buildRouteLines", () => {
       agentPlans: [{ ...plan, legs: [{ ...plan.legs[0]!, direction: "reverse" }] }],
     };
     const [line] = buildRouteLines(reversed, scenarioMap, null);
-    expect(line?.points[0]).toEqual({ x: 180, z: 60 });
+    expect(line?.points[0]).toEqual({ x: -350, z: 0 });
   });
 
   it("marks the selected agent's line as selected", () => {
@@ -55,9 +57,9 @@ describe("buildForecastLayer", () => {
     const layer = buildForecastLayer(view, scenarioMap)!;
     expect(layer.trusted).toBe(true);
     const band = layer.bands[0]!;
-    expect(band.label).toBe("fire may reach 10:00–15:00 (incident time)");
-    expect(band.spreadMs).toBe(300_000);
-    expect(band.widthUnits).toBe(bandWidthForSpread(300_000));
+    expect(band.label).toBe("fire may reach 2:30–5:30 (incident time)");
+    expect(band.spreadMs).toBe(180_000);
+    expect(band.widthUnits).toBe(bandWidthForSpread(180_000));
   });
 
   it("wider uncertainty draws a wider ribbon, bounded", () => {

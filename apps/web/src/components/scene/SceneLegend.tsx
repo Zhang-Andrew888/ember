@@ -2,6 +2,7 @@ import { forwardRef } from "react";
 import { colors } from "../../styles/colors.js";
 import { formatIncidentClock } from "../../format/time.js";
 import type { ForecastLayer } from "./sceneLayers.js";
+import { scenarioMap } from "../../map/activeScenario.js";
 import type { FireCellMarker } from "./sceneEntities.js";
 
 export interface SceneLegendProps {
@@ -68,6 +69,10 @@ export const SceneLegend = forwardRef<HTMLDivElement, SceneLegendProps>(function
         <p className="scene-legend__forecast" role="status" data-reliability={forecast?.reliability ?? "none"}>
           {forecast ? forecast.headline : "Forecast: not yet built"}
           {forecast?.explanation ? ` — ${forecast.explanation}` : ""}
+        </p>
+        <p className="scene-legend__source">
+          Map: {scenarioMap.version}
+          {scenarioMap.source.kind === "local-snapshot" ? " (local snapshot; scenarios/ has no valid file)" : ""}
         </p>
         <button type="button" onClick={onResetCamera}>
           Reset camera

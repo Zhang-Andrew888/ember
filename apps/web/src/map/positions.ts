@@ -1,10 +1,8 @@
 import type { AgentPosition } from "@ember/domain";
 import type { ScenarioMap } from "./scenarioMap.js";
+import { worldToScene, type SceneVector } from "./worldScale.js";
 
-export interface SceneVector {
-  readonly x: number;
-  readonly z: number;
-}
+export type { SceneVector };
 
 /**
  * Unit vector describing which way an edge-bound entity is facing, for
@@ -25,10 +23,27 @@ export function resolveNodePosition(map: ScenarioMap, nodeId: string): SceneVect
   return node ? { x: node.x, z: node.z } : null;
 }
 
+/** Index of the polyline segment containing `distance` metres, and the fraction along it. */
+function locateOnEdge(
+  cumulativeMeters: readonly number[],
+  distance: number,
+): { segment: number; t: number } {
+  const total = cumulativeMeters[cumulativeMeters.length - 1] ?? 0;
+  const d = clamp(distance, 0, total);
+  for (let i = 1; i < cumulativeMeters.length; i++) {
+    const end = cumulativeMeters[i]!;
+    if (d <= end || i === cumulativeMeters.length - 1) {
+      const start = cumulativeMeters[i - 1]!;
+      return { segment: i - 1, t: end > start ? (d - start) / (end - start) : 0 };
+    }
+  }
+  return { segment: 0, t: 0 };
+}
+
 /**
- * Resolves a point along an edge's polyline at the given distance from its
- * start endpoint. Distances beyond the edge length are clamped, since a
- * stale/placeholder map must never throw while rendering a live snapshot.
+ * Resolves a point along an edge's polyline at the given distance (sim
+ * metres) from its start endpoint. Distances beyond the edge length are
+ * clamped, since a stale map must never throw while rendering a live snapshot.
  */
 export function resolveEdgePoint(
   map: ScenarioMap,
@@ -37,20 +52,15 @@ export function resolveEdgePoint(
 ): SceneVector | null {
   const edge = map.edges.get(edgeId);
   if (!edge) return null;
-  const from = map.nodes.get(edge.fromNodeId);
-  const to = map.nodes.get(edge.toNodeId);
-  if (!from || !to) return null;
-
-  const t = edge.lengthMeters > 0 ? clamp(distanceAlongPolyline, 0, edge.lengthMeters) / edge.lengthMeters : 0;
-  return {
-    x: from.x + (to.x - from.x) * t,
-    z: from.z + (to.z - from.z) * t,
-  };
+  const { segment, t } = locateOnEdge(edge.cumulativeMeters, distanceAlongPolyline);
+  const a = edge.points[segment]!;
+  const b = edge.points[segment + 1]!;
+  return { x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t };
 }
 
 /**
  * Ordered scene points along an edge, in travel order for the given direction.
- * Null when the edge or either endpoint is unknown to this scenario map.
+ * Null when the edge is unknown to this scenario map.
  */
 export function resolveEdgePolyline(
   map: ScenarioMap,
@@ -59,30 +69,27 @@ export function resolveEdgePolyline(
 ): SceneVector[] | null {
   const edge = map.edges.get(edgeId);
   if (!edge) return null;
-  const from = map.nodes.get(edge.fromNodeId);
-  const to = map.nodes.get(edge.toNodeId);
-  if (!from || !to) return null;
-  const points = [
-    { x: from.x, z: from.z },
-    { x: to.x, z: to.z },
-  ];
+  const points = edge.points.map((point) => ({ x: point.x, z: point.z }));
   return direction === "forward" ? points : points.reverse();
 }
 
-/** Heading along an edge, flipped for the "reverse" travel direction. */
+/**
+ * Heading along an edge at the given distance (default: start), flipped
+ * for the "reverse" travel direction.
+ */
 export function resolveEdgeHeading(
   map: ScenarioMap,
   edgeId: string,
   direction: "forward" | "reverse",
+  distanceAlongPolyline = 0,
 ): SceneHeading | null {
   const edge = map.edges.get(edgeId);
   if (!edge) return null;
-  const from = map.nodes.get(edge.fromNodeId);
-  const to = map.nodes.get(edge.toNodeId);
-  if (!from || !to) return null;
-
-  const dx = to.x - from.x;
-  const dz = to.z - from.z;
+  const { segment } = locateOnEdge(edge.cumulativeMeters, distanceAlongPolyline);
+  const a = edge.points[segment]!;
+  const b = edge.points[segment + 1]!;
+  const dx = b.x - a.x;
+  const dz = b.z - a.z;
   const length = Math.hypot(dx, dz) || 1;
   const sign = direction === "forward" ? 1 : -1;
   return { dx: (sign * dx) / length, dz: (sign * dz) / length };
@@ -98,18 +105,10 @@ export function resolveAgentPosition(map: ScenarioMap, position: AgentPosition):
 
 const GRID_SIZE = 64;
 const CELL_METERS = 25;
-const SCENE_SIZE = 1400;
-const WORLD_METERS = GRID_SIZE * CELL_METERS;
 
 /** Resolves the center of a flat terrain grid cell (matches @ember/simulation/model). */
 export function resolveGridCellPosition(gridCellIndex: number): SceneVector {
   const gx = gridCellIndex % GRID_SIZE;
   const gy = Math.floor(gridCellIndex / GRID_SIZE);
-  const xm = (gx + 0.5) * CELL_METERS;
-  const ym = (gy + 0.5) * CELL_METERS;
-  const scale = SCENE_SIZE / WORLD_METERS;
-  return {
-    x: (xm - WORLD_METERS / 2) * scale,
-    z: (ym - WORLD_METERS / 2) * scale,
-  };
+  return worldToScene((gx + 0.5) * CELL_METERS, (gy + 0.5) * CELL_METERS, GRID_SIZE * CELL_METERS);
 }

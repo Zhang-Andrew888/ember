@@ -67,7 +67,12 @@ export function buildSceneEntities(view: CoordinatorView, map: ScenarioMap): Sce
     if (!position) continue;
     const heading =
       agent.position.kind === "edge"
-        ? resolveEdgeHeading(map, agent.position.edgeId, agent.position.direction)
+        ? resolveEdgeHeading(
+            map,
+            agent.position.edgeId,
+            agent.position.direction,
+            agent.position.distanceAlongPolyline,
+          )
         : null;
     agents.push({
       id: agent.id,

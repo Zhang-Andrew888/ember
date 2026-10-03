@@ -1436,3 +1436,28 @@ Self-critique (screenshots 1440x900 + 1024x720): first render's forecast ribbon 
 (6-16), thickened route (4.5/8). Still off: at 1024x720 the legend covers the route start; fire cells sit far from
 roads because the hand-authored map and the 64x64 fire grid use different coordinate frames (item 2 fixes this).
 Blocked: nothing. Next: open PR; item 2 (scenario loader).
+
+### Commit 3: item 2 - scenario loader replaces the hand-authored map
+Changed: removed the hand-authored topology in `map/scenarioMap.ts`. New `map/scenarioSchema.ts` (Zod),
+`map/loadScenario.ts` (first valid `scenarios/*.json` wins; invalid files are skipped with the reason),
+`map/activeScenario.ts` (`import.meta.glob` of `scenarios/*.json?strip`), `map/worldScale.ts`, polyline-aware
+`map/positions.ts` (roads with `via` bends, heading at the agent's leg), Roads over full polylines.
+Fire cells, roads, sites and routes now share one coordinate frame (they did not before).
+Decisions (nobody to ask):
+- `scenarios/` has only `scenario-v1.placeholder.json`, all `PENDING`, which fails validation (skipped and reported).
+  The synthetic topology exists only as code in sim-lane `packages/simulation`. I did NOT import sim packages. A
+  one-off script outside the repo generated `map/synthetic-v1.snapshot.json` (topology + public height/fuel grids,
+  needed by item 3) from `buildSyntheticScenario()`/`createTerrain()`. It is machine-generated, not hand-authored,
+  and is only a fallback: any valid `scenarios/*.json` wins. Needs: someone with sim-lane access to freeze a real
+  file into `scenarios/` (then delete the snapshot).
+- `requiredWork` (site truth) is stripped from anything read out of `scenarios/` by `scenarioPlugin.ts` before
+  bundling, is absent from the Zod schema, and is absent from the snapshot. Tests cover all three.
+- New direct dependency: `zod` 3.24.2 in `apps/web` (same exact version as `@ember/domain`, no second copy).
+  Why: scenario files are a boundary needing runtime validation and `@ember/domain` does not re-export `z`.
+- The frozen fixture and the mock data use `placeholder-*` ids. `net/mockBase.ts` remaps mock views onto the real
+  scenario ids (and authors a 4-leg plan, forecast bands and fire cells on the real roads); the fixture is untouched.
+- Camera now fits the scene to the canvas on creation (`fitZoom`), and that pose is the reset target.
+Self-critique (1440x900 and 1024x720): whole scenario now visible, route/forecast/fire line up on the same roads.
+Still off: terrain is the old flat sage/ochre plane (item 3), legend is tall at 1024x720, fire cells are tiny.
+PR #8 (open, CI green, no reviews as of 13:01 ET) carries all commits since the branch is the same.
+Blocked: nothing. Next: item 3 terrain composition.

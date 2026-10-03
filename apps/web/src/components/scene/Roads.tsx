@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { scenarioMap } from "../../map/scenarioMap.js";
+import { scenarioMap } from "../../map/activeScenario.js";
 import { colors } from "../../styles/colors.js";
 
 const ROAD_WIDTH = 6;
@@ -19,18 +19,19 @@ export function Roads() {
   const segments = useMemo<RoadSegment[]>(() => {
     const result: RoadSegment[] = [];
     for (const edge of scenarioMap.edges.values()) {
-      const from = scenarioMap.nodes.get(edge.fromNodeId);
-      const to = scenarioMap.nodes.get(edge.toNodeId);
-      if (!from || !to) continue;
-      const dx = to.x - from.x;
-      const dz = to.z - from.z;
-      result.push({
-        key: edge.id,
-        x: (from.x + to.x) / 2,
-        z: (from.z + to.z) / 2,
-        length: Math.hypot(dx, dz),
-        rotationY: -Math.atan2(dz, dx),
-      });
+      for (let i = 1; i < edge.points.length; i++) {
+        const from = edge.points[i - 1]!;
+        const to = edge.points[i]!;
+        const dx = to.x - from.x;
+        const dz = to.z - from.z;
+        result.push({
+          key: `${edge.id}:${i}`,
+          x: (from.x + to.x) / 2,
+          z: (from.z + to.z) / 2,
+          length: Math.hypot(dx, dz),
+          rotationY: -Math.atan2(dz, dx),
+        });
+      }
     }
     return result;
   }, []);

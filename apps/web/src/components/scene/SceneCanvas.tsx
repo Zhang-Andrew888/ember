@@ -9,10 +9,10 @@ import { ForecastLayer } from "./ForecastLayer.js";
 import { AgentMarkers } from "./AgentMarkers.js";
 import { CameraControls, type CameraControlsHandle } from "./CameraControls.js";
 import { listRefugeNodes } from "./sceneEntities.js";
-import { scenarioMap } from "../../map/scenarioMap.js";
+import { scenarioMap } from "../../map/activeScenario.js";
 import type { FireCellMarker, SceneEntities } from "./sceneEntities.js";
 
-const INITIAL_ZOOM = 1.1;
+const INITIAL_ZOOM = 0.72;
 // ~50 degree tilt from the ground plane (docs/FRONTEND.md "fixed initial tilt around 50 degrees").
 const INITIAL_CAMERA_POSITION: [number, number, number] = [0, 520, 440];
 

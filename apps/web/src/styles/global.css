@@ -618,3 +618,9 @@ input {
   border-left: 3px dashed #c1443b;
   padding-left: 0.4rem;
 }
+
+.scene-legend__source {
+  margin: 0;
+  font-size: 0.7rem;
+  opacity: 0.7;
+}

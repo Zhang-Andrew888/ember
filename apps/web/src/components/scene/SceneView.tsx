@@ -8,7 +8,7 @@ import { SceneLegend } from "./SceneLegend.js";
 import type { CameraControlsHandle } from "./CameraControls.js";
 import { polylineMidpoint } from "./sceneLayers.js";
 import { listRefugeNodes, type FireCellMarker, type SceneEntities } from "./sceneEntities.js";
-import { scenarioMap } from "../../map/scenarioMap.js";
+import { scenarioMap } from "../../map/activeScenario.js";
 import { siteProtectionStatusLabel, siteDamageLabel } from "../../format/reports.js";
 import { formatIncidentClock } from "../../format/time.js";
 
