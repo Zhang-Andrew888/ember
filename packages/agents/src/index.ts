@@ -7,3 +7,4 @@ export { ScoutController, edgeImportance } from "./scout.js";
 export { EvidenceTracker } from "./evidence.js";
 export { explain } from "./explain.js";
 export { runControllers, type RunLog } from "./testing.js";
+export * from "./voi.js";
