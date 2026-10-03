@@ -159,6 +159,22 @@ describe("information boundary", () => {
     expect(burning.length).toBeLessThan(40);
   });
 
+  it("never puts private parameters or truth cells in any agent projection", () => {
+    const inc = new Incident({
+      scenario: buildSyntheticScenario(),
+      seed: "secret-seed-456",
+      overrides: { spreadMultiplier: 1.2345678, windShiftMs: 311_111 },
+    });
+    inc.advanceTo(200_000);
+    const view = inc.projectCoordinator();
+    for (const agent of view.agents) {
+      const text = JSON.stringify(inc.projectAgent(agent.id));
+      for (const forbidden of ["secret-seed-456", "spreadMultiplier", "windShift", "privateWorld", "ignitedAt", "cellState", "1.2345678", "311111"]) {
+        expect(text, `${agent.id} leaked ${forbidden}`).not.toContain(forbidden);
+      }
+    }
+  });
+
   it("gives crews identical inputs when only hidden parameters differ and nothing new is seen", () => {
     const make = (mult: number): Incident =>
       new Incident({ scenario: buildSyntheticScenario(), seed: "a", overrides: { spreadMultiplier: mult, windShiftMs: 300_000 + mult * 1000 } });
