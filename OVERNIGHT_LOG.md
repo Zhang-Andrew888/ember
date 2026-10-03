@@ -1042,3 +1042,42 @@ spec'd behavior - proven, not assumed), 3 clean negative results (long
 transcript, high-DPI, and this round's push-to-talk pointer/keyboard
 reproductions). Will keep watching for further instructions and
 re-checking periodically until 10:00 ET.
+
+## 2026-10-03 09:1x UTC (05:1x ET) - full document sweep complete; final regression checkpoint
+
+Finished reading every project doc relevant to web-lane scope end to end
+looking for claims never exercised live, the methodology that found the
+5 real bugs logged above: `docs/FRONTEND.md` (done, found 3), `docs/
+COMMUNICATION.md` (done, found 1 real + 1 investigated-and-correctly-
+reverted), `docs/VALIDATION.md`'s frontend checklist (done, 2 clean
+checks: long transcript, high-DPI), `docs/ARCHITECTURE.md` and `docs/
+IMPLEMENTATION_PLAN.md` (read fully - overwhelmingly sim-lane/server
+territory; the web-lane-relevant pieces - transport routes, knowledge
+whitelisting, Slice 6 exit gate - were already covered by this session's
+earlier work and the still-open contract-change issues #1/#2), and
+`EMBER_LINE.md` (the product spec itself - nothing new; its web-relevant
+claims - recipient display, map-never-issues-commands, no color-only
+hidden-fire fog - were already implemented and audited earlier this
+session).
+
+Ran a final holistic checkpoint rather than another targeted hunt:
+typecheck/lint/`pnpm vitest run apps/web/src` all green (132 tests, 17
+files), the full 8-scenario regression smoke test clean, and a fresh
+re-run of the full replay flow end-to-end (REPLAY banner, 0:00 at start,
+scrubbing to 5:00/5 of 5, Next disabled at the end, zero Send buttons,
+Exit returns to debrief) - zero page errors, confirming the cumulative
+state across all of this extended session's fixes (the CameraControls
+dispose fix, replay focus fix, Escape-cancel, the narrow-viewport
+min-height fix, site damage text, and the end-cancels-audio fix) is
+still solid together, not just individually.
+
+**Status:** no code changes from this entry; everything already pushed
+and CI-green as of `8196452`.
+
+Document-driven bug hunting has reached genuine diminishing returns - the
+last several checks (long transcript, high-DPI, push-to-talk
+pointer/keyboard reproductions) all came back clean, and every web-lane-
+relevant doc in the repo has now been read end to end at least once this
+session. Will keep watching for further instructions and periodically
+re-verify CI/build health until 10:00 ET, rather than manufacturing
+further speculative changes without a concrete lead.
