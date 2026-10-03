@@ -37,11 +37,17 @@ export class IncidentRegistry {
   private readonly records = new Map<string, IncidentRecord>();
   private readonly byToken = new Map<string, string>();
 
+  /**
+   * @param defaultSeed Operator-chosen seed (server side only, e.g. `DEMO_SEED`) so a rehearsed fire can
+   *   be replayed. When absent each incident gets a random seed that is independent of its public id.
+   */
+  constructor(private readonly defaultSeed?: string) {}
+
   create(body: CreateIncidentBody = {}, clock: MonotonicClock): IncidentRecord {
     const id = randomBytes(12).toString("hex");
     const token = randomBytes(24).toString("hex");
     const scenario = body.scenario ?? buildSyntheticScenario();
-    const seed = body.seed ?? `incident-${id}`;
+    const seed = body.seed ?? this.defaultSeed ?? randomBytes(16).toString("hex");
     const session = new IncidentSession({ scenario, seed, ...body.session });
     const speechStore = new SpeechAudioStore();
     const grokTts = grokVoiceEnabled();
