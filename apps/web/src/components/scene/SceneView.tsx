@@ -8,7 +8,7 @@ import { SceneLegend } from "./SceneLegend.js";
 import type { CameraControlsHandle } from "./CameraControls.js";
 import { listRefugeNodes, type FireCellMarker, type SceneEntities } from "./sceneEntities.js";
 import { scenarioMap } from "../../map/scenarioMap.js";
-import { siteProtectionStatusLabel } from "../../format/reports.js";
+import { siteProtectionStatusLabel, siteDamageLabel } from "../../format/reports.js";
 import { formatIncidentClock } from "../../format/time.js";
 
 export interface SceneViewProps {
@@ -67,16 +67,22 @@ export function SceneView({
       text: refuge.label ?? "Refuge",
       variant: "refuge" as const,
     }));
-    const siteLabels = entities.sites.map((site) => ({
-      id: `site:${site.id}`,
-      x: site.position.x,
-      y: 18,
-      z: site.position.z,
-      // Status is color-coded on the marker too, but never color-only
-      // (docs/FRONTEND.md) - the label always spells it out as text.
-      text: `${site.name} — ${siteProtectionStatusLabel(site.protectionStatus)}${site.stale ? " (stale)" : ""}`,
-      variant: "site" as const,
-    }));
+    const siteLabels = entities.sites.map((site) => {
+      // Status and damage are color-coded on the marker too (a ring sized
+      // by damage, separate from the body's protection-status color), but
+      // never color-only (docs/FRONTEND.md) - the label always spells both
+      // out as text. Sites have no click-to-inspect (unlike agents and fire
+      // cells), so the label is the only accessible path to either value.
+      const damageLabel = siteDamageLabel(site.damage);
+      return {
+        id: `site:${site.id}`,
+        x: site.position.x,
+        y: 18,
+        z: site.position.z,
+        text: `${site.name} — ${siteProtectionStatusLabel(site.protectionStatus)}${damageLabel ? `, ${damageLabel}` : ""}${site.stale ? " (stale)" : ""}`,
+        variant: "site" as const,
+      };
+    });
     const agentLabels = entities.agents.map((agent) => ({
       id: `agent:${agent.id}`,
       x: agent.position.x,

@@ -1,11 +1,17 @@
 import type { MockIncidentSocketOptions } from "./mockIncidentSocket.js";
-import { emptyScenario, staleContradictionScenario, runEndedScenarios } from "./scenarios.js";
+import {
+  emptyScenario,
+  staleContradictionScenario,
+  siteDamageScenario,
+  runEndedScenarios,
+} from "./scenarios.js";
 
 export const SCENARIO_QUERY_KEY = "scenario";
 
 export const SCENARIO_NAMES = [
   "empty",
   "stale-contradiction",
+  "site-damage",
   "ended-time-expired",
   "ended-fire-extinguished",
   "ended-all-sites-resolved",
@@ -35,6 +41,8 @@ export function resolveScenario(search: string): MockIncidentSocketOptions | nul
       return { snapshots: [emptyScenario] };
     case "stale-contradiction":
       return { snapshots: [staleContradictionScenario] };
+    case "site-damage":
+      return { snapshots: [siteDamageScenario] };
     case "ended-time-expired":
       return { snapshots: [runEndedScenarios.time_expired] };
     case "ended-fire-extinguished":

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { CoordinatorView } from "@ember/domain";
-import { emptyScenario, staleContradictionScenario, runEndedScenarios } from "./scenarios.js";
+import { emptyScenario, staleContradictionScenario, siteDamageScenario, runEndedScenarios } from "./scenarios.js";
 
 describe("net/scenarios - emptyScenario", () => {
   it("is schema-valid", () => {
@@ -29,6 +29,18 @@ describe("net/scenarios - staleContradictionScenario", () => {
     );
     expect(matching.length).toBeGreaterThanOrEqual(2);
     expect(new Set(matching.map((cell) => cell.burnState)).size).toBeGreaterThan(1);
+  });
+});
+
+describe("net/scenarios - siteDamageScenario", () => {
+  it("is schema-valid", () => {
+    expect(() => CoordinatorView.parse(siteDamageScenario)).not.toThrow();
+  });
+
+  it("has at least one site with positive observed damage that isn't destroyed", () => {
+    const damaged = siteDamageScenario.sites.filter((s) => (s.observedDamage ?? 0) > 0);
+    expect(damaged.length).toBeGreaterThan(0);
+    expect(damaged.every((s) => s.observedDestroyed === false)).toBe(true);
   });
 });
 

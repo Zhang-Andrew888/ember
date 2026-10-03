@@ -5,6 +5,7 @@ import {
   routineReports,
   siteProtectionStatus,
   siteProtectionStatusLabel,
+  siteDamageLabel,
 } from "./reports.js";
 
 describe("format/reports - latestUrgentReport", () => {
@@ -85,5 +86,27 @@ describe("format/reports - siteProtectionStatusLabel", () => {
     const labels = statuses.map(siteProtectionStatusLabel);
     expect(labels.every((label) => label.length > 0)).toBe(true);
     expect(new Set(labels).size).toBe(statuses.length);
+  });
+});
+
+describe("format/reports - siteDamageLabel", () => {
+  it("is null when damage hasn't been observed", () => {
+    expect(siteDamageLabel(null)).toBeNull();
+  });
+
+  it("is null at zero damage", () => {
+    expect(siteDamageLabel(0)).toBeNull();
+  });
+
+  it("gives a rounded percentage for positive damage", () => {
+    expect(siteDamageLabel(0.4)).toBe("40% damaged");
+  });
+
+  it("rounds rather than truncates", () => {
+    expect(siteDamageLabel(0.125)).toBe("13% damaged");
+  });
+
+  it("reads sensibly at full damage", () => {
+    expect(siteDamageLabel(1)).toBe("100% damaged");
   });
 });

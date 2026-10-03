@@ -45,6 +45,31 @@ export const staleContradictionScenario: CoordinatorView = {
   ],
 };
 
+/**
+ * A site with observed damage but still under active protection work -
+ * exercises the damage ring in SiteMarkers.tsx (docs/FRONTEND.md: "Site
+ * protection and site damage have separate indicators. '60% protected' is
+ * not '60% health'"). No existing scenario/fixture/mock snapshot ever sets
+ * observedDamage above 0, so this path had never actually been rendered or
+ * checked live before this scenario was added.
+ */
+export const siteDamageScenario: CoordinatorView = {
+  ...fixtureCoordinatorView,
+  sequence: 600 as CoordinatorView["sequence"],
+  sites: [
+    {
+      ...fixtureCoordinatorView.sites[0]!,
+      observedCompletedWork: 20 as never,
+      observedDamage: 0.4 as never,
+      observedDestroyed: false,
+      lastObservedAt: 120_000 as never,
+      stale: false,
+    },
+    fixtureCoordinatorView.sites[1]!,
+    fixtureCoordinatorView.sites[2]!,
+  ],
+};
+
 function endedView(
   displayReason: EndReason,
   overrides: Partial<CoordinatorView> = {},

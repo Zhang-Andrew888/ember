@@ -46,3 +46,14 @@ const SITE_PROTECTION_STATUS_LABEL: Record<SiteProtectionStatus, string> = {
 export function siteProtectionStatusLabel(status: SiteProtectionStatus): string {
   return SITE_PROTECTION_STATUS_LABEL[status];
 }
+
+/**
+ * Text form of observed damage, so SiteMarkers.tsx's damage ring isn't the
+ * only way to read it (docs/FRONTEND.md: "Do not convey ... by color
+ * alone" - the same rule already applied to protection status). Null when
+ * there's nothing to say (unobserved, or observed at zero damage).
+ */
+export function siteDamageLabel(damage: number | null): string | null {
+  if (damage === null || damage <= 0) return null;
+  return `${Math.round(damage * 100)}% damaged`;
+}
