@@ -137,6 +137,17 @@ Reading these honestly:
 - Not implemented from the docs: the scout using relayed crew missions or deadlines for relevance; objective kinds
   "avoid corridor" (contract gap, issue #3); real-map extraction.
 
+## Later hardening (after the slice gates were met)
+
+- Fixed a stranded-halt bug: an agent halted mid-edge with no way forward is now re-planned instead of idling.
+- Added property tests: backward ReturnTable against forward search, the fast fire-spread path against a reference
+  implementation of the documented formula, and capping of a large supported ensemble keeps the extremes.
+- `validateScenario` / `scenarioGates` (packages/simulation) check references, duplicates, connectivity, ignition
+  placement and the five documented geometry gates; `Incident` refuses an invalid scenario.
+- `apps/server/src/check-scenario-cli.ts` runs those checks on a scenario JSON
+  (`npx tsx src/check-scenario-cli.ts <file>`); the synthetic scenario passes all five gates, the placeholder
+  `scenarios/scenario-v1.placeholder.json` correctly fails the schema (its fields are still PENDING).
+
 ## CI notes
 
 Two pushed commits (`fb01dc1`, `d67effe`) showed a red `Test` job even though every test passed: vitest exited 1
