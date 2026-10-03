@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { startIncident } from "./incidentRestClient.js";
+import {
+  createIncident,
+  resolveWebSocketUrl,
+  startIncident,
+} from "./incidentRestClient.js";
 
 describe("net/incidentRestClient - startIncident", () => {
   afterEach(() => {
@@ -15,6 +19,19 @@ describe("net/incidentRestClient - startIncident", () => {
     expect(result).toBe(true);
     expect(fetchMock).toHaveBeenCalledWith("http://localhost:3000/incidents/incident-1/start", {
       method: "POST",
+      headers: {},
+    });
+  });
+
+  it("sends x-incident-token when provided", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await startIncident("http://localhost:3000", "incident-1", "secret-token");
+
+    expect(fetchMock).toHaveBeenCalledWith("http://localhost:3000/incidents/incident-1/start", {
+      method: "POST",
+      headers: { "x-incident-token": "secret-token" },
     });
   });
 
@@ -36,7 +53,51 @@ describe("net/incidentRestClient - startIncident", () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       "http://localhost:3000/incidents/incident%20with%20spaces/start",
-      { method: "POST" },
+      { method: "POST", headers: {} },
     );
+  });
+});
+
+describe("net/incidentRestClient - createIncident", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("POST /incidents and returns id, token, and events path", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          incidentId: "abc",
+          token: "tok",
+          websocket: { events: "/incidents/abc/events?token=tok" },
+        }),
+      }),
+    );
+
+    const created = await createIncident("http://localhost:3000");
+    expect(created).toEqual({
+      incidentId: "abc",
+      token: "tok",
+      websocketEventsPath: "/incidents/abc/events?token=tok",
+    });
+  });
+
+  it("returns null on failed response", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false }));
+    expect(await createIncident("http://localhost:3000")).toBeNull();
+  });
+});
+
+describe("net/incidentRestClient - resolveWebSocketUrl", () => {
+  it("maps http base to ws on the same host", () => {
+    expect(resolveWebSocketUrl("http://127.0.0.1:3000", "/incidents/x/events?token=t")).toBe(
+      "ws://127.0.0.1:3000/incidents/x/events?token=t",
+    );
+  });
+
+  it("passes through absolute ws URLs", () => {
+    expect(resolveWebSocketUrl("", "ws://127.0.0.1:1/events")).toBe("ws://127.0.0.1:1/events");
   });
 });
