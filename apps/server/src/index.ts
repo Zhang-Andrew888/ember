@@ -25,3 +25,4 @@ export {
 } from "./evaluation.js";
 export { SessionHub, LiveRun, type ClientId } from "./hub.js";
 export { ClientMessage, ServerMessage, decode, encode } from "./protocol.js";
+export { startServer, type ServerHandle } from "./ws-server.js";

@@ -50,7 +50,7 @@ export class IncidentRunner {
 
   get wallElapsedMs(): number {
     if (this.startedAtMs === null) return 0;
-    return Math.max(0, this.clock.nowMs() - this.startedAtMs);
+    return Math.max(0, Math.floor(this.clock.nowMs() - this.startedAtMs));
   }
 
   /** Advance the incident to the simulated time that is due now. */

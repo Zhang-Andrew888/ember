@@ -148,7 +148,7 @@ export class LiveRun {
   ) {}
 
   get wallElapsedMs(): number {
-    return this.startedAt === null ? 0 : Math.max(0, this.clock.nowMs() - this.startedAt);
+    return this.startedAt === null ? 0 : Math.max(0, Math.floor(this.clock.nowMs() - this.startedAt));
   }
 
   start(): void {
