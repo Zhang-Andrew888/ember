@@ -1,0 +1,1 @@
+[out:json][timeout:60];(way["highway"~"^(trunk|primary|secondary|tertiary|unclassified|residential|living_street|service|road|primary_link|secondary_link|tertiary_link)$"](37.8205,-122.2240,37.8405,-122.1990);>;);out body;
