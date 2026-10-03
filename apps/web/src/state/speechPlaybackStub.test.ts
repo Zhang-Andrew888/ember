@@ -12,7 +12,13 @@ describe("state/speechPlaybackStub", () => {
 
   it("starts idle", () => {
     const stub = createSpeechPlaybackStub();
-    expect(stub.getSnapshot()).toEqual({ state: "idle", text: null, urgent: false });
+    expect(stub.getSnapshot()).toEqual({
+      state: "idle",
+      text: null,
+      urgent: false,
+      queuedUrgent: false,
+      queuedRoutineCount: 0,
+    });
   });
 
   it("speak() moves pending -> playing -> idle with the same text throughout", () => {
@@ -27,7 +33,13 @@ describe("state/speechPlaybackStub", () => {
     expect(stub.getSnapshot().text).toBe("Crew 1 on site.");
 
     vi.advanceTimersByTime(10_000); // well past any possible playing duration
-    expect(stub.getSnapshot()).toEqual({ state: "idle", text: null, urgent: false });
+    expect(stub.getSnapshot()).toEqual({
+      state: "idle",
+      text: null,
+      urgent: false,
+      queuedUrgent: false,
+      queuedRoutineCount: 0,
+    });
   });
 
   it("longer text plays for longer than the minimum duration", () => {
@@ -46,12 +58,15 @@ describe("state/speechPlaybackStub", () => {
     expect(stub.getSnapshot().state).toBe("idle");
   });
 
-  it("a routine speak() while something is already active is dropped, not queued", () => {
+  it("queues routine audio behind an active clip", () => {
     const stub = createSpeechPlaybackStub();
     stub.speak("first message");
     vi.advanceTimersByTime(200); // now playing "first message"
     stub.speak("second message");
     expect(stub.getSnapshot().text).toBe("first message");
+    expect(stub.getSnapshot().queuedRoutineCount).toBe(1);
+    vi.advanceTimersByTime(10_000);
+    expect(stub.getSnapshot().state).toBe("idle");
   });
 
   it("an urgent speak() interrupts whatever is currently playing", () => {
@@ -60,7 +75,24 @@ describe("state/speechPlaybackStub", () => {
     vi.advanceTimersByTime(200); // now playing "routine message"
     stub.speak("URGENT: fire crossing the road", { urgent: true });
 
-    expect(stub.getSnapshot()).toEqual({ state: "pending", text: "URGENT: fire crossing the road", urgent: true });
+    expect(stub.getSnapshot()).toEqual({
+      state: "pending",
+      text: "URGENT: fire crossing the road",
+      urgent: true,
+      queuedUrgent: false,
+      queuedRoutineCount: 0,
+    });
+  });
+
+  it("defers urgent audio while recording, then plays after recording ends", () => {
+    const stub = createSpeechPlaybackStub();
+    stub.setRecording(true);
+    stub.speak("URGENT report", { urgent: true });
+    expect(stub.getSnapshot().queuedUrgent).toBe(true);
+    expect(stub.getSnapshot().state).toBe("idle");
+    stub.setRecording(false);
+    expect(stub.getSnapshot().state).toBe("pending");
+    expect(stub.getSnapshot().text).toBe("URGENT report");
   });
 
   it("an urgent speak() interrupts a pending (not yet playing) routine message too", () => {
@@ -75,7 +107,13 @@ describe("state/speechPlaybackStub", () => {
     stub.speak("routine message");
     vi.advanceTimersByTime(200); // now playing
     stub.cancel();
-    expect(stub.getSnapshot()).toEqual({ state: "idle", text: null, urgent: false });
+    expect(stub.getSnapshot()).toEqual({
+      state: "idle",
+      text: null,
+      urgent: false,
+      queuedUrgent: false,
+      queuedRoutineCount: 0,
+    });
   });
 
   it("cancel() drops a pending (not yet playing) message too", () => {

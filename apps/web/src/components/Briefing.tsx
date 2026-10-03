@@ -1,9 +1,14 @@
+import { useCallback } from "react";
 import { briefingCallsigns, briefingIncidentLabel, briefingSites } from "../briefing/briefingInfo.js";
 import { colors } from "../styles/colors.js";
+import { MicCheck } from "./MicCheck.js";
+import { createVoiceCapture } from "../net/voiceCapture.js";
+import { DemoBanner } from "./DemoBanner.js";
 
 export interface BriefingProps {
   readonly onStart: () => void;
   readonly starting: boolean;
+  readonly demoMode: boolean;
 }
 
 /**
@@ -13,9 +18,12 @@ export interface BriefingProps {
  * pressed - App.tsx only begins snapshot playback / calls the start
  * endpoint from onStart.
  */
-export function Briefing({ onStart, starting }: BriefingProps) {
+export function Briefing({ onStart, starting, demoMode }: BriefingProps) {
+  const probeMic = useCallback(() => createVoiceCapture({ preferMicrophone: true }).probeMicrophone(), []);
+
   return (
     <div className="briefing">
+      {demoMode ? <DemoBanner /> : null}
       <h1 className="briefing__title">EMBER LINE</h1>
       <p className="briefing__incident-label">{briefingIncidentLabel}</p>
 
@@ -60,10 +68,7 @@ export function Briefing({ onStart, starting }: BriefingProps) {
 
       <section aria-labelledby="briefing-mic-heading">
         <h2 id="briefing-mic-heading">Microphone check</h2>
-        <p className="briefing__mic-status">
-          Voice push-to-talk is not connected in this build. Text input will be available once the incident
-          starts.
-        </p>
+        <MicCheck onProbe={probeMic} />
       </section>
 
       <button type="button" className="briefing__start" onClick={onStart} disabled={starting}>

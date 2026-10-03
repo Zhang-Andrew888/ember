@@ -24,14 +24,29 @@ declare module "node:http" {
   }
 }
 declare const Buffer: {
-  from(data: unknown): { toString(encoding?: string): string };
+  from(data: unknown, encoding?: string): Uint8Array & { toString(encoding?: string): string };
 };
-declare const process: { argv: string[]; exitCode?: number; stdout: { write(s: string): void } };
+declare const process: {
+  argv: string[];
+  exitCode?: number;
+  env: Record<string, string | undefined>;
+  stdout: { write(s: string): void };
+};
+declare const console: { log(message?: string): void };
+declare class Blob {
+  constructor(parts: unknown[], options?: { type?: string });
+}
+declare class FormData {
+  append(name: string, value: Blob, filename?: string): void;
+}
 declare function setInterval(handler: () => void, ms: number): unknown;
 declare function setTimeout(handler: (...args: never[]) => void, ms: number): unknown;
 declare function clearInterval(handle: unknown): void;
 declare const performance: { now(): number };
-declare const fetch: (input: string, init?: { method?: string }) => Promise<{ json(): Promise<unknown> }>;
+declare const fetch: (
+  input: string,
+  init?: { method?: string; headers?: Record<string, string>; body?: string | FormData },
+) => Promise<{ ok: boolean; status: number; json(): Promise<unknown>; arrayBuffer(): Promise<ArrayBuffer> }>;
 declare class URLSearchParams {
   constructor(init?: string);
   get(name: string): string | null;

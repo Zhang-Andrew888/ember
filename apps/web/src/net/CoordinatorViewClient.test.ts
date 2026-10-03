@@ -73,7 +73,11 @@ describe("net/CoordinatorViewClient - createCoordinatorViewClient", () => {
       sockets.push(s);
       return s;
     });
-    expect(client.getState()).toEqual({ status: "connecting", view: null });
+    expect(client.getState()).toEqual({
+      status: "connecting",
+      view: null,
+      sideband: { transcripts: [], receipts: [], audioCues: [] },
+    });
     client.close();
   });
 
@@ -89,6 +93,35 @@ describe("net/CoordinatorViewClient - createCoordinatorViewClient", () => {
 
     expect(client.getState().status).toBe("open");
     expect(client.getState().view?.sequence).toBe(fixtureCoordinatorView.sequence);
+    client.close();
+  });
+
+  it("accumulates receipt sideband messages", () => {
+    const sockets: FakeSocket[] = [];
+    const client = createCoordinatorViewClient(() => {
+      const s = new FakeSocket();
+      sockets.push(s);
+      return s;
+    });
+    sockets[0]!.emitOpen();
+    sockets[0]!.emitMessage(
+      JSON.stringify({
+        protocolVersion: 1,
+        message: {
+          type: "receipt",
+          receipt: {
+            commandId: "cmd-1",
+            status: "received",
+            recipientId: null,
+            appliedTick: null,
+            explanation: "",
+            planRevision: null,
+          },
+          reply: "Received.",
+        },
+      }),
+    );
+    expect(client.getState().sideband.receipts).toHaveLength(1);
     client.close();
   });
 

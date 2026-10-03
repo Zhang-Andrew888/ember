@@ -3,6 +3,12 @@
 export * from "./intent.js";
 export * from "./interpreter.js";
 export {
+  clarificationFallback,
+  createGrokInterpreter,
+  parseModelIntentJson,
+  type GrokIntentComplete,
+} from "./grok-interpreter.js";
+export {
   CommandGateway,
   statusReply,
   type AgentStatus,
