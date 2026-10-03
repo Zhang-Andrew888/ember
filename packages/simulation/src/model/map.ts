@@ -2,14 +2,25 @@ import { z } from "zod";
 import { EdgeId, NodeId, SiteId } from "@ember/domain";
 import { SIM_DEFAULTS } from "./constants.js";
 
-export const Point = z.object({ x: z.number(), y: z.number() });
+const finiteMeters = z.number().finite();
+
+/** Reject coordinates that do not fall in a fire-grid cell. */
+function rejectOffGrid(point: { x: number; y: number }, ctx: z.RefinementCtx): void {
+  if (cellIndexOf(point.x, point.y) === null) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "is off the grid" });
+  }
+}
+
+export const Point = z.object({ x: finiteMeters, y: finiteMeters }).superRefine(rejectOffGrid);
 export type Point = z.infer<typeof Point>;
 
-export const MapNode = z.object({
-  id: NodeId,
-  x: z.number(),
-  y: z.number(),
-});
+export const MapNode = z
+  .object({
+    id: NodeId,
+    x: finiteMeters,
+    y: finiteMeters,
+  })
+  .superRefine(rejectOffGrid);
 export type MapNode = z.infer<typeof MapNode>;
 
 export const MapEdge = z.object({

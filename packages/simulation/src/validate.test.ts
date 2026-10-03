@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { NodeId } from "@ember/domain";
-import { cellIndexOf } from "./model/index.js";
-import { Incident, buildSyntheticScenario, scenarioGates, validateScenario, type SimScenario } from "./index.js";
+import { SIM_DEFAULTS, cellIndexOf, cellsWithin } from "./model/index.js";
+import { Incident, SimScenario, buildSyntheticScenario, scenarioGates, validateScenario } from "./index.js";
 
 describe("scenario validation", () => {
   it("accepts the synthetic scenario", () => {
@@ -31,6 +31,69 @@ describe("scenario validation", () => {
     expect(validateScenario(nearRefuge).some((e) => /inside a refuge area/.test(e))).toBe(true);
     const island = { ...s, map: { ...s.map, nodes: [...s.map.nodes, { id: NodeId.parse("island"), x: 1500, y: 1500 }] } };
     expect(validateScenario(island).some((e) => /island is not connected/.test(e))).toBe(true);
+  });
+
+  it("rejects a site shifted to x=1650 m even though every geometry gate still passes", () => {
+    const s = buildSyntheticScenario();
+    const shifted: SimScenario = {
+      ...s,
+      map: {
+        ...s.map,
+        nodes: s.map.nodes.map((n) => ({ ...n, x: n.x + 400 })),
+        edges: s.map.edges.map((e) => ({ ...e, via: e.via.map((p) => ({ x: p.x + 400, y: p.y })) })),
+      },
+    };
+    const siteB = shifted.map.sites.find((site) => site.id === "site-b");
+    const siteNode = shifted.map.nodes.find((n) => n.id === siteB?.nodeId);
+    expect(siteNode).toMatchObject({ id: "n-sb", x: 1650, y: 800 });
+    expect(cellsWithin(1650, 800, SIM_DEFAULTS.siteExposureRadiusM)).toEqual([]);
+    const gates = scenarioGates(shifted);
+    expect(gates).toHaveLength(5);
+    for (const g of gates) expect(g.ok, `${g.gate}: ${g.detail}`).toBe(true);
+    expect(validateScenario(shifted).filter((e) => /off the grid/.test(e)).sort()).toEqual([
+      "node n-sa is off the grid",
+      "node n-sb is off the grid",
+      "node n-sc is off the grid",
+    ]);
+    expect(() => new Incident({ scenario: shifted, seed: "x" })).toThrow(/off the grid/);
+  });
+
+  it("rejects non-finite coordinates, off-grid via points, and zero-length edges", () => {
+    const s = buildSyntheticScenario();
+    const nonFinite: SimScenario = {
+      ...s,
+      map: { ...s.map, nodes: s.map.nodes.map((n) => (n.id === "n-rw" ? { ...n, y: Number.NaN } : n)) },
+    };
+    expect(validateScenario(nonFinite).some((e) => e === "node n-rw has non-finite coordinates")).toBe(true);
+
+    const via: SimScenario = {
+      ...s,
+      map: {
+        ...s.map,
+        edges: s.map.edges.map((e) => (e.id === "e-rs-sc" ? { ...e, via: [{ x: -10, y: 250 }] } : e)),
+      },
+    };
+    expect(validateScenario(via)).toContain("edge e-rs-sc via point 0 is off the grid");
+
+    const zero: SimScenario = {
+      ...s,
+      map: {
+        ...s.map,
+        edges: s.map.edges.map((e) => (e.id === "e-rw-j1" ? { ...e, to: e.from, via: [] } : e)),
+      },
+    };
+    expect(validateScenario(zero)).toContain("edge e-rw-j1 has invalid geometry");
+  });
+
+  it("schema rejects an off-grid node", () => {
+    const s = buildSyntheticScenario();
+    const raw = {
+      ...s,
+      map: { ...s.map, nodes: s.map.nodes.map((n) => (n.id === "n-sb" ? { ...n, x: 1650 } : n)) },
+    };
+    const parsed = SimScenario.safeParse(raw);
+    expect(parsed.success).toBe(false);
+    if (!parsed.success) expect(parsed.error.issues.some((issue) => issue.message === "is off the grid")).toBe(true);
   });
 });
 
