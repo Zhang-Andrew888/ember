@@ -2,11 +2,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   createCoordinatorViewClient,
   type CoordinatorViewClient,
-  type WebSocketLike,
 } from "./net/CoordinatorViewClient.js";
 import { createMockIncidentSocket, type MockIncidentSocket } from "./net/mockIncidentSocket.js";
 import { resolveScenario } from "./net/scenarioSelection.js";
-import { startIncident } from "./net/incidentRestClient.js";
+import {
+  createIncident,
+  resolveWebSocketUrl,
+  startIncident,
+} from "./net/incidentRestClient.js";
+import { createProtocolWebSocket, type ProtocolWebSocket } from "./net/protocolWebSocket.js";
 import { useCoordinatorView } from "./state/useCoordinatorView.js";
 import { useReducedMotion } from "./state/useReducedMotion.js";
 import { createSpeechPlaybackStub } from "./state/speechPlaybackStub.js";
@@ -24,9 +28,12 @@ import { EndOverlay } from "./components/EndOverlay.js";
 import { ReplayView } from "./components/ReplayView.js";
 
 const INCIDENT_ID = import.meta.env.VITE_INCIDENT_ID ?? "demo";
-const WS_URL = import.meta.env.VITE_INCIDENT_WS_URL;
-const REST_BASE_URL = import.meta.env.VITE_INCIDENT_REST_BASE_URL;
-const IS_MOCK_MODE = !WS_URL;
+const INCIDENT_TOKEN = import.meta.env.VITE_INCIDENT_TOKEN as string | undefined;
+const WS_URL = import.meta.env.VITE_INCIDENT_WS_URL as string | undefined;
+/** Set to any value (including empty) to use `POST /incidents` + proxied REST/WS instead of mock. */
+const REST_BASE_URL = import.meta.env.VITE_INCIDENT_REST_BASE_URL as string | undefined;
+const HAS_LIVE_REST = REST_BASE_URL !== undefined;
+const IS_MOCK_MODE = !WS_URL && !HAS_LIVE_REST;
 
 const EMPTY_ENTITIES = { agents: [], sites: [], fireCells: [], routes: [], forecast: null };
 
@@ -38,6 +45,9 @@ export function App() {
   const [client, setClient] = useState<CoordinatorViewClient | null>(null);
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const mockSocketRef = useRef<MockIncidentSocket | null>(null);
+  const protocolSocketRef = useRef<ProtocolWebSocket | null>(null);
+  const liveSessionRef = useRef<{ incidentId: string; token: string } | null>(null);
+  const liveWsUrlRef = useRef<string | null>(null);
   const reducedMotion = useReducedMotion();
 
   const { status: connectionStatus, view } = useCoordinatorView(client);
@@ -83,17 +93,37 @@ export function App() {
     }
     // The real WebSocket's richer onmessage/close signatures are a superset of
     // WebSocketLike; narrowing through unknown avoids a brittle structural match.
-    return new WebSocket(`${WS_URL}`) as unknown as WebSocketLike;
+    const url = liveWsUrlRef.current ?? WS_URL;
+    if (url === undefined) {
+      throw new Error("Live WebSocket URL is not configured");
+    }
+    const socket = createProtocolWebSocket(url);
+    protocolSocketRef.current = socket;
+    return socket;
   }, []);
 
   const handleStart = useCallback(async () => {
     setStarting(true);
+    if (HAS_LIVE_REST) {
+      const created = await createIncident(REST_BASE_URL ?? "");
+      if (created === null) {
+        setStarting(false);
+        return;
+      }
+      liveSessionRef.current = { incidentId: created.incidentId, token: created.token };
+      liveWsUrlRef.current = resolveWebSocketUrl(REST_BASE_URL ?? "", created.websocketEventsPath);
+    }
     const nextClient = createCoordinatorViewClient(openSocket);
     setClient(nextClient);
     if (IS_MOCK_MODE) {
       mockSocketRef.current?.start();
-    } else if (REST_BASE_URL) {
-      await startIncident(REST_BASE_URL, INCIDENT_ID);
+    } else {
+      const incidentId = liveSessionRef.current?.incidentId ?? INCIDENT_ID;
+      const token = liveSessionRef.current?.token ?? INCIDENT_TOKEN;
+      const restBase = HAS_LIVE_REST ? (REST_BASE_URL ?? "") : REST_BASE_URL;
+      if (restBase !== undefined) {
+        await startIncident(restBase, incidentId, token);
+      }
     }
     setStarting(false);
     setPhase("live");
@@ -113,14 +143,14 @@ export function App() {
     // on, since there's no real backend behind it to make that true.
     speechStubRef.current.speak(`Received: ${text}`, { urgent: false });
 
-    if (IS_MOCK_MODE || !REST_BASE_URL) return;
-    void fetch(`${REST_BASE_URL}/incidents/${encodeURIComponent(INCIDENT_ID)}/messages`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text }),
-    }).catch(() => {
-      // Best-effort: the server is authoritative, a failed send just leaves no receipt.
-    });
+    const socket = protocolSocketRef.current;
+    if (socket !== null) {
+      socket.sendCommand({
+        type: "say",
+        text,
+        idempotencyKey: crypto.randomUUID(),
+      });
+    }
   }, []);
 
   const entities = useMemo(
