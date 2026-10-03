@@ -22,6 +22,13 @@ Running log for the crew increments. Newest last.
 - Safety check caught in review of my own cut: a crew on its normal return phase must still withdraw when its route closes, so only withdrawing/retreating crews are exempt.
 - return/hold/avoid/resume are always accepted: they only reduce exposure. Survival reasons are ordered: observation, certifier, forecast reliability.
 
+## Increment 6: callsigns and communication style (feat/crew-6-callsigns, from main)
+- `callsigns.ts`: `CallsignDirectory.resolve` is total (match / ambiguous / unknown, never throws) and deterministic regardless of directory order. Normalizes case, punctuation and number words ("Crew-Two" = "crew 2"); strips spoken filler ("the", "please"). Exact normalized match wins, else all heard tokens must appear in a callsign. Crew 1 never matches Crew 10. Identical callsigns are always ambiguous. `clarification()` gives the question to ask.
+- `defaultCallsign` derives the documented fictional callsigns (Crew N, Scout) from authored ids.
+- `style.ts`: `plain` (default) or `radio` (callsign-first, shorter opening). Never changes the reason or uncertainty; test pins that the reason text is kept verbatim.
+- `ControllerOptions.style` per crew; the stored last report is the styled text, i.e. what was actually said.
+- The communication package already resolves explicit names itself (matchName); I did not touch it (out of lane). This directory is the crew-side source of truth callers can adopt.
+
 ## Increment 4: knowledge (feat/crew-4-knowledge, from main, independent of #10/#11/#13)
 - `packages/knowledge`: `contradictions()` (clear overturned by later fire; equal-time conflict, order independent, deduped), `contradictedCells()`, `staleBeliefs(now)`, `ageMs`, `isSuperseded`, and `selectRelay` with `DEFAULT_RELAY_POLICY`.
 - Recovery is conservative: a contradicted cell stays closed, an older clear never revives it, and relayed old clears that arrive late are history not contradictions.
