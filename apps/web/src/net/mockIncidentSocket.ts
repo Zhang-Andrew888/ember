@@ -2,6 +2,7 @@ import type { CoordinatorView } from "@ember/domain";
 import { fixtureCoordinatorView } from "../../../../tests/fixtures/coordinator-view.fixture.js";
 import type { WebSocketLike } from "./CoordinatorViewClient.js";
 import { adaptToScenarioIds } from "./mockBase.js";
+import { defaultRecordedMockSnapshots } from "./recordedMockPlayback.js";
 
 /**
  * Hand-authored CoordinatorView snapshots for the Slice-1 dev/test harness.
@@ -110,11 +111,16 @@ export interface MockIncidentSocket extends WebSocketLike {
   start(): void;
   /** Delivers an extra wire frame (receipts/transcripts) during mock runs. */
   deliver(raw: string): void;
+  /** True once the scripted snapshot timeline has finished without an `incidentEnd`. */
+  readonly playbackEnded: boolean;
 }
 
 export interface MockIncidentSocketOptions {
   readonly snapshots?: CoordinatorView[];
+  /** Fixed spacing between snapshots (dev scenarios). Omit to use each snapshot's `wallElapsedMs`. */
   readonly intervalMs?: number;
+  /** Fired after the last snapshot is delivered when the run did not end. */
+  readonly onPlaybackEnded?: () => void;
   /**
    * Simulates a connection that fails before ever opening (e.g. server
    * unreachable) - fires onerror then onclose instead of onopen. For the
@@ -139,12 +145,23 @@ const CLOSED = 3;
  * until Start" (docs/FRONTEND.md) even though the socket connects on mount.
  */
 export function createMockIncidentSocket(options: MockIncidentSocketOptions = {}): MockIncidentSocket {
-  const snapshots = options.snapshots ?? authoredSnapshots;
-  const intervalMs = options.intervalMs ?? 2000;
+  const snapshots = options.snapshots ?? defaultRecordedMockSnapshots();
 
   let readyState = CONNECTING;
   let started = false;
+  let playbackEnded = false;
   const timers: Array<ReturnType<typeof setTimeout>> = [];
+
+  const schedulePlaybackEnd = (delayMs: number, lastView: CoordinatorView): void => {
+    if (lastView.incidentEnd !== null) return;
+    timers.push(
+      setTimeout(() => {
+        if (readyState !== OPEN || playbackEnded) return;
+        playbackEnded = true;
+        options.onPlaybackEnded?.();
+      }, delayMs + 50),
+    );
+  };
 
   const socket: MockIncidentSocket = {
     onopen: null,
@@ -157,14 +174,33 @@ export function createMockIncidentSocket(options: MockIncidentSocketOptions = {}
     start() {
       if (started) return;
       started = true;
+      if (snapshots.length === 0) {
+        playbackEnded = true;
+        options.onPlaybackEnded?.();
+        return;
+      }
+      const baseWall = snapshots[0]!.wallElapsedMs as number;
       snapshots.forEach((snapshot, index) => {
+        const delayMs =
+          options.intervalMs !== undefined
+            ? index * options.intervalMs
+            : Math.max(0, (snapshot.wallElapsedMs as number) - baseWall);
         timers.push(
           setTimeout(() => {
             if (readyState !== OPEN) return;
             socket.onmessage?.({ data: JSON.stringify(adaptToScenarioIds(snapshot)) });
-          }, index * intervalMs),
+          }, delayMs),
         );
       });
+      const last = snapshots[snapshots.length - 1]!;
+      const lastDelay =
+        options.intervalMs !== undefined
+          ? (snapshots.length - 1) * options.intervalMs
+          : Math.max(0, (last.wallElapsedMs as number) - baseWall);
+      schedulePlaybackEnd(lastDelay, last);
+    },
+    get playbackEnded() {
+      return playbackEnded;
     },
     close() {
       if (readyState === CLOSED) return;

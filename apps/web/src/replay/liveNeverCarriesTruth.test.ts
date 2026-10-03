@@ -2,7 +2,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { CoordinatorView } from "@ember/domain";
 import { fixtureCoordinatorView } from "../../../../tests/fixtures/coordinator-view.fixture.js";
 import { adaptToScenarioIds } from "../net/mockBase.js";
-import { authoredSnapshots, createMockIncidentSocket } from "../net/mockIncidentSocket.js";
+import {
+  authoredSnapshots,
+  createMockIncidentSocket,
+  type MockIncidentSocketOptions,
+} from "../net/mockIncidentSocket.js";
 import { SCENARIO_NAMES, resolveScenario } from "../net/scenarioSelection.js";
 import { modelStatesScenario, runEndedScenarios } from "../net/scenarios.js";
 import { parseCoordinatorViewFrame } from "../net/wireProtocol.js";
@@ -91,9 +95,12 @@ describe("live payloads carry no truth", () => {
 describe("what the mock socket actually emits", () => {
   afterEach(() => vi.useRealTimers());
 
-  async function emitted(options: Parameters<typeof createMockIncidentSocket>[0]): Promise<string[]> {
+  async function emitted(options: MockIncidentSocketOptions = {}): Promise<string[]> {
     vi.useFakeTimers();
-    const socket = createMockIncidentSocket({ intervalMs: 10, ...options });
+    const socket = createMockIncidentSocket({
+      ...options,
+      intervalMs: options.intervalMs ?? 10,
+    });
     const frames: string[] = [];
     socket.onmessage = (event) => frames.push(event.data as string);
     await vi.advanceTimersByTimeAsync(1);
@@ -104,7 +111,7 @@ describe("what the mock socket actually emits", () => {
   }
 
   it("default demo frames parse through the production wire parser with no truth keys", async () => {
-    const frames = await emitted({});
+    const frames = await emitted({ snapshots: authoredSnapshots });
     expect(frames.length).toBe(authoredSnapshots.length);
     for (const raw of frames) {
       const view = parseCoordinatorViewFrame(raw);
