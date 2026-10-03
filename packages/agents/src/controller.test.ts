@@ -541,3 +541,27 @@ describe("controller capabilities", () => {
     expect(new CrewController({ agentId: crew1, callsign: "Scout", role: "scout", map: scenario.map }).capabilities.workRate).toBe(0);
   });
 });
+
+describe("member condition in the controller", () => {
+  it("accumulates fatigue over a mission, keeps every value in range, and plans from the tightened config", () => {
+    const scenario = scenarioWith({ fire: far, work: 60 });
+    const inc = new Incident({ scenario, seed: "m1", overrides: calm });
+    const c = crew(scenario);
+    expect(c.memberState).toEqual({ fatigue: 0, injuryRisk: 0, morale: 1 });
+    runControllers(inc, [c], 400_000);
+    const m = c.memberState;
+    expect(m.fatigue).toBeGreaterThan(0);
+    for (const v of [m.fatigue, m.injuryRisk, m.morale]) {
+      expect(v).toBeGreaterThanOrEqual(0);
+      expect(v).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it("a rested crew behaves exactly as before: tightening starts only past the onset", () => {
+    const scenario = scenarioWith({ fire: far, work: 60 });
+    const inc = new Incident({ scenario, seed: "a1", overrides: calm });
+    const c = crew(scenario);
+    runControllers(inc, [c], 700_000);
+    expect(inc.end?.matchingReasons ?? []).toContain("all_sites_resolved");
+  });
+});

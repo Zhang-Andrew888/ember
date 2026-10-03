@@ -22,6 +22,7 @@ import {
   planReturn,
   protectionTargets,
   type CertifyFailure,
+  type NavConfig,
   type PlanningContext,
   type MissionSearchResult,
   type PriorityClass,
@@ -32,6 +33,7 @@ import { RoadIndex, type PublicMap } from "@ember/simulation/model";
 import { capabilitiesOf, type CrewCapabilities } from "./crew-roles.js";
 import { decideContinuation, decideOrder } from "./autonomy.js";
 import { EvidenceTracker } from "./evidence.js";
+import { FATIGUE_PER_MIN, FRESH_MEMBER_STATE, advanceMemberState, tightenNav, type Activity, type MemberState } from "./member-state.js";
 import { applyStyle, type CommStyle } from "./style.js";
 import { explain } from "./explain.js";
 import {
@@ -92,6 +94,9 @@ export class CrewController implements AgentController {
   /** Edges the coordinator asked this crew to avoid until resume or a new objective. */
   protected readonly avoidCorridorEdges = new Set<EdgeId>();
   private currentState: ControllerState = "HOLDING";
+  private member: MemberState = FRESH_MEMBER_STATE;
+  private lastTickMs: number | null = null;
+  private lastAtRefuge = true;
   private seq = 0;
   private fireDirty = true;
   private evalDirty = true;
@@ -122,6 +127,30 @@ export class CrewController implements AgentController {
   /** This role's documented speed and work rate. */
   get capabilities(): CrewCapabilities {
     return capabilitiesOf(this.role);
+  }
+
+  /** Fatigue, injury risk and morale: a crew-internal planning margin that only ever tightens feasibility. */
+  get memberState(): MemberState {
+    return this.member;
+  }
+
+  /** Planning config after condition is applied: never looser than the configured one. */
+  protected effectiveNav(): NavConfig {
+    return tightenNav(this.cfg.nav ?? DEFAULT_NAV_CONFIG, this.member);
+  }
+
+  private advanceMember(nowMs: number): void {
+    const prev = this.lastTickMs;
+    this.lastTickMs = nowMs;
+    if (prev === null) return;
+    const s = this.currentState;
+    const emergency = s === "WITHDRAWING" || s === "RETREATING" || s === "STRANDED";
+    let activity: Activity;
+    if (emergency) activity = "emergency";
+    else if (s === "WORKING") activity = "working";
+    else if (this.lastAtRefuge) activity = "resting"; // waiting at a refuge is rest, not exertion
+    else activity = s === "APPROACHING" || s === "RETURNING" || s === "PLANNING" ? "travelling" : "resting";
+    this.member = advanceMemberState(this.member, FATIGUE_PER_MIN[this.role], { dtMs: nowMs - prev, activity });
   }
 
   get state(): ControllerState {
@@ -157,6 +186,8 @@ export class CrewController implements AgentController {
     const now = proj.simTimeMs;
     this.lastProj = proj;
     this.lastEnv = env;
+    this.advanceMember(now);
+    this.lastAtRefuge = this.atRefuge(proj.position);
     if (proj.state === "lost") {
       this.currentState = "LOST";
       this.active = null;
@@ -249,7 +280,7 @@ export class CrewController implements AgentController {
       position: proj.position,
       nowMs: proj.simTimeMs,
       oracle: env.reservations?.oracle(this.agentId, cls, proj.simTimeMs) ?? env.oracle ?? ALWAYS_FREE,
-      config: this.cfg.nav ?? DEFAULT_NAV_CONFIG,
+      config: this.effectiveNav(),
       avoidEdges: avoid,
       diagnose: false,
     };
@@ -289,7 +320,7 @@ export class CrewController implements AgentController {
       position: proj.position,
       legIndex,
       nowMs: proj.simTimeMs,
-      ...(this.cfg.nav === undefined ? {} : { config: this.cfg.nav }),
+      config: this.effectiveNav(),
     });
     if (!certified.ok) {
       this.withdrawPer(this.continuation(active, proj, ctx, false, reasonOf(certified.failure)), proj, ctx, out);
@@ -475,7 +506,7 @@ export class CrewController implements AgentController {
   }
 
   candidateSearch(ctx: PlanningContext, allowed: ReadonlySet<string> | null): MissionSearchResult {
-    const targets = protectionTargets(this.evidence.siteKnowledge(), this.cfg.nav?.crewWorkRate ?? this.capabilities.workRate, allowed);
+    const targets = protectionTargets(this.evidence.siteKnowledge(), this.effectiveNav().crewWorkRate, allowed);
     return planMissions(ctx, targets);
   }
 

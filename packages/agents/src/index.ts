@@ -12,3 +12,4 @@ export * from "./crew-roles.js";
 export * from "./autonomy.js";
 export * from "./callsigns.js";
 export * from "./style.js";
+export * from "./member-state.js";
