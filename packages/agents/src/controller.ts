@@ -193,7 +193,7 @@ export class CrewController implements AgentController {
 
   // ---------- forecast ----------
 
-  private refreshForecast(proj: AgentProjection, now: number): ForecastEnsemble {
+  protected refreshForecast(proj: AgentProjection, now: number): ForecastEnsemble {
     const cur = this.forecast.current;
     const due = cur === null || this.fireDirty || now - cur.builtAtMs >= (this.cfg.forecast?.refreshMs ?? 25_000);
     let ensemble = cur;

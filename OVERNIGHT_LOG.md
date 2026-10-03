@@ -44,7 +44,8 @@ real Oakland extract.
 10. `navigation: reservations` - priorities, guard gap, verified yielding.
 11. `agents/server: reservations wired in, scout, team session`.
 12. `communication: gateway, scripted interpreter, audio scheduler, push-to-talk, replies; server conversation bridge`
-    (Slice 5, no-provider). Contract-gap issue filed as #3 (existing #1/#2 are the web lane's).
+    (Slice 5, no-provider).
+13. `replay/server: metrics, bundles, scripted coordinator policy, three-variant evaluation harness, failure injection` (Slice 7). Contract-gap issue filed as #3 (existing #1/#2 are the web lane's).
 
 ## Design decisions and deviations (read these)
 

@@ -7,10 +7,14 @@ import {
   type ReservationHooks,
 } from "@ember/agents";
 import { ReservationService } from "@ember/navigation";
-import { Incident, SIM_DEFAULTS, type IncidentOptions } from "@ember/simulation";
-import { RoadIndex } from "@ember/simulation/model";
+import { Incident, SIM_DEFAULTS, type AgentSpec, type IncidentOptions } from "@ember/simulation";
+import { RoadIndex, type PublicMap } from "@ember/simulation/model";
+
+export type ControllerFactory = (spec: AgentSpec, map: PublicMap, config: Partial<ControllerConfig> | undefined) => AgentController | null;
 
 export interface SessionOptions extends IncidentOptions {
+  /** Build a controller per agent; return null to leave an agent uncontrolled. Defaults to crews and a scout. */
+  readonly factory?: ControllerFactory;
   readonly controllerConfig?: Partial<ControllerConfig>;
   /** Agents that get no controller and simply stay put (e.g. a parked scout in a test). */
   readonly uncontrolled?: readonly string[];
@@ -33,6 +37,8 @@ export class IncidentSession {
   readonly controllers = new Map<AgentId, AgentController>();
   readonly decisions: LoggedDecision[] = [];
   readonly planFailures: { tick: number; agentId: string; reason: string }[] = [];
+  /** Real milliseconds a controller took on ticks that produced a plan (replanning latency). */
+  readonly replanLatencyMs: number[] = [];
   private readonly road: RoadIndex;
   private readonly hooks: ReservationHooks;
 
@@ -63,19 +69,16 @@ export class IncidentSession {
       this.controllers.get(holder)?.proposeYield(now) ?? null,
     );
     const skip = new Set(options.uncontrolled ?? []);
+    const factory: ControllerFactory =
+      options.factory ??
+      ((a, map, config) => {
+        const ctor = a.role === "scout" ? ScoutController : CrewController;
+        return new ctor({ agentId: a.id, callsign: a.callsign, role: a.role, map, ...(config === undefined ? {} : { config }) });
+      });
     for (const a of this.incident.scenario.agents) {
       if (skip.has(a.id)) continue;
-      const ctor = a.role === "scout" ? ScoutController : CrewController;
-      this.controllers.set(
-        a.id,
-        new ctor({
-          agentId: a.id,
-          callsign: a.callsign,
-          role: a.role,
-          map: this.incident.scenario.map,
-          ...(options.controllerConfig === undefined ? {} : { config: options.controllerConfig }),
-        }),
-      );
+      const controller = factory(a, this.incident.scenario.map, options.controllerConfig);
+      if (controller !== null) this.controllers.set(a.id, controller);
     }
   }
 
@@ -102,7 +105,9 @@ export class IncidentSession {
       }
     }
     for (const [id, controller] of this.controllers) {
+      const t0 = Date.now();
       const out = controller.tick(inc.projectAgent(id), { reservations: this.hooks });
+      if (out.orders.length > 0) this.replanLatencyMs.push(Date.now() - t0);
       for (const order of out.orders) inc.submit(order);
       for (const r of out.reports) inc.submit({ kind: "report", agentId: id, text: r.text, urgent: r.urgent });
       const callsign = inc.scenario.agents.find((a) => a.id === id)?.callsign ?? id;

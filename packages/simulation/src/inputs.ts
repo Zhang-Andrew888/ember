@@ -30,6 +30,12 @@ export const SimInput = z.discriminatedUnion("kind", [
     toAgentId: AgentId,
   }),
   z.object({
+    kind: z.literal("sensor_fault"),
+    agentId: AgentId,
+    /** Observations from this agent are lost until this simulated time (failure injection). */
+    untilMs: z.number().int().nonnegative(),
+  }),
+  z.object({
     kind: z.literal("set_active_recipient"),
     recipientId: AgentId.nullable(),
   }),

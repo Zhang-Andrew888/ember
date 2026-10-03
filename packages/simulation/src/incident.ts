@@ -89,6 +89,7 @@ export class Incident {
   private readonly truthNotices: SimNotice[] = [];
   private readonly reports: CoordinatorView["recentReports"] = [];
   private activeRecipient: AgentId | null = null;
+  private readonly sensorFaultUntil = new Map<AgentId, number>();
   private ordinal = 0;
   private wallMs = 0;
   private inputsClosed = false;
@@ -202,6 +203,9 @@ export class Incident {
         store.ingestRelay(source, SimTimeMs.parse(appliedAtMs));
         return;
       }
+      case "sensor_fault":
+        this.sensorFaultUntil.set(input.agentId, input.untilMs);
+        return;
       case "set_active_recipient":
         this.activeRecipient = input.recipientId;
         return;
@@ -290,6 +294,8 @@ export class Incident {
     const agent = this.world.agent(agentId);
     const memory = this.sensors.get(agentId);
     if (memory === undefined) return;
+    // A faulted sensor publishes nothing; its memory is untouched so recovery re-reports changes.
+    if (atMs < (this.sensorFaultUntil.get(agentId) ?? 0)) return;
     const p = this.world.agentPoint(agent);
     const radius = SIM_DEFAULTS.observationRadiusM;
     const fields: Observation["observedFields"] = [];
