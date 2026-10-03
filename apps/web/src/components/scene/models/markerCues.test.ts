@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { AgentState } from "@ember/domain";
-import { agentCue, agentLabelText, crewNumber, damageNotches, siteCue, siteModelKind } from "./markerCues.js";
+import { agentCue, agentLabelText, displayState, crewNumber, damageNotches, siteCue, siteModelKind } from "./markerCues.js";
 import type { SiteProtectionStatus } from "../../../format/reports.js";
 
 describe("agent cues", () => {
@@ -15,6 +15,23 @@ describe("agent cues", () => {
   it("each non-idle state has its own glyph (no two states share a shape)", () => {
     const glyphs = AgentState.options.filter((s) => s !== "idle").map((s) => agentCue(s).glyph);
     expect(new Set(glyphs).size).toBe(glyphs.length);
+  });
+
+  it("returning has its own glyph and text, distinct from every domain state", () => {
+    const glyphs = [...AgentState.options.filter((s) => s !== "idle"), "returning" as const].map((s) => agentCue(s).glyph);
+    expect(new Set(glyphs).size).toBe(glyphs.length);
+    expect(agentCue("returning").text).toBe("returning");
+    expect(agentLabelText("Crew 1", "returning")).toBe("Crew 1 · returning");
+  });
+
+  it("an approaching crew on its return leg reads as returning; nothing else changes", () => {
+    expect(displayState("approaching", "return")).toBe("returning");
+    expect(displayState("approaching", "approach")).toBe("approaching");
+    expect(displayState("approaching", null)).toBe("approaching");
+    expect(displayState("approaching", undefined)).toBe("approaching");
+    for (const state of AgentState.options.filter((s) => s !== "approaching")) {
+      expect(displayState(state, "return")).toBe(state);
+    }
   });
 
   it("lost crews are knocked over and muted, others upright", () => {

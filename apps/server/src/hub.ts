@@ -206,6 +206,9 @@ export class SessionHub {
   }
 }
 
+/** Wall time an ended incident keeps being pumped so its closing audio and events can drain. */
+export const ENDED_PUMP_GRACE_MS = 60_000;
+
 /**
  * The live loop: advance the incident only to the simulated time due on a monotonic clock, step
  * controllers each simulated second, and publish. Falling behind is reported, never hidden by
@@ -215,6 +218,7 @@ export class LiveRun {
   readonly failures: TechnicalFailure[] = [];
   private startedAt: number | null = null;
   private halted = false;
+  private endedAtWallMs: number | null = null;
 
   constructor(
     readonly session: IncidentSession,
@@ -243,6 +247,13 @@ export class LiveRun {
    */
   safePump(): void {
     if (this.halted) return;
+    if (this.session.incident.ended) {
+      // Keep pumping for a short grace period so the end announcement and audio events drain, then stop:
+      // an ended incident has nothing left to advance, and every 200 ms tick per old incident adds up.
+      const now = this.wallElapsedMs;
+      this.endedAtWallMs ??= now;
+      if (now - this.endedAtWallMs > ENDED_PUMP_GRACE_MS) return;
+    }
     try {
       this.pump();
     } catch (error) {

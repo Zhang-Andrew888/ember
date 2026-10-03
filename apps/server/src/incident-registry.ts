@@ -22,7 +22,16 @@ export interface IncidentRecord {
   started: boolean;
   readonly speechStore: SpeechAudioStore;
   readonly viewRecorder: ViewRecorder;
+  /** Monotonic ms when the record was created, for retention. */
+  readonly createdAtMs: number;
+  /** Monotonic ms when a sweep first saw the incident ended or halted; null while it is still live. */
+  finishedSeenAtMs: number | null;
 }
+
+/** How long a finished (ended or halted) incident stays available for replay before it is dropped. */
+export const FINISHED_RETENTION_MS = 30 * 60 * 1000;
+/** How long an incident that was created but never started is kept. */
+export const UNSTARTED_RETENTION_MS = 30 * 60 * 1000;
 
 export interface CreateIncidentBody {
   readonly scenario?: SimScenario;
@@ -68,6 +77,8 @@ export class IncidentRegistry {
       started: false,
       speechStore,
       viewRecorder,
+      createdAtMs: clock.nowMs(),
+      finishedSeenAtMs: null,
     };
     this.records.set(id, record);
     this.byToken.set(token, id);
@@ -118,6 +129,28 @@ export class IncidentRegistry {
   private logReplayFailure(error: unknown): void {
     const message = error instanceof Error ? error.message : String(error);
     process.stderr.write(`ember-server: replay export failed: ${message}\n`);
+  }
+
+  /**
+   * Drop incidents nobody can still need: finished ones after the replay retention window, and ones
+   * that were created but never started. Returns what was dropped so the caller can close its sockets.
+   * Without this a long-running server keeps every incident (and its recorded views) forever.
+   */
+  sweep(nowMs: number): IncidentRecord[] {
+    const dropped: IncidentRecord[] = [];
+    for (const record of this.records.values()) {
+      const finished = record.session.incident.ended || record.live.isHalted;
+      if (finished && record.finishedSeenAtMs === null) record.finishedSeenAtMs = nowMs;
+      const expired =
+        record.finishedSeenAtMs !== null
+          ? nowMs - record.finishedSeenAtMs > FINISHED_RETENTION_MS
+          : !record.started && nowMs - record.createdAtMs > UNSTARTED_RETENTION_MS;
+      if (!expired) continue;
+      this.records.delete(record.id);
+      this.byToken.delete(record.token);
+      dropped.push(record);
+    }
+    return dropped;
   }
 
   all(): Iterable<IncidentRecord> {

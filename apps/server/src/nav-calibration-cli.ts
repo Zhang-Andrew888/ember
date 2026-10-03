@@ -40,13 +40,15 @@ for (const preset of NAV_CALIBRATION_PRESETS) {
   );
   const s = summarize(runs);
   (out.presets as Record<string, unknown>)[preset.id] = {
+    name: preset.name,
+    description: preset.description,
     nav: preset.nav,
     switchMargin: preset.switchMargin ?? DEFAULT_CONTROLLER_CONFIG.switchMargin,
     switchCooldownMs: preset.switchCooldownMs ?? DEFAULT_CONTROLLER_CONFIG.switchCooldownMs,
     summary: s,
   };
   process.stdout.write(
-    `${preset.id} work=${s.meanWorkDelivered.toFixed(1)} standing=${s.meanSitesProtectedAndStanding.toFixed(2)} lost=${s.meanCrewsLost.toFixed(2)} missions=${s.totalMissionsStarted}\n`,
+    `${preset.id} (${preset.name}) work=${s.meanWorkDelivered.toFixed(1)} standing=${s.meanSitesProtectedAndStanding.toFixed(2)} lost=${s.meanCrewsLost.toFixed(2)} missions=${s.totalMissionsStarted}\n`,
   );
 }
 

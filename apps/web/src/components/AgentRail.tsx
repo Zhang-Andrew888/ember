@@ -1,7 +1,10 @@
-import type { CoordinatorAgentView } from "@ember/domain";
+import type { CoordinatorAgentPlanView, CoordinatorAgentView } from "@ember/domain";
+import { displayState, type AgentDisplayState } from "./scene/models/markerCues.js";
 
 export interface AgentRailProps {
   readonly agents: CoordinatorAgentView[];
+  /** Current plans, so a crew on its return leg reads "Returning" rather than "Approaching". */
+  readonly plans?: readonly CoordinatorAgentPlanView[];
   readonly selectedAgentId: string | null;
   readonly onSelectAgent: (agentId: string) => void;
 }
@@ -11,9 +14,10 @@ const ROLE_LABEL: Record<CoordinatorAgentView["role"], string> = {
   scout: "Scout",
 };
 
-const STATE_LABEL: Record<CoordinatorAgentView["state"], string> = {
+const STATE_LABEL: Record<AgentDisplayState, string> = {
   idle: "Idle",
   approaching: "Approaching",
+  returning: "Returning",
   working: "Working",
   withdrawing: "Withdrawing",
   retreating: "Retreating",
@@ -25,7 +29,7 @@ const STATE_LABEL: Record<CoordinatorAgentView["state"], string> = {
  * in the scene but is kept entirely separate from the conversation's
  * active recipient (docs/FRONTEND.md).
  */
-export function AgentRail({ agents, selectedAgentId, onSelectAgent }: AgentRailProps) {
+export function AgentRail({ agents, plans = [], selectedAgentId, onSelectAgent }: AgentRailProps) {
   return (
     <ul className="agent-rail" aria-label="Agents">
       {agents.map((agent) => (
@@ -38,7 +42,7 @@ export function AgentRail({ agents, selectedAgentId, onSelectAgent }: AgentRailP
           >
             <span className="agent-rail__callsign">{agent.callsign}</span>
             <span className="agent-rail__role">{ROLE_LABEL[agent.role]}</span>
-            <span className="agent-rail__state">{STATE_LABEL[agent.state]}</span>
+            <span className="agent-rail__state">{STATE_LABEL[displayState(agent.state, plans.find((plan) => plan.agentId === agent.id)?.phase)]}</span>
           </button>
         </li>
       ))}

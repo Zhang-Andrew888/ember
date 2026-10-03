@@ -14,4 +14,13 @@ describe("nav calibration presets", () => {
     expect(presetNavConfig(tight!).bufferMs).toBe(25_000);
     expect(presetNavConfig(tight!).speedMps).toBe(DEFAULT_NAV_CONFIG.speedMps);
   });
+
+  it("gives every preset a unique id, a name and a description", () => {
+    const ids = NAV_CALIBRATION_PRESETS.map((preset) => preset.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    for (const preset of NAV_CALIBRATION_PRESETS) {
+      expect(preset.name.trim().length).toBeGreaterThan(0);
+      expect(preset.description.trim().length).toBeGreaterThan(0);
+    }
+  });
 });

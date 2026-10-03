@@ -1779,3 +1779,14 @@ Authorised by Andrew: "go fix 51 52 53, make a pr and you may make the sim fix".
 - Fix: the recorder dedupes on a revision the hub supplies, `Incident.eventCount` (new getter), which is exactly the old sequence, so the recorded density returns to what it was on main before #96. Clients still receive the step-based sequence, so the clock fix is untouched.
 - Tests: incident event count steady on quiet steps while the sequence rises; recorder keeps one view per revision; the hub passes the event count (mutation-checked: fails when the hub reverts to the default).
 - Not measured: the full-run view count with this change. By construction it equals the old per-event count, but I did not re-run the reviewer's measurement.
+
+## feat/web-scene: remaining #51 and #52 items (branch fix/sim-server-hardening)
+
+Authorised by Andrew: "take on the remaining 51 and 52 items in sim".
+
+- **Host and Origin check** (`origin-guard.ts`): requests whose Host is not `localhost` or an IP literal get 403, and so does a WebSocket upgrade whose Origin is a foreign name or the opaque `null`. Rule is hostname-based so a LAN demo at http://192.168.x.x still works; extra names (for example `demo-laptop.local`) go in `EMBER_ALLOWED_HOSTS`. Tested at unit and HTTP level and mutation-checked. Verified live: the Vite proxy still connects.
+- **Incident cleanup**: `IncidentRegistry.sweep` drops finished incidents 30 min after they are first seen finished and never-started ones after 30 min, revoking the token and closing their sockets. `LiveRun.safePump` stops pumping an ended incident 60 s after it ended (the grace period lets the closing audio drain). Tested.
+- **Preset names**: every nav calibration preset has a `name` and `description`; the CLI prints them and the committed exploratory results file was patched to match (no re-run, so its numbers are unchanged).
+- **Demo-path tests**: wrong-token 401s, replay 409 while active, token authorization, sweep and grace behaviour.
+- **"Holding crews labelled approaching"**: probed a full 1,500 s run comparing the controller's state with the world's. A holding crew is never labelled approaching; the real mismatch is a crew on its RETURN leg being labelled "approaching" (about a third of the run), because the domain `AgentState` has no `returning`. Fixed in the web: the coordinator view's plan phase turns it into "returning", with its own shape cue (one back chevron) and a text label, in both the map labels and the agent rail. No domain change.
+- **Not done**: the incident token still travels in the WebSocket URL (a browser WebSocket cannot set headers; the alternatives change the protocol, so this needs a decision); the placeholder `.env` in git history and the tracked `.DS_Store` files (history rewrite and docs/** are not mine to touch); stale docs; bundle size; the react-hooks lint plugin.

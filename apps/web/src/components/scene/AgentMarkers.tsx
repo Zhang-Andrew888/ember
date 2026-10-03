@@ -70,6 +70,15 @@ function GlyphMeshes({ glyph }: { readonly glyph: ReturnType<typeof agentCue>["g
           ))}
         </group>
       );
+    case "return":
+      // One chevron pointing back toward the truck: "<" (distinct from ">>" approaching and "<<" withdrawing).
+      return (
+        <group rotation={[0, Math.PI, 0]}>
+          <mesh geometry={chevron} position={[33, 0, 0]}>
+            <meshBasicMaterial color="#F1F4ED" {...flat} />
+          </mesh>
+        </group>
+      );
     case "work":
       return (
         <mesh geometry={work}>
