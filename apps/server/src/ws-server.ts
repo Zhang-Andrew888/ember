@@ -36,7 +36,7 @@ export async function startServer(options: SessionOptions & { port?: number }): 
       // A protocol error (such as an oversized frame) closes the socket; "close" does the cleanup.
     });
     socket.on("close", () => {
-      hub.disconnect(id);
+      hub.disconnect(id, live.wallElapsedMs);
       sockets.delete(id);
     });
     flush();

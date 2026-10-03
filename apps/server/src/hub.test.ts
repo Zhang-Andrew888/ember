@@ -128,7 +128,9 @@ describe("wire protocol and information boundary", () => {
     const id = hub.connect();
     hub.drain(id);
     hub.handle(id, JSON.stringify({ type: "ptt_begin" }), 1000);
-    hub.disconnect(id, "Crew 2, protect the");
+    hub.disconnect(id, 2500, "Crew 2, protect the");
+    // Capture times are wall milliseconds throughout, never mixed with simulated time.
+    expect(hub.unsentUtterance(id)).toMatchObject({ startedMs: 1000, releasedMs: 2500 });
     expect(session.incident.inputLog).toHaveLength(0);
     hub.reconnect(id);
     const back = hub.drain(id).map((m) => JSON.parse(m) as { type: string; kind?: string; detail?: string });

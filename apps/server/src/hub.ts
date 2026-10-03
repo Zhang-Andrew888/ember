@@ -1,4 +1,4 @@
-import { PushToTalk } from "@ember/communication";
+import { PushToTalk, type Utterance } from "@ember/communication";
 import { dueSimTimeMs, SIM_DEFAULTS } from "@ember/simulation";
 import type { ConversationBridge } from "./conversation.js";
 import { decode, encode, type ServerMessage } from "./protocol.js";
@@ -36,8 +36,8 @@ export class SessionHub {
   }
 
   /** A closed socket mid-capture keeps its transcript as unsent for explicit resend. */
-  disconnect(id: ClientId, partialTranscript = ""): void {
-    this.ptt.get(id)?.disconnect(this.session.incident.simTimeMs, partialTranscript);
+  disconnect(id: ClientId, wallMs: number, partialTranscript = ""): void {
+    this.ptt.get(id)?.disconnect(wallMs, partialTranscript);
     this.outboxes.delete(id);
   }
 
@@ -50,6 +50,11 @@ export class SessionHub {
     if (unsent !== null && unsent !== undefined) {
       this.send(id, { type: "notice", kind: "unsent_utterance", detail: unsent.text });
     }
+  }
+
+  /** The utterance a client left half-submitted, kept for explicit resend. */
+  unsentUtterance(id: ClientId): Utterance | null {
+    return this.ptt.get(id)?.unsentUtterance ?? null;
   }
 
   drain(id: ClientId): string[] {
