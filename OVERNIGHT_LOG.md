@@ -1536,3 +1536,15 @@ exactly on the cabins and labels covered models -> fan-out + higher label anchor
 1440x900 -> key collapsed under 1700 px and toggles laid out in a row. Still off: tally pegs are subtle at fit zoom
 (the label and rail carry the number); chevron glyphs are small; legend still overlaps the top-left corner of the map.
 Blocked: nothing. Next: item 5 stale-information styling, then 6 camera follow, 7 perf script, 8 replay.
+
+### Commit 9: item 5 - stale-information styling
+Changed: `staleness.ts` (age in SIM time; stale after 30 s; opacity fades to 0.35 by 150 s; "never observed" is stale,
+not fresh), `staleHatch.ts` (screen-space diagonal hatch patch for any material), agents/sites/fire cells carry
+`ageMs`, stale agents and sites fade + hatch + go pale grey, stale flame ghosts dim further with age, labels turn
+dashed + italic and say "(seen 1:00 ago)", legend entry says "faded, hatched, age shown". `?scenario=model-states`
+now includes a stale crew (60 sim-seconds old).
+Self-critique: first hatch made the stale truck almost black and shapeless -> lighter pale-grey stale colour and a
+thinner hatch (2.2/7 discarded). Now a stale marker is clearly an older, ghosted copy of the live shape.
+Not done / by design: stale information is never hidden - only restyled. The route and forecast layers have no age
+of their own in the contract (plans carry no timestamp), so they are not faded.
+Blocked: nothing. Next: item 6 camera follow + reset + reduced motion.

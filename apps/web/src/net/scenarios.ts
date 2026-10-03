@@ -140,7 +140,8 @@ export const modelStatesScenario: CoordinatorView = {
   agents: [
     edgeAgent("crew-1", "Crew 1", "protection_crew", "approaching", "e-rw-j1", 120),
     edgeAgent("crew-2", "Crew 2", "protection_crew", "withdrawing", "e-j1-s", 150),
-    edgeAgent("crew-3", "Crew 3", "protection_crew", "retreating", "e-rs-s", 160),
+    // Crew 3 last reported 60 sim-seconds ago: its marker must fade and hatch.
+    edgeAgent("crew-3", "Crew 3", "protection_crew", "retreating", "e-rs-s", 160, 30_000),
     edgeAgent("scout", "Scout", "scout", "working", "e-n-h", 200),
     edgeAgent("crew-4", "Crew 4", "protection_crew", "lost", "e-j1-n", 150),
     nodeAgent("crew-5", "Crew 5", "protection_crew", "working", "n-sa"),
@@ -159,6 +160,7 @@ function edgeAgent(
   state: CoordinatorView["agents"][number]["state"],
   edgeId: string,
   distance: number,
+  reportedAt = 90_000,
 ): CoordinatorView["agents"][number] {
   return {
     id: id as never,
@@ -172,7 +174,7 @@ function edgeAgent(
       direction: "forward",
       turnaroundTimeRemaining: 0 as never,
     },
-    reportedAt: 90_000 as never,
+    reportedAt: reportedAt as never,
   };
 }
 

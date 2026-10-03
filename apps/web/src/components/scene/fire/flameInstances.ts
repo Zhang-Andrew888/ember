@@ -1,4 +1,5 @@
 import type { FireCellMarker } from "../sceneEntities.js";
+import { freshness } from "../staleness.js";
 
 export interface FlameInstance {
   readonly x: number;
@@ -41,7 +42,8 @@ export function buildFlameInstances(
         x: cell.position.x + Math.cos(angle) * radius,
         z: cell.position.z + Math.sin(angle) * radius,
         seed,
-        intensity: cell.stale ? STALE_INTENSITY : 1,
+        // A stale ghost fades further the older it is - it never looks current.
+        intensity: cell.stale ? STALE_INTENSITY * freshness(cell.ageMs, true).opacity : 1,
         stale: cell.stale,
         height: cellSize * 1.9 * sizeJitter,
         width: cellSize * 1.0 * sizeJitter,

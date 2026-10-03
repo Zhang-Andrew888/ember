@@ -1,6 +1,8 @@
 import { useEffect, useMemo } from "react";
 import type { ThreeEvent } from "@react-three/fiber";
-import { DoubleSide, type BufferGeometry } from "three";
+import { DoubleSide, MeshStandardMaterial, type BufferGeometry } from "three";
+import { applyStaleHatch, type StaleHatchUniform } from "./staleHatch.js";
+import { freshness } from "./staleness.js";
 import type { AgentMarker } from "./sceneEntities.js";
 import { sceneTerrain } from "./terrain/sceneTerrain.js";
 import { agentCue, crewNumber } from "./models/markerCues.js";
@@ -22,6 +24,7 @@ const MODEL_SCALE = 1.9;
 const CREW_COLORS = ["#4FA7E0", "#E0A04A", "#8BBF6B", "#C97BC2", "#D9D26A"];
 const SCOUT_COLOR = "#E8DD6B";
 const MUTED = "#6c7476";
+const MUTED_STALE = "#c3cdcf";
 
 function headingRotationY(agent: AgentMarker): number {
   if (!agent.heading) return 0;
@@ -139,7 +142,20 @@ function AgentModel({
   const cue = agentCue(agent.state);
   const number = crewNumber(agent.callsign, crewOrdinal);
   const crewGeometry = useGeometry(() => createCrewGeometry(number), [number]);
-  const color = cue.muted ? MUTED : agent.role === "scout" ? SCOUT_COLOR : CREW_COLORS[slot % CREW_COLORS.length]!;
+  const fresh = freshness(agent.ageMs);
+  // Colour fades toward grey with age as well as opacity: an old position never looks current.
+  const color = cue.muted || fresh.stale ? (cue.muted ? MUTED : MUTED_STALE) : agent.role === "scout" ? SCOUT_COLOR : CREW_COLORS[slot % CREW_COLORS.length]!;
+  const hatch = useMemo<StaleHatchUniform>(() => ({ uStaleHatch: { value: 0 } }), []);
+  hatch.uStaleHatch.value = fresh.stale ? 1 : 0;
+  const material = useMemo(() => {
+    const m = new MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.7, fog: false });
+    applyStaleHatch(m, hatch);
+    return m;
+  }, [hatch]);
+  material.color.set(color);
+  material.transparent = fresh.stale;
+  material.opacity = fresh.opacity;
+  useEffect(() => () => material.dispose(), [material]);
   const y = sceneTerrain.groundY(agent.position.x, agent.position.z) + MODEL_LIFT;
   const handleClick = (event: ThreeEvent<MouseEvent>) => {
     event.stopPropagation();
@@ -155,7 +171,7 @@ function AgentModel({
         position={[0, cue.lying ? 4 : 0, 0]}
         castShadow
       >
-        <meshStandardMaterial vertexColors color={color} flatShading roughness={0.7} fog={false} />
+        <primitive object={material} attach="material" />
       </mesh>
       <GlyphMeshes glyph={cue.glyph} />
       {selected ? (

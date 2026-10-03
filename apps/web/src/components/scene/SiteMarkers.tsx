@@ -1,5 +1,7 @@
 import { useEffect, useMemo } from "react";
-import { DoubleSide, type BufferGeometry } from "three";
+import { DoubleSide, MeshStandardMaterial, type BufferGeometry } from "three";
+import { applyStaleHatch, type StaleHatchUniform } from "./staleHatch.js";
+import { freshness } from "./staleness.js";
 import type { SiteMarker } from "./sceneEntities.js";
 import type { SceneNode } from "../../map/scenarioMap.js";
 import { colors } from "../../styles/colors.js";
@@ -52,28 +54,33 @@ function SiteModel({ site, index }: { readonly site: SiteMarker; readonly index:
   const filled = damageNotches(site.damage);
   const y = sceneTerrain.groundY(site.position.x, site.position.z) + SITE_LIFT;
   const tint = PROTECTION_TINT[site.protectionStatus];
+  const fresh = freshness(site.ageMs, site.stale);
+  const hatch = useMemo<StaleHatchUniform>(() => ({ uStaleHatch: { value: 0 } }), []);
+  // Unobserved sites are already outline-only ghosts; stale observed sites fade and hatch.
+  hatch.uStaleHatch.value = fresh.stale && !cue.ghost ? 1 : 0;
+  const material = useMemo(() => {
+    const m = new MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.85, fog: false });
+    applyStaleHatch(m, hatch);
+    return m;
+  }, [hatch]);
+  material.color.set(tint);
+  material.transparent = fresh.stale;
+  material.opacity = fresh.opacity;
+  useEffect(() => () => material.dispose(), [material]);
 
   return (
     <group position={[site.position.x, y, site.position.z]} scale={SITE_SCALE}>
       {cue.collapsed ? (
         <mesh geometry={rubble} castShadow>
-          <meshStandardMaterial vertexColors color={tint} flatShading roughness={1} fog={false} />
+          <primitive object={material} attach="material" />
         </mesh>
       ) : (
         <mesh geometry={building} castShadow={!cue.ghost}>
           {cue.ghost ? (
             // Nothing is known about this site: draw only its outline, never a solid building.
-            <meshBasicMaterial color={tint} wireframe transparent opacity={site.stale ? 0.35 : 0.8} fog={false} />
+            <meshBasicMaterial color={tint} wireframe transparent opacity={0.8} fog={false} />
           ) : (
-            <meshStandardMaterial
-              vertexColors
-              color={tint}
-              flatShading
-              roughness={0.85}
-              fog={false}
-              transparent={site.stale}
-              opacity={site.stale ? 0.55 : 1}
-            />
+            <primitive object={material} attach="material" />
           )}
         </mesh>
       )}

@@ -9,6 +9,7 @@ import {
   type SceneVector,
 } from "../../map/positions.js";
 import { buildForecastLayer, buildRouteLines, type ForecastLayer, type RouteLine } from "./sceneLayers.js";
+import { ageOf } from "./staleness.js";
 import { siteProtectionStatus, type SiteProtectionStatus } from "../../format/reports.js";
 
 export interface AgentMarker {
@@ -18,6 +19,8 @@ export interface AgentMarker {
   readonly state: CoordinatorAgentView["state"];
   readonly position: SceneVector;
   readonly heading: SceneHeading | null;
+  /** Sim ms since the coordinator last heard from this agent (its position is that old). */
+  readonly ageMs: number | null;
 }
 
 export interface SiteMarker {
@@ -27,6 +30,8 @@ export interface SiteMarker {
   readonly protectionStatus: SiteProtectionStatus;
   readonly damage: number | null;
   readonly stale: boolean;
+  /** Sim ms since this site was last observed; null = never. */
+  readonly ageMs: number | null;
 }
 
 export interface FireCellMarker {
@@ -37,6 +42,8 @@ export interface FireCellMarker {
   readonly stale: boolean;
   /** simTimeMs the cell was last observed at - for inspection timestamps (docs/FRONTEND.md). */
   readonly lastObservedAt: number;
+  /** Sim ms since this cell was last observed. */
+  readonly ageMs: number;
 }
 
 export interface SceneEntities {
@@ -74,6 +81,7 @@ export function buildSceneEntities(view: CoordinatorView, map: ScenarioMap): Sce
       protectionStatus: siteProtectionStatus(site),
       damage: site.observedDamage,
       stale: site.stale,
+      ageMs: ageOf(view.simTimeMs as number, site.lastObservedAt as number | null),
     });
   }
 
@@ -109,6 +117,7 @@ function resolveAgents(view: CoordinatorView, map: ScenarioMap): AgentMarker[] {
       state: agent.state,
       position,
       heading,
+      ageMs: ageOf(view.simTimeMs as number, agent.reportedAt as number),
     });
   }
   return agents;
@@ -180,6 +189,7 @@ function resolveFireCells(view: CoordinatorView, _map: ScenarioMap): FireCellMar
       burnState: cell.burnState,
       stale: cell.stale,
       lastObservedAt: cell.lastObservedAt as number,
+      ageMs: ageOf(view.simTimeMs as number, cell.lastObservedAt as number) ?? 0,
     });
   }
   return fireCells;

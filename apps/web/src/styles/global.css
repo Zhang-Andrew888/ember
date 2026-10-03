@@ -674,3 +674,15 @@ input {
 .scene-legend__controls details {
   flex-basis: 100%;
 }
+
+/* Stale information: dashed, dimmed - the label text also states the age. */
+.scene-label--stale {
+  border-style: dashed;
+  opacity: 0.78;
+  font-style: italic;
+}
+
+.scene-legend__swatch--stale {
+  background: repeating-linear-gradient(135deg, #5b6a6d 0 2px, transparent 2px 4px);
+  outline: 1px dashed #5b6a6d;
+}

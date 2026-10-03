@@ -45,8 +45,8 @@ export const SceneLegend = forwardRef<HTMLDivElement, SceneLegendProps>(function
           Observed fire
         </li>
         <li>
-          <span className="scene-legend__swatch" style={{ background: colors.staleOutline }} />
-          Stale observation
+          <span className="scene-legend__swatch scene-legend__swatch--stale" />
+          Stale: faded, hatched, age shown
         </li>
         <li>
           <span className="scene-legend__swatch scene-legend__swatch--hatch" />
