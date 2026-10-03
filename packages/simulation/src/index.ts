@@ -1,5 +1,8 @@
 // packages/simulation - owns: truth state, clock, motion, fire, damage, end conditions
 // Must not: make LLM requests
+//
+// Authoritative runtime: `Incident`, `recordOf`, `replayRecord` — not the `SimulationAPI`
+// interface in @ember/domain (see packages/simulation/CONTRACT_GAPS.md, issue #3).
 export type { SimulationAPI } from "@ember/domain";
 export * from "./clock.js";
 export * from "./inputs.js";

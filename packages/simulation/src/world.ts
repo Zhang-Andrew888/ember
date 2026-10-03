@@ -431,6 +431,7 @@ export class World {
     }
   }
 
+  /** Maps truth commitment to domain `AgentState` (contract gap #3: returning/stranded/holding/planning collapse here). */
   private refreshState(agent: TruthAgent): void {
     if (agent.state === "lost") return;
     const c = agent.commitment;
@@ -443,6 +444,7 @@ export class World {
     } else if (c.mode === "retreating") {
       agent.state = "retreating";
     } else {
+      // Return legs and pre-departure holding both surface as "approaching" to the coordinator.
       agent.state = "approaching";
     }
   }
