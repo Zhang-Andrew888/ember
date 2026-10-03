@@ -182,3 +182,30 @@ describe("forecast service", () => {
     expect(SIM_DEFAULTS.gridSize).toBe(64);
   });
 });
+
+describe("incremental fitting", () => {
+  it("rebuilds from scratch when evidence arrives out of order for a source, giving the same fit", () => {
+    const early = observeFire(map, inPrior, [watcher], 60_000);
+    const inOrder = [briefingObservation(map), ...early];
+    const swapped = [briefingObservation(map), early[3]!, early[1]!, early[2]!, ...early.slice(4), early[0]!];
+    const snapA = snapshotOf("crew-1", inOrder, 60_000);
+    const snapB = snapshotOf("crew-1", swapped, 60_000);
+    const a = fitObservations(snapA);
+    const b = fitObservations(snapB);
+    expect(b.map((o) => o.id).sort()).toEqual(a.map((o) => o.id).sort());
+    const svcA = new ForecastService(agent, map).update(snapA, 60_000);
+    const svcB = new ForecastService(agent, map).update(snapB, 60_000);
+    // The same evidence in a different arrival order supports the same members.
+    expect(svcB.members.map((m) => m.id).sort()).toEqual(svcA.members.map((m) => m.id).sort());
+  });
+
+  it("keeps an earlier member verification valid as more evidence is appended", () => {
+    const obs = evidence(inPrior, 120_000);
+    const service = new ForecastService(agent, map);
+    service.update(snapshotOf("crew-1", obs.slice(0, Math.ceil(obs.length / 2)), 60_000), 60_000);
+    const full = service.update(snapshotOf("crew-1", obs, 120_000), 120_000);
+    const fresh = new ForecastService(agent, map).update(snapshotOf("crew-1", obs, 120_000), 120_000);
+    for (const m of full.members) expect(fitMember(m, fitObservations(snapshotOf("crew-1", obs, 120_000)), 0.1).pass).toBe(true);
+    expect(full.reliability).toBe(fresh.reliability);
+  });
+});
