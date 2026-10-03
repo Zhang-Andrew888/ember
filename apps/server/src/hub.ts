@@ -40,13 +40,28 @@ export class SessionHub {
     return id;
   }
 
-  /** A closed socket mid-capture keeps its transcript as unsent for explicit resend. */
+  /**
+   * Release a closed socket. A partial utterance is finished as unsent and then dropped with the
+   * rest of that client's capture state — production reconnects allocate a new id, so retaining
+   * it would keep every closed client for the life of the incident. Nothing is submitted.
+   */
   disconnect(id: ClientId, wallMs: number, partialTranscript = ""): void {
     this.ptt.get(id)?.disconnect(wallMs, partialTranscript);
+    this.ptt.delete(id);
     this.outboxes.delete(id);
+    this.backpressureClosed.delete(id);
   }
 
-  /** A returning client keeps its capture state (including an unsent utterance) and gets a fresh view. */
+  /** Per-client records still held. Closed sockets must not remain in any of these. */
+  retainedClients(): { capture: number; outboxes: number; backpressure: number } {
+    return {
+      capture: this.ptt.size,
+      outboxes: this.outboxes.size,
+      backpressure: this.backpressureClosed.size,
+    };
+  }
+
+  /** A client that still has capture state gets a fresh view. A disconnected id has none. */
   reconnect(id: ClientId): void {
     if (!this.ptt.has(id)) return;
     this.outboxes.set(id, []);
@@ -57,7 +72,7 @@ export class SessionHub {
     }
   }
 
-  /** The utterance a client left half-submitted, kept for explicit resend. */
+  /** Half-submitted utterance for a client that still has capture state; null after release. */
   unsentUtterance(id: ClientId): Utterance | null {
     return this.ptt.get(id)?.unsentUtterance ?? null;
   }
