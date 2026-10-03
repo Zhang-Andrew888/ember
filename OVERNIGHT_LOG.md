@@ -745,3 +745,37 @@ inventing new work:
 **Conclusion: no further fixes needed.** The codebase is in a clean,
 fully green, fully verified state. Will keep watching for further
 instructions and log anything that comes up until 10:00 ET.
+
+## 2026-10-03 08:4x UTC (04:4x ET) - continuing past backlog completion, per instruction to keep working
+
+The 6-item backlog and the diff self-review are both done (previous
+entry). Per the active directive to keep working rather than stop at a
+prior gate, re-examined newer UI specifically against earlier, already-
+"complete" audits - since a later backlog item can introduce a regression
+against an earlier one's own checklist.
+
+**Found and fixed a real gap:** `ReplayView` postdates backlog item 2
+(the formal accessibility audit) and was never itself checked against
+it. Live Playwright check: entering replay (a full-page App-phase swap,
+not an overlay) unmounts whatever had focus - the EndOverlay's own Replay
+button - with nothing taking its place; focus silently fell back to
+`<body>`. Same class of bug EndOverlay already solved for its own mount.
+Fixed (`f74666e`) the same way: focus the "REPLAY" banner label via a
+ref + `tabIndex={-1}` on mount. Verified live: focus now lands there
+immediately on entry (was `<body>`); exiting replay still correctly
+refocuses EndOverlay's own heading (already worked, unaffected). Re-ran
+a full keyboard tab-walk through replay's controls and the 8-scenario
+regression smoke test - both clean, zero page errors.
+
+**Verified:** typecheck/lint/test green (120 tests, 17 files - no new
+test needed; this is a DOM-focus behavior verified live, matching how
+the original EndOverlay focus fix was verified).
+
+**Status:** CI green on `f74666e` (verified via the GitHub Actions API).
+Also spot-checked the new `.replay-banner__label` text color
+(`--color-refuge` on `--color-panel`) for WCAG text contrast while in
+the area - 8.91:1, well clear of the 4.5:1 normal-text minimum.
+
+**Next:** keep looking for this same class of cross-cutting gap (does a
+later backlog item's new UI hold up against an earlier item's own
+checklist) before considering the session's work exhausted.
