@@ -1,6 +1,7 @@
 import type { CoordinatorView } from "@ember/domain";
 import { fixtureCoordinatorView } from "../../../../tests/fixtures/coordinator-view.fixture.js";
 import type { WebSocketLike } from "./CoordinatorViewClient.js";
+import { adaptToScenarioIds } from "./mockBase.js";
 
 /**
  * Hand-authored CoordinatorView snapshots for the Slice-1 dev/test harness.
@@ -158,7 +159,7 @@ export function createMockIncidentSocket(options: MockIncidentSocketOptions = {}
         timers.push(
           setTimeout(() => {
             if (readyState !== OPEN) return;
-            socket.onmessage?.({ data: JSON.stringify(snapshot) });
+            socket.onmessage?.({ data: JSON.stringify(adaptToScenarioIds(snapshot)) });
           }, index * intervalMs),
         );
       });

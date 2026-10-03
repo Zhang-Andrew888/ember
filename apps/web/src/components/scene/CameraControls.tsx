@@ -13,6 +13,14 @@ interface FocusAnimation {
   readonly start: number;
 }
 
+/** Orthographic zoom that fits the ~1400-unit scene (plus label margin) in a canvas of this size. */
+export function fitZoom(widthPx: number, heightPx: number): number {
+  const SCENE_FIT_WIDTH = 1500;
+  // The ~50 degree tilt foreshortens depth, so the vertical budget is smaller than the width's.
+  const SCENE_FIT_HEIGHT = 1050;
+  return Math.min(widthPx / SCENE_FIT_WIDTH, heightPx / SCENE_FIT_HEIGHT);
+}
+
 function easeOutCubic(t: number): number {
   return 1 - Math.pow(1 - t, 3);
 }
@@ -55,6 +63,22 @@ export const CameraControls = forwardRef<CameraControlsHandle, CameraControlsPro
     return instance;
     // camera/gl are stable for the Canvas lifetime; this must only run once.
   }, []);
+
+  // Fit the whole scene into the canvas once, then remember that pose as
+  // the reset target (OrbitControls.reset restores the saved state).
+  const width = useThree((state) => state.size.width);
+  const height = useThree((state) => state.size.height);
+  const fitted = useRef(false);
+  useEffect(() => {
+    if (fitted.current || width === 0 || height === 0) return;
+    fitted.current = true;
+    if ("zoom" in camera) {
+      camera.zoom = fitZoom(width, height);
+      camera.updateProjectionMatrix();
+    }
+    controls.saveState();
+    invalidate();
+  }, [camera, controls, invalidate, width, height]);
 
   useEffect(() => {
     controls.enableDamping = !reducedMotion;

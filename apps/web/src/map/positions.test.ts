@@ -1,19 +1,18 @@
 import { describe, it, expect } from "vitest";
-import { scenarioMap } from "./scenarioMap.js";
+import { scenarioMap } from "./activeScenario.js";
 import {
   resolveNodePosition,
   resolveEdgePoint,
   resolveEdgeHeading,
+  resolveEdgePolyline,
   resolveAgentPosition,
   resolveGridCellPosition,
 } from "./positions.js";
 
 describe("map/positions - resolveNodePosition", () => {
-  it("resolves a known refuge node", () => {
-    expect(resolveNodePosition(scenarioMap, "placeholder-node-refuge-west")).toEqual({
-      x: -260,
-      z: 20,
-    });
+  it("resolves a known refuge node into scene units", () => {
+    // n-rw is (100, 800) m in a 1600 m world mapped onto 1400 scene units.
+    expect(resolveNodePosition(scenarioMap, "n-rw")).toEqual({ x: -612.5, z: 0 });
   });
 
   it("returns null for an unknown node id", () => {
@@ -22,22 +21,31 @@ describe("map/positions - resolveNodePosition", () => {
 });
 
 describe("map/positions - resolveEdgePoint", () => {
-  const edgeId = "placeholder-edge-refuge-west-site-a";
+  const edgeId = "e-rw-j1"; // (100,800) -> (400,800), 300 m
 
   it("resolves the start of an edge at distance 0", () => {
-    expect(resolveEdgePoint(scenarioMap, edgeId, 0)).toEqual({ x: -260, z: 20 });
+    expect(resolveEdgePoint(scenarioMap, edgeId, 0)).toEqual({ x: -612.5, z: 0 });
   });
 
-  it("resolves a midpoint proportionally to distance", () => {
-    const point = resolveEdgePoint(scenarioMap, edgeId, 360);
-    // fixture: crew-1 is 360m along this 500m edge
-    const t = 360 / 500;
-    expect(point?.x).toBeCloseTo(-260 + (180 - -260) * t);
-    expect(point?.z).toBeCloseTo(20 + (60 - 20) * t);
+  it("resolves a midpoint proportionally to distance in metres", () => {
+    const point = resolveEdgePoint(scenarioMap, edgeId, 150);
+    expect(point?.x).toBeCloseTo(-481.25);
+    expect(point?.z).toBeCloseTo(0);
+  });
+
+  it("follows interior polyline points (e-rs-sc bends at (1000, 250))", () => {
+    const edge = scenarioMap.edges.get("e-rs-sc")!;
+    const firstLeg = edge.cumulativeMeters[1]!;
+    const bend = resolveEdgePoint(scenarioMap, "e-rs-sc", firstLeg);
+    expect(bend?.x).toBeCloseTo((1000 - 800) * 0.875);
+    expect(bend?.z).toBeCloseTo((250 - 800) * 0.875);
+    // Past the bend the point is on the second leg, not the straight chord.
+    const after = resolveEdgePoint(scenarioMap, "e-rs-sc", firstLeg + 50)!;
+    expect(after.x).toBeGreaterThan(bend!.x);
   });
 
   it("clamps distances beyond the edge length instead of throwing", () => {
-    expect(resolveEdgePoint(scenarioMap, edgeId, 10_000)).toEqual({ x: 180, z: 60 });
+    expect(resolveEdgePoint(scenarioMap, edgeId, 10_000)).toEqual({ x: -350, z: 0 });
   });
 
   it("returns null for an unknown edge id", () => {
@@ -47,31 +55,46 @@ describe("map/positions - resolveEdgePoint", () => {
 
 describe("map/positions - resolveEdgeHeading", () => {
   it("points from the edge start toward its end when forward", () => {
-    const heading = resolveEdgeHeading(scenarioMap, "placeholder-edge-refuge-west-site-a", "forward");
-    expect(heading?.dx).toBeGreaterThan(0);
+    const heading = resolveEdgeHeading(scenarioMap, "e-rw-j1", "forward");
+    expect(heading?.dx).toBeCloseTo(1);
+    expect(heading?.dz).toBeCloseTo(0);
   });
 
   it("flips direction when reverse", () => {
-    const forward = resolveEdgeHeading(scenarioMap, "placeholder-edge-refuge-west-site-a", "forward");
-    const reverse = resolveEdgeHeading(scenarioMap, "placeholder-edge-refuge-west-site-a", "reverse");
+    const forward = resolveEdgeHeading(scenarioMap, "e-rs-s", "forward");
+    const reverse = resolveEdgeHeading(scenarioMap, "e-rs-s", "reverse");
     expect(reverse?.dx).toBeCloseTo(-(forward?.dx ?? 0));
     expect(reverse?.dz).toBeCloseTo(-(forward?.dz ?? 0));
+  });
+
+  it("uses the heading of the leg the agent is on", () => {
+    const edge = scenarioMap.edges.get("e-rs-sc")!;
+    const early = resolveEdgeHeading(scenarioMap, "e-rs-sc", "forward", 1)!;
+    const late = resolveEdgeHeading(scenarioMap, "e-rs-sc", "forward", edge.lengthMeters - 1)!;
+    expect(early.dz / early.dx).toBeCloseTo(150 / 200); // (800,100) -> (1000,250)
+    expect(late.dz / late.dx).toBeCloseTo(300 / 200); // (1000,250) -> (1200,550)
+  });
+});
+
+describe("map/positions - resolveEdgePolyline", () => {
+  it("returns all points in travel order and reversed for reverse", () => {
+    const forward = resolveEdgePolyline(scenarioMap, "e-rs-sc", "forward")!;
+    const reverse = resolveEdgePolyline(scenarioMap, "e-rs-sc", "reverse")!;
+    expect(forward).toHaveLength(3);
+    expect(reverse[0]).toEqual(forward[2]);
   });
 });
 
 describe("map/positions - resolveAgentPosition", () => {
   it("resolves a node-kind position", () => {
-    const point = resolveAgentPosition(scenarioMap, {
-      kind: "node",
-      nodeId: "placeholder-node-refuge-west" as never,
-    } as never);
-    expect(point).toEqual({ x: -260, z: 20 });
+    const point = resolveAgentPosition(scenarioMap, { kind: "node", nodeId: "n-rw" as never } as never);
+    expect(point).toEqual({ x: -612.5, z: 0 });
   });
 
   it("resolves an edge-kind position", () => {
     const point = resolveAgentPosition(scenarioMap, {
       kind: "edge",
-      edgeId: "placeholder-edge-refuge-south-north-sector" as never,
+      edgeId: "e-rs-s" as never,
       distanceAlongPolyline: 200 as never,
       direction: "forward",
       turnaroundTimeRemaining: 0 as never,

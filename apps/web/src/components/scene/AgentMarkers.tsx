@@ -1,5 +1,6 @@
 import type { ThreeEvent } from "@react-three/fiber";
 import type { AgentMarker } from "./sceneEntities.js";
+import { sceneTerrain } from "./terrain/sceneTerrain.js";
 
 /** Cone/octahedron half-height is ~7; this must clear the terrain's max bump (~2.4) by a margin. */
 const MARKER_Y = 12;
@@ -39,7 +40,7 @@ export function AgentMarkers({
         return (
           <group
             key={agent.id}
-            position={[agent.position.x, MARKER_Y, agent.position.z]}
+            position={[agent.position.x, sceneTerrain.groundY(agent.position.x, agent.position.z) + MARKER_Y, agent.position.z]}
             rotation={[0, headingRotationY(agent), 0]}
           >
             {/* Scout gets a distinct silhouette (octahedron) rather than relying on color alone. */}

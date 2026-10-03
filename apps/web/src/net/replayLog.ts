@@ -1,5 +1,6 @@
 import type { CoordinatorView } from "@ember/domain";
 import { fixtureCoordinatorView } from "../../../../tests/fixtures/coordinator-view.fixture.js";
+import { adaptToScenarioIds } from "./mockBase.js";
 import { authoredSnapshots } from "./mockIncidentSocket.js";
 import { runEndedScenarios } from "./scenarios.js";
 
@@ -17,7 +18,7 @@ import { runEndedScenarios } from "./scenarios.js";
  * says so plainly rather than fabricating a "full simulated fire" layer
  * with no real data behind it.
  */
-export const replayLog: CoordinatorView[] = [
+const rawReplayLog: CoordinatorView[] = [
   {
     ...fixtureCoordinatorView,
     sequence: 1 as CoordinatorView["sequence"],
@@ -54,3 +55,5 @@ export const replayLog: CoordinatorView[] = [
   })),
   { ...runEndedScenarios.time_expired, sequence: 10 as CoordinatorView["sequence"] },
 ];
+
+export const replayLog: CoordinatorView[] = rawReplayLog.map(adaptToScenarioIds);
