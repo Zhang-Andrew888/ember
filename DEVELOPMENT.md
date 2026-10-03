@@ -31,7 +31,7 @@ Leave `apps/web/.env.local` unset (or copy from [apps/web/.env.example](apps/web
 
 ## Mode B — Live incident server + browser
 
-Runs the real HTTP/WebSocket incident API. Vite proxies `/incidents` and `/health` to port **3000**.
+Runs the real HTTP/WebSocket incident API. Vite proxies `/incidents` and `/health` to **127.0.0.1:3000** (override with **`EMBER_SERVER_PORT`** when the server uses another port).
 
 **Terminal 1 — server**
 
