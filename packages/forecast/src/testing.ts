@@ -1,5 +1,5 @@
 import { AgentId, Meters, Observation, ObservationId, SimTimeMs, type SiteId } from "@ember/domain";
-import { GRID_EDGE, type AgentKnowledgeSnapshot, KnowledgeStore } from "@ember/knowledge";
+import { type AgentKnowledgeSnapshot, KnowledgeStore } from "@ember/knowledge";
 import {
   FireField,
   SIM_DEFAULTS,
@@ -44,7 +44,7 @@ export function observeFire(
         const code = s === 2 ? 2 : s === 3 ? 3 : 1;
         if (mem[cell] === code) continue;
         mem[cell] = code;
-        fields.push({ kind: "cell", edgeId: GRID_EDGE, cellIndex: cell, burnState });
+        fields.push({ kind: "cell", gridCellIndex: cell, burnState });
       }
       if (fields.length === 0) continue;
       out.push(
@@ -76,7 +76,7 @@ export function briefingObservation(map: PublicMap, sites: readonly SiteId[] = [
     receivedAt: 0,
     spatialFootprint: { centerX: 800, centerY: 800, radius: 1200 },
     observedFields: [
-      ...map.initialFireCells.map((cellIndex) => ({ kind: "cell", edgeId: GRID_EDGE, cellIndex, burnState: "burning" })),
+      ...map.initialFireCells.map((gridCellIndex) => ({ kind: "cell", gridCellIndex, burnState: "burning" as const })),
       ...sites.map((siteId) => ({ kind: "site", siteId, completedWork: 0, damage: 0, destroyed: false })),
     ],
   });

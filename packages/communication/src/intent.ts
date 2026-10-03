@@ -35,6 +35,8 @@ export interface Directory {
   readonly scoutPoints: readonly { id: string; name: string }[];
   /** Named places used to match report footprints, e.g. "east corridor". */
   readonly locations: readonly { name: string; x: number; y: number; radius: number }[];
+  /** Named road segments for avoid-corridor objectives; id is the edge id. */
+  readonly corridors: readonly { id: string; name: string }[];
 }
 
 export type NameMatch = { kind: "unique"; id: string } | { kind: "ambiguous"; ids: string[] } | { kind: "unknown" };

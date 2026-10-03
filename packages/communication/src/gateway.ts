@@ -88,6 +88,7 @@ const KIND_OF: Record<string, ObjectiveKind | undefined> = {
   observe: "scout_location",
   return: "return_to_refuge",
   hold: "hold",
+  avoid: "avoid_corridor",
 };
 
 /**
@@ -288,20 +289,35 @@ export class CommandGateway {
       if (o.kind === "resume") {
         actions.push({ kind: "resume_autonomous", agentId: recipientId });
         objectiveText = `${agent.callsign} resumes independent selection.`;
-      } else if (o.kind === "avoid") {
-        rejectedObjective = "Avoid-corridor objectives are not supported by the shared contract yet.";
       } else {
         const kind = KIND_OF[o.kind]!;
         let targetId: string | null = null;
         let targetLabel = "";
-        if (o.kind === "protect" || o.kind === "observe") {
-          const pool = o.kind === "protect"
-            ? this.env.directory.sites.map((s) => ({ id: s.id, name: s.name }))
-            : this.env.directory.scoutPoints.map((s) => ({ id: s.id, name: s.name }));
-          if (o.targetName === undefined) return this.ask(message, seq, env, o.kind === "protect" ? "Which site should it protect?" : "Which point should it observe?");
+        if (o.kind === "protect" || o.kind === "observe" || o.kind === "avoid") {
+          const pool =
+            o.kind === "protect"
+              ? this.env.directory.sites.map((s) => ({ id: s.id, name: s.name }))
+              : o.kind === "observe"
+                ? this.env.directory.scoutPoints.map((s) => ({ id: s.id, name: s.name }))
+                : this.env.directory.corridors.map((s) => ({ id: s.id, name: s.name }));
+          if (o.targetName === undefined) {
+            return this.ask(
+              message,
+              seq,
+              env,
+              o.kind === "protect" ? "Which site should it protect?" : o.kind === "observe" ? "Which point should it observe?" : "Which corridor should it avoid?",
+            );
+          }
           const m = matchName(o.targetName, pool);
           if (m.kind !== "unique") {
-            return this.ask(message, seq, env, m.kind === "ambiguous" ? `Which one: ${m.ids.join(" or ")}?` : `I don't know a ${o.kind === "protect" ? "site" : "point"} called ${o.targetName}.`);
+            return this.ask(
+              message,
+              seq,
+              env,
+              m.kind === "ambiguous"
+                ? `Which one: ${m.ids.join(" or ")}?`
+                : `I don't know a ${o.kind === "protect" ? "site" : o.kind === "observe" ? "point" : "corridor"} called ${o.targetName}.`,
+            );
           }
           targetId = m.id;
           targetLabel = pool.find((p) => p.id === m.id)!.name;
@@ -310,6 +326,8 @@ export class CommandGateway {
           rejectedObjective = `${agent.callsign} does not do protection work.`;
         } else if (o.kind === "observe" && agent.role !== "scout") {
           rejectedObjective = `${agent.callsign} is not a scout.`;
+        } else if (o.kind === "avoid" && agent.role !== "protection_crew") {
+          rejectedObjective = `${agent.callsign} cannot take corridor-avoidance orders.`;
         } else {
           const objective = Objective.parse({
             id: ObjectiveId.parse(`obj-${seq}`),

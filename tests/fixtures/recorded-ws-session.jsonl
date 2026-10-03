@@ -1,0 +1,2 @@
+{"protocolVersion":1,"message":{"type":"view","view":{"protocolVersion":1,"sequence":0,"simTimeMs":0,"wallElapsedMs":0,"incidentStatus":"active","activeRecipientId":null,"agents":[],"sites":[],"observedCells":[],"agentPlans":[],"coordinatorForecast":null,"recentReports":[],"incidentEnd":null}}}
+{"protocolVersion":1,"message":{"type":"notice","kind":"bad_message","detail":"Message was not understood and was ignored."}}

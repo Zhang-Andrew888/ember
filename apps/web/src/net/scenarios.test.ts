@@ -19,14 +19,9 @@ describe("net/scenarios - staleContradictionScenario", () => {
     expect(() => CoordinatorView.parse(staleContradictionScenario)).not.toThrow();
   });
 
-  it("contains two entries for the same edge+cellIndex with different burnState", () => {
-    const [edgeId, cellIndex] = [
-      staleContradictionScenario.observedCells[0]!.edgeId,
-      staleContradictionScenario.observedCells[0]!.cellIndex,
-    ];
-    const matching = staleContradictionScenario.observedCells.filter(
-      (cell) => cell.edgeId === edgeId && cell.cellIndex === cellIndex,
-    );
+  it("contains two entries for the same gridCellIndex with different burnState", () => {
+    const gridCellIndex = staleContradictionScenario.observedCells[0]!.gridCellIndex;
+    const matching = staleContradictionScenario.observedCells.filter((cell) => cell.gridCellIndex === gridCellIndex);
     expect(matching.length).toBeGreaterThanOrEqual(2);
     expect(new Set(matching.map((cell) => cell.burnState)).size).toBeGreaterThan(1);
   });

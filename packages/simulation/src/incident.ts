@@ -7,13 +7,16 @@ import {
   Observation,
   SequenceNumber,
   SimTimeMs,
+  WIRE_PROTOCOL_VERSION,
   WorkUnits,
   type AgentPosition,
+  type CoordinatorAgentPlanView,
+  type CoordinatorForecastView,
   type DomainEvent,
   type EndReason,
   type SiteId,
 } from "@ember/domain";
-import { GRID_EDGE, KnowledgeStore, STALE_AFTER_MS, type AgentKnowledgeSnapshot } from "@ember/knowledge";
+import { KnowledgeStore, STALE_AFTER_MS, type AgentKnowledgeSnapshot } from "@ember/knowledge";
 import { SIM_DEFAULTS, cellsWithin, hashValue } from "./model/index.js";
 import { SimInput, type AppliedInput, type InputReceipt } from "./inputs.js";
 import { SimScenario } from "./scenario.js";
@@ -277,10 +280,9 @@ export class Incident {
       damage: 0,
       destroyed: false,
     }));
-    const cells = this.scenario.map.initialFireCells.map((cellIndex) => ({
+    const cells = this.scenario.map.initialFireCells.map((gridCellIndex) => ({
       kind: "cell" as const,
-      edgeId: GRID_EDGE,
-      cellIndex,
+      gridCellIndex,
       burnState: "burning" as const,
     }));
     const observation = Observation.parse({
@@ -309,7 +311,7 @@ export class Incident {
       const code = state === "unburned" ? 1 : state === "burning" ? 2 : 3;
       if (memory.cells[cell] === code) continue;
       memory.cells[cell] = code;
-      fields.push({ kind: "cell", edgeId: GRID_EDGE, cellIndex: cell, burnState: state });
+      fields.push({ kind: "cell", gridCellIndex: cell, burnState: state });
     }
     for (const site of this.world.sites) {
       const sp = this.world.road.nodePoint(site.nodeId);
@@ -348,9 +350,28 @@ export class Incident {
 
   // ---------- projections ----------
 
-  projectCoordinator(): CoordinatorView {
+  projectCoordinator(options: { coordinatorForecast?: CoordinatorForecastView | null } = {}): CoordinatorView {
     const now = this.world.timeMs;
+    const agentPlans: CoordinatorAgentPlanView[] = [];
+    for (const agent of this.world.agents) {
+      const c = agent.commitment;
+      if (c === null || agent.state === "lost") continue;
+      let phase: CoordinatorAgentPlanView["phase"] = "approach";
+      if (agent.working) phase = "work";
+      else if (c.hasWork && now >= c.plan.workInterval.endMs && c.legIndex >= c.approachCount) phase = "return";
+      else if (!c.hasWork && c.legIndex >= c.plan.timedLegs.length - 1 && now >= c.plan.workInterval.startMs) phase = "return";
+      agentPlans.push({
+        agentId: agent.id,
+        planId: c.plan.id,
+        legs: c.plan.timedLegs.map((leg) => ({ edgeId: leg.edgeId, direction: leg.direction })),
+        workInterval: c.plan.workInterval,
+        refugeId: c.plan.refugeId,
+        phase,
+        limitingReason: c.plan.limitingReason,
+      });
+    }
     const view = {
+      protocolVersion: WIRE_PROTOCOL_VERSION,
       sequence: this.eventSequence,
       simTimeMs: now,
       wallElapsedMs: this.wallMs,
@@ -379,13 +400,14 @@ export class Incident {
         };
       }),
       observedCells: this.coordinator.cellBeliefs().map((b) => ({
-        edgeId: GRID_EDGE,
-        cellIndex: b.cell,
+        gridCellIndex: b.cell,
         burnState: b.state,
         lastObservedAt: b.observedAt,
         stale: now - b.observedAt > STALE_AFTER_MS,
         observerAgentId: b.sourceAgentId,
       })),
+      agentPlans,
+      coordinatorForecast: options.coordinatorForecast ?? null,
       recentReports: this.reports.slice(-20),
       incidentEnd: this.endRecord,
     };

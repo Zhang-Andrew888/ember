@@ -15,7 +15,7 @@ describe("replay truth reveal", () => {
     expect(truthCells.size).toBeGreaterThan(100);
 
     const view = incident.projectCoordinator();
-    const known = new Set(view.observedCells.filter((c) => c.burnState !== "unburned").map((c) => c.cellIndex));
+    const known = new Set(view.observedCells.filter((c) => c.burnState !== "unburned").map((c) => c.gridCellIndex));
     const unseen = [...truthCells].filter((c) => !known.has(c));
     expect(unseen.length).toBeGreaterThan(50);
 

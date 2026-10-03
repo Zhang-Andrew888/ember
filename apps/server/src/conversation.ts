@@ -34,6 +34,10 @@ export function directoryFor(scenario: SimScenario): Directory {
       ...scenario.map.scoutPoints.map((p) => ({ name: POINT_NAMES[p] ?? p, ...point(p), radius: 150 })),
       ...(a !== null && b !== null ? [{ name: "east corridor", x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, radius: 250 }] : []),
     ],
+    corridors:
+      corridor === undefined
+        ? []
+        : [{ id: corridor.id as string, name: "east corridor" }],
   };
 }
 

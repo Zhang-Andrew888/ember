@@ -1,5 +1,4 @@
 import type { AgentId } from "@ember/domain";
-import { GRID_EDGE } from "@ember/knowledge";
 import { RoadIndex, type PublicMap } from "@ember/simulation/model";
 import type { IncidentSession } from "./session.js";
 
@@ -71,7 +70,7 @@ export class ScriptedCoordinatorPolicy {
       const done = this.relayed.get(agent.id) ?? new Set<string>();
       const candidates = received
         .filter((o) => o.sourceAgentId !== agent.id && !done.has(o.id))
-        .filter((o) => o.observedFields.some((f) => f.kind === "cell" && f.edgeId === GRID_EDGE && routeCells.has(f.cellIndex)))
+        .filter((o) => o.observedFields.some((f) => f.kind === "cell" && routeCells.has(f.gridCellIndex)))
         .sort((a, b) => b.observedAt - a.observedAt || (a.id < b.id ? -1 : 1));
       const pick = candidates[0];
       if (pick === undefined) continue;

@@ -7,7 +7,7 @@ import {
   type AgentId,
   type AgentPosition,
   type DecisionType,
-  type EdgeId,
+  EdgeId,
   type MissionPlan as MissionPlanT,
   type Objective,
   type SiteId,
@@ -83,6 +83,8 @@ export class CrewController implements AgentController {
   protected pendingObjective: Objective | null = null;
   protected holding = false;
   protected stranded = false;
+  /** Edges the coordinator asked this crew to avoid until resume or a new objective. */
+  protected readonly avoidCorridorEdges = new Set<EdgeId>();
   private currentState: ControllerState = "HOLDING";
   private seq = 0;
   private fireDirty = true;
@@ -132,6 +134,7 @@ export class CrewController implements AgentController {
     this.objective = null;
     this.pendingObjective = null;
     this.holding = false;
+    this.avoidCorridorEdges.clear();
     this.evalDirty = true;
   }
 
@@ -222,7 +225,10 @@ export class CrewController implements AgentController {
     env: ControllerEnvironment,
     cls: PriorityClass = "approach",
   ): PlanningContext {
-    const avoid = new Set<EdgeId>();
+    const avoid = new Set<EdgeId>(this.avoidCorridorEdges);
+    if (this.objective?.kind === "avoid_corridor" && this.objective.targetId !== null) {
+      avoid.add(EdgeId.parse(this.objective.targetId));
+    }
     return {
       agentId: this.agentId,
       road: this.road,
@@ -548,6 +554,18 @@ export class CrewController implements AgentController {
           return reject("reservation_unavailable");
         }
         this.decide(out, proj, hadPlan ? "mission_update" : "mission_start", "objective_accepted", `${this.missionVerb(chosen.target.id)} on coordinator objective`);
+        return;
+      }
+      case "avoid_corridor": {
+        if (obj.targetId === null) return reject("missing_target");
+        this.avoidCorridorEdges.add(EdgeId.parse(obj.targetId));
+        this.objective = obj;
+        this.holding = false;
+        this.evalDirty = true;
+        if (this.active !== null && this.active.plan.timedLegs.some((l) => l.edgeId === obj.targetId)) {
+          return reject("active_plan_uses_corridor");
+        }
+        this.decide(out, proj, "mission_update", "objective_accepted", `avoiding corridor ${obj.targetId}`);
         return;
       }
       case "return_to_refuge":

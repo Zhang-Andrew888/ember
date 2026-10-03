@@ -5,7 +5,7 @@ import {
   resolveEdgePoint,
   resolveEdgeHeading,
   resolveAgentPosition,
-  resolveCellPosition,
+  resolveGridCellPosition,
 } from "./positions.js";
 
 describe("map/positions - resolveNodePosition", () => {
@@ -80,18 +80,12 @@ describe("map/positions - resolveAgentPosition", () => {
   });
 });
 
-describe("map/positions - resolveCellPosition", () => {
-  it("resolves the midpoint of cell 0 on a 2-cell edge", () => {
-    const point = resolveCellPosition(scenarioMap, "placeholder-edge-fire-patch-1", 0);
-    const expectedPoint = resolveEdgePoint(scenarioMap, "placeholder-edge-fire-patch-1", 20);
-    expect(point).toEqual(expectedPoint);
+describe("map/positions - resolveGridCellPosition", () => {
+  it("maps grid index 0 to scene coordinates", () => {
+    expect(resolveGridCellPosition(0)).toEqual({ x: -689.0625, z: -689.0625 });
   });
 
-  it("resolves cell 3 on the north-spread edge referenced by the fixture", () => {
-    expect(resolveCellPosition(scenarioMap, "placeholder-edge-north-spread-1", 3)).not.toBeNull();
-  });
-
-  it("returns null for an unknown edge", () => {
-    expect(resolveCellPosition(scenarioMap, "unknown-edge", 0)).toBeNull();
+  it("maps a fixture fire cell index", () => {
+    expect(resolveGridCellPosition(1203)).toMatchObject({ x: expect.any(Number), z: expect.any(Number) });
   });
 });

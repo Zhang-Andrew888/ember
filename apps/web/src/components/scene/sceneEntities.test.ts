@@ -38,11 +38,10 @@ describe("components/scene/sceneEntities - buildSceneEntities", () => {
     expect(entities.fireCells.filter((c) => !c.stale)).toHaveLength(2);
   });
 
-  it("carries edgeId/cellIndex/lastObservedAt through for inspection", () => {
-    const freshCell = entities.fireCells.find((c) => c.edgeId === "placeholder-edge-north-spread-1");
+  it("carries gridCellIndex/lastObservedAt through for inspection", () => {
+    const freshCell = entities.fireCells.find((c) => c.gridCellIndex === 1203);
     expect(freshCell).toMatchObject({
-      edgeId: "placeholder-edge-north-spread-1",
-      cellIndex: 3,
+      gridCellIndex: 1203,
       lastObservedAt: 85_000,
       stale: false,
     });
@@ -62,9 +61,7 @@ describe("components/scene/sceneEntities - buildSceneEntities", () => {
       observedCells: [olderReport, contradicting],
     };
     const result = buildSceneEntities(view, scenarioMap);
-    const matching = result.fireCells.filter(
-      (c) => c.edgeId === olderReport.edgeId && c.cellIndex === olderReport.cellIndex,
-    );
+    const matching = result.fireCells.filter((c) => c.gridCellIndex === olderReport.gridCellIndex);
     expect(matching).toHaveLength(1);
     expect(matching[0]).toMatchObject({ burnState: "unburned", lastObservedAt: 92_000, stale: false });
   });
@@ -82,9 +79,7 @@ describe("components/scene/sceneEntities - buildSceneEntities", () => {
       observedCells: [contradicting, olderReport], // fresher one listed first this time
     };
     const result = buildSceneEntities(view, scenarioMap);
-    const matching = result.fireCells.filter(
-      (c) => c.edgeId === olderReport.edgeId && c.cellIndex === olderReport.cellIndex,
-    );
+    const matching = result.fireCells.filter((c) => c.gridCellIndex === olderReport.gridCellIndex);
     expect(matching).toHaveLength(1);
     expect(matching[0]?.burnState).toBe("unburned");
   });
@@ -99,7 +94,7 @@ describe("components/scene/sceneEntities - buildSceneEntities", () => {
         },
       ],
       sites: [{ ...fixtureCoordinatorView.sites[0]!, nodeId: "unknown-node" as never }],
-      observedCells: [{ ...fixtureCoordinatorView.observedCells[0]!, edgeId: "unknown-edge" }],
+      observedCells: [],
     };
     const result = buildSceneEntities(viewWithUnknownIds, scenarioMap);
     expect(result.agents).toHaveLength(0);

@@ -1,5 +1,5 @@
 import { SimTimeMs, type AgentId } from "@ember/domain";
-import { GRID_EDGE, hashValue, type AgentKnowledgeSnapshot } from "@ember/knowledge";
+import { hashValue, type AgentKnowledgeSnapshot } from "@ember/knowledge";
 import { FireField, streamRng, type PublicMap } from "@ember/simulation/model";
 import { DEFAULT_FORECAST_CONFIG, widenRanges, type ForecastConfig } from "./config.js";
 import { FitAccumulator, fitMember, type FitObservation } from "./fit.js";
@@ -310,7 +310,7 @@ export function directlyObservedClosed(snapshot: AgentKnowledgeSnapshot): Set<nu
   const closed = new Set<number>();
   for (const obs of snapshot.observations) {
     for (const f of obs.observedFields) {
-      if (f.kind === "cell" && f.edgeId === GRID_EDGE && f.burnState !== "unburned") closed.add(f.cellIndex);
+      if (f.kind === "cell" && f.burnState !== "unburned") closed.add(f.gridCellIndex);
     }
   }
   return closed;

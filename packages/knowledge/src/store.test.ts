@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { AgentId, ObservationId, SiteId, SimTimeMs, WorkUnits, EdgeId, Meters } from "@ember/domain";
-import type { Observation } from "@ember/domain";
-import { GRID_EDGE, KnowledgeStore } from "./index.js";
+import { AgentId, ObservationId, SiteId, SimTimeMs, WorkUnits, Meters } from "@ember/domain";
+import { Observation } from "@ember/domain";
+import { KnowledgeStore } from "./index.js";
 
 const scout = AgentId.parse("scout");
 const crew = AgentId.parse("crew-1");
@@ -19,10 +19,9 @@ function obs(
     observedAt: SimTimeMs.parse(at),
     receivedAt: SimTimeMs.parse(received),
     spatialFootprint: { centerX: Meters.parse(0), centerY: Meters.parse(0), radius: Meters.parse(150) },
-    observedFields: cells.map(([cellIndex, burnState]) => ({
+    observedFields: cells.map(([gridCellIndex, burnState]) => ({
       kind: "cell" as const,
-      edgeId: GRID_EDGE,
-      cellIndex,
+      gridCellIndex,
       burnState,
     })),
   };
@@ -158,17 +157,17 @@ describe("knowledge/KnowledgeStore", () => {
     expect(beliefs[0]?.conflict).toBe(true);
   });
 
-  it("ignores non-grid cell fields but retains them in history", () => {
-    const store = new KnowledgeStore(crew);
-    const o = obs("o1", crew, 1000, []);
-    store.ingest({
-      ...o,
-      observedFields: [
-        { kind: "cell", edgeId: EdgeId.parse("road-1"), cellIndex: 0, burnState: "burning" },
-      ],
-    });
-    expect(store.closedCells().size).toBe(0);
-    expect(store.observations()).toHaveLength(1);
+  it("rejects legacy road-edge cell shapes at the domain boundary", () => {
+    expect(() =>
+      Observation.parse({
+        id: "obs:legacy",
+        sourceAgentId: crew,
+        observedAt: 1000,
+        receivedAt: 1000,
+        spatialFootprint: { centerX: 0, centerY: 0, radius: 1 },
+        observedFields: [{ kind: "cell", edgeId: "road-1", cellIndex: 0, burnState: "burning" }],
+      }),
+    ).toThrow();
   });
 
   it("hashes identical content identically and independent of arrival order", () => {

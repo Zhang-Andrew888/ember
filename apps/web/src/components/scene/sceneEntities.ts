@@ -2,7 +2,7 @@ import type { CoordinatorAgentView, CoordinatorView } from "@ember/domain";
 import type { ScenarioMap, SceneNode } from "../../map/scenarioMap.js";
 import {
   resolveAgentPosition,
-  resolveCellPosition,
+  resolveGridCellPosition,
   resolveNodePosition,
   resolveEdgeHeading,
   type SceneHeading,
@@ -30,8 +30,7 @@ export interface SiteMarker {
 
 export interface FireCellMarker {
   readonly key: string;
-  readonly edgeId: string;
-  readonly cellIndex: number;
+  readonly gridCellIndex: number;
   readonly position: SceneVector;
   readonly burnState: "unburned" | "burning" | "burned";
   readonly stale: boolean;
@@ -101,27 +100,23 @@ export function buildSceneEntities(view: CoordinatorView, map: ScenarioMap): Sce
  * "unburned" one. docs/ARCHITECTURE.md: "Fresh local hazard controls
  * planning" over a stale relay; rendering both entries would draw two
  * overlapping markers with no defined precedence between them. Keeps only
- * the entry with the greatest lastObservedAt per edgeId+cellIndex.
+ * the entry with the greatest lastObservedAt per gridCellIndex.
  */
-function resolveFireCells(view: CoordinatorView, map: ScenarioMap): FireCellMarker[] {
-  const latestByKey = new Map<string, CoordinatorView["observedCells"][number]>();
+function resolveFireCells(view: CoordinatorView, _map: ScenarioMap): FireCellMarker[] {
+  const latestByKey = new Map<number, CoordinatorView["observedCells"][number]>();
   for (const cell of view.observedCells) {
-    const key = `${cell.edgeId}:${cell.cellIndex}`;
-    const existing = latestByKey.get(key);
+    const existing = latestByKey.get(cell.gridCellIndex);
     if (!existing || (cell.lastObservedAt as number) >= (existing.lastObservedAt as number)) {
-      latestByKey.set(key, cell);
+      latestByKey.set(cell.gridCellIndex, cell);
     }
   }
 
   const fireCells: FireCellMarker[] = [];
   for (const cell of latestByKey.values()) {
-    const position = resolveCellPosition(map, cell.edgeId, cell.cellIndex);
-    if (!position) continue;
     fireCells.push({
-      key: `${cell.edgeId}:${cell.cellIndex}`,
-      edgeId: cell.edgeId,
-      cellIndex: cell.cellIndex,
-      position,
+      key: `cell-${cell.gridCellIndex}`,
+      gridCellIndex: cell.gridCellIndex,
+      position: resolveGridCellPosition(cell.gridCellIndex),
       burnState: cell.burnState,
       stale: cell.stale,
       lastObservedAt: cell.lastObservedAt as number,

@@ -15,3 +15,4 @@ export { admitsProtection, burnFractionAt, earliestIgnitionMs } from "./ensemble
 export { fitMember, fitObservations, type FitObservation } from "./fit.js";
 export { rolloutContext, rolloutIgnition } from "./rollout.js";
 export { observeFire, briefingObservation, snapshotOf, type Observer } from "./testing.js";
+export { edgeArrivalBands, toCoordinatorForecastView } from "./coordinator-projection.js";

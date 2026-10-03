@@ -72,8 +72,8 @@ export type Site = z.infer<typeof Site>;
 
 const CellObservationFields = z.object({
   kind: z.literal("cell"),
-  edgeId: EdgeId,
-  cellIndex: z.number().int().nonnegative(),
+  /** Flat index in the 64×64 terrain grid (row-major). Replaces the legacy pseudo-edge `"grid"`. */
+  gridCellIndex: z.number().int().nonnegative().max(4095),
   burnState: z.enum(["unburned", "burning", "burned"]),
 });
 
@@ -128,6 +128,8 @@ export const ObjectiveKind = z.enum([
   "scout_location",
   "return_to_refuge",
   "hold",
+  /** Planner must not use the targeted road edge (corridor segment). */
+  "avoid_corridor",
 ]);
 export type ObjectiveKind = z.infer<typeof ObjectiveKind>;
 

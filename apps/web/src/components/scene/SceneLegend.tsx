@@ -60,7 +60,7 @@ export const SceneLegend = forwardRef<HTMLDivElement, SceneLegendProps>(function
             {fireCells.map((cell) => (
               <li key={cell.key}>
                 <button type="button" onClick={() => onInspectCell(cell)}>
-                  {cell.edgeId} (cell {cell.cellIndex}) — {cell.burnState}
+                  Cell {cell.gridCellIndex} — {cell.burnState}
                   {cell.stale ? ", stale" : ""}, last observed {formatIncidentClock(cell.lastObservedAt)}
                 </button>
               </li>

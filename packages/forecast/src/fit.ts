@@ -1,6 +1,5 @@
 import type { Observation } from "@ember/domain";
 import type { AgentKnowledgeSnapshot } from "@ember/knowledge";
-import { GRID_EDGE } from "@ember/knowledge";
 import { SIM_DEFAULTS, cellsWithin } from "@ember/simulation/model";
 import type { ForecastMember } from "./types.js";
 
@@ -41,7 +40,7 @@ export function fitObservations(snapshot: AgentKnowledgeSnapshot): FitObservatio
     );
     for (const obs of list) {
       for (const field of obs.observedFields) {
-        if (field.kind === "cell" && field.edgeId === GRID_EDGE) memory[field.cellIndex] = stateCode(field.burnState);
+        if (field.kind === "cell") memory[field.gridCellIndex] = stateCode(field.burnState);
       }
       const fp = obs.spatialFootprint;
       const known: number[] = [];
@@ -131,7 +130,7 @@ export class FitAccumulator {
       }
       src.lastAt = obs.observedAt;
       for (const field of obs.observedFields) {
-        if (field.kind === "cell" && field.edgeId === GRID_EDGE) src.mem[field.cellIndex] = stateCode(field.burnState);
+        if (field.kind === "cell") src.mem[field.gridCellIndex] = stateCode(field.burnState);
       }
       const fp = obs.spatialFootprint;
       const known: number[] = [];

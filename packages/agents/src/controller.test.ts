@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { AgentId, NodeId, ObjectiveId, Observation, SequenceNumber, SimTimeMs, SiteId, type AgentPosition, type Objective } from "@ember/domain";
 import { Incident, authoredCommit, buildSyntheticScenario, type AgentProjection, type SimScenario } from "@ember/simulation";
 import { RoadIndex, cellIndexOf } from "@ember/simulation/model";
-import { GRID_EDGE, KnowledgeStore } from "@ember/knowledge";
+import { KnowledgeStore } from "@ember/knowledge";
 import { briefingObservation } from "@ember/forecast";
 import { planMissions, protectionTargets } from "@ember/navigation";
 import { cellsOfEdge } from "@ember/navigation";
@@ -166,7 +166,7 @@ describe("autonomous withdrawal and survival", () => {
       observedAt: at,
       receivedAt: at,
       spatialFootprint: { centerX: 1000, centerY: 800, radius: 150 },
-      observedFields: cells.map((cellIndex) => ({ kind: "cell", edgeId: GRID_EDGE, cellIndex, burnState: "burning" })),
+      observedFields: cells.map((gridCellIndex) => ({ kind: "cell", gridCellIndex, burnState: "burning" as const })),
     });
   }
 
@@ -217,7 +217,7 @@ describe("autonomous withdrawal and survival", () => {
         observedAt: 300_500,
         receivedAt: 300_500,
         spatialFootprint: { centerX: 1000, centerY: 800, radius: 150 },
-        observedFields: [{ kind: "cell", edgeId: GRID_EDGE, cellIndex: cellIndexOf(900, 900)!, burnState: "burning" }],
+        observedFields: [{ kind: "cell", gridCellIndex: cellIndexOf(900, 900)!, burnState: "burning" }],
       }),
     );
     const out = c.tick(
@@ -258,9 +258,9 @@ describe("autonomous withdrawal and survival", () => {
         receivedAt: 20_000,
         spatialFootprint: { centerX: 1250, centerY: 1100, radius: 150 },
         observedFields: [
-          { kind: "cell", edgeId: GRID_EDGE, cellIndex: cellIndexOf(1250, 1100)!, burnState: "burning" },
-          { kind: "cell", edgeId: GRID_EDGE, cellIndex: cellIndexOf(1225, 1100)!, burnState: "burning" },
-          { kind: "cell", edgeId: GRID_EDGE, cellIndex: cellIndexOf(1250, 1075)!, burnState: "burning" },
+          { kind: "cell", gridCellIndex: cellIndexOf(1250, 1100)!, burnState: "burning" },
+          { kind: "cell", gridCellIndex: cellIndexOf(1225, 1100)!, burnState: "burning" },
+          { kind: "cell", gridCellIndex: cellIndexOf(1250, 1075)!, burnState: "burning" },
         ],
       }),
     );
@@ -470,7 +470,7 @@ describe("mid-edge replanning against the simulator", () => {
         observedAt: 200_000,
         receivedAt: 200_000,
         spatialFootprint: { centerX: 900, centerY: 740, radius: 150 },
-        observedFields: ahead.map((cellIndex) => ({ kind: "cell", edgeId: GRID_EDGE, cellIndex, burnState: "burning" })),
+        observedFields: ahead.map((gridCellIndex) => ({ kind: "cell", gridCellIndex, burnState: "burning" as const })),
       }),
     );
     const c = crew(scenario);
@@ -506,7 +506,7 @@ describe("older relayed clear versus fresh local fire", () => {
         observedAt: at,
         receivedAt: at + 10_000,
         spatialFootprint: { centerX: 900, centerY: 740, radius: 150 },
-        observedFields: [{ kind: "cell", edgeId: GRID_EDGE, cellIndex: cell, burnState: state }],
+        observedFields: [{ kind: "cell", gridCellIndex: cell, burnState: state }],
       });
     tracker.ingest([obs("local", 300_000, "burning", "crew-1")]);
     expect(tracker.closed.has(cell)).toBe(true);

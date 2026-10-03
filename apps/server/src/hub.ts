@@ -1,7 +1,7 @@
 import { PushToTalk, type Utterance } from "@ember/communication";
 import { dueSimTimeMs, SIM_DEFAULTS } from "@ember/simulation";
 import type { ConversationBridge } from "./conversation.js";
-import { decode, encode, type ServerMessage } from "./protocol.js";
+import { decode, encodeServer, type ServerMessage } from "./protocol.js";
 import type { MonotonicClock, TechnicalFailure } from "./runner.js";
 import type { IncidentSession } from "./session.js";
 
@@ -11,8 +11,13 @@ export type ClientId = number;
  * Fan-out of sanitized server messages and intake of validated client messages. The hub never
  * advances the world; the live run does, on the monotonic clock.
  */
+/** Slow clients must reconnect after overflow; a reading client drains every flush (~200 ms). */
+const MAX_OUTBOX_MESSAGES = 4096;
+
 export class SessionHub {
   private readonly outboxes = new Map<ClientId, string[]>();
+  /** Clients dropped because their outbound queue overflowed (backpressure). */
+  readonly backpressureClosed = new Set<ClientId>();
   private readonly ptt = new Map<ClientId, PushToTalk>();
   private nextClient = 1;
   private transcriptPointer = 0;
@@ -31,7 +36,7 @@ export class SessionHub {
     const id = this.nextClient++;
     this.outboxes.set(id, []);
     this.ptt.set(id, new PushToTalk());
-    this.send(id, { type: "view", view: this.session.incident.projectCoordinator() });
+    this.send(id, { type: "view", view: this.session.coordinatorView() });
     return id;
   }
 
@@ -45,7 +50,7 @@ export class SessionHub {
   reconnect(id: ClientId): void {
     if (!this.ptt.has(id)) return;
     this.outboxes.set(id, []);
-    this.send(id, { type: "view", view: this.session.incident.projectCoordinator() });
+    this.send(id, { type: "view", view: this.session.coordinatorView() });
     const unsent = this.ptt.get(id)?.unsentUtterance;
     if (unsent !== null && unsent !== undefined) {
       this.send(id, { type: "notice", kind: "unsent_utterance", detail: unsent.text });
@@ -63,13 +68,20 @@ export class SessionHub {
     return box.splice(0, box.length);
   }
 
-  private send(id: ClientId, message: ServerMessage): void {
-    this.outboxes.get(id)?.push(encode(message));
+  private send(id: ClientId, message: ServerMessage): boolean {
+    const box = this.outboxes.get(id);
+    if (box === undefined) return false;
+    if (box.length >= MAX_OUTBOX_MESSAGES) {
+      this.backpressureClosed.add(id);
+      this.outboxes.delete(id);
+      return false;
+    }
+    box.push(encodeServer(message));
+    return true;
   }
 
   private broadcast(message: ServerMessage): void {
-    const text = encode(message);
-    for (const box of this.outboxes.values()) box.push(text);
+    for (const id of [...this.outboxes.keys()]) this.send(id, message);
   }
 
   handle(id: ClientId, raw: string, wallMs: number): void {
@@ -99,7 +111,7 @@ export class SessionHub {
       }
       case "inspect": {
         // Only what the coordinator already sees; the active recipient is reported, never changed.
-        const view = this.session.incident.projectCoordinator();
+        const view = this.session.coordinatorView();
         const agent = view.agents.find((a) => a.id === msg.agentId);
         if (agent === undefined) {
           this.send(id, { type: "notice", kind: "bad_message", detail: "Unknown agent." });
@@ -123,7 +135,7 @@ export class SessionHub {
     const stepIndex = Math.floor(inc.simTimeMs / SIM_DEFAULTS.stepMs);
     if (stepIndex !== this.lastViewStep && stepIndex % this.viewEverySteps === 0) {
       this.lastViewStep = stepIndex;
-      this.broadcast({ type: "view", view: inc.projectCoordinator() });
+      this.broadcast({ type: "view", view: this.session.coordinatorView() });
     }
     for (; this.transcriptPointer < this.bridge.transcript.length; this.transcriptPointer++) {
       const t = this.bridge.transcript[this.transcriptPointer]!;
@@ -140,7 +152,7 @@ export class SessionHub {
     for (const n of this.bridge.gateway.takeNotices()) this.broadcast({ type: "notice", kind: n.kind, detail: n.commandId });
     if (inc.ended && !this.endSent && inc.end !== null) {
       this.endSent = true;
-      this.broadcast({ type: "view", view: inc.projectCoordinator() });
+      this.broadcast({ type: "view", view: this.session.coordinatorView() });
       this.broadcast({ type: "ended", end: inc.end });
     }
   }

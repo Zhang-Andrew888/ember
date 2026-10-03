@@ -17,6 +17,7 @@
 import type { CoordinatorView } from "@ember/domain";
 
 export const fixtureCoordinatorView: CoordinatorView = {
+  protocolVersion: 1,
   sequence: 450 as unknown as CoordinatorView["sequence"],
   simTimeMs: 90_000 as unknown as CoordinatorView["simTimeMs"],
   wallElapsedMs: 18_000 as unknown as CoordinatorView["wallElapsedMs"],
@@ -102,57 +103,36 @@ export const fixtureCoordinatorView: CoordinatorView = {
   ],
 
   observedCells: [
-    // Initial briefing fire patch - stale (observed at t=0, now t=90 s)
+    { gridCellIndex: 1100, burnState: "burning", lastObservedAt: 0 as unknown as never, stale: true, observerAgentId: "crew-1" as unknown as never },
+    { gridCellIndex: 1101, burnState: "burning", lastObservedAt: 0 as unknown as never, stale: true, observerAgentId: "crew-1" as unknown as never },
+    { gridCellIndex: 1164, burnState: "burning", lastObservedAt: 0 as unknown as never, stale: true, observerAgentId: "crew-1" as unknown as never },
+    { gridCellIndex: 1165, burnState: "burning", lastObservedAt: 0 as unknown as never, stale: true, observerAgentId: "crew-1" as unknown as never },
+    { gridCellIndex: 1203, burnState: "burning", lastObservedAt: 85_000 as unknown as never, stale: false, observerAgentId: "scout" as unknown as never },
+    { gridCellIndex: 1180, burnState: "burning", lastObservedAt: 85_000 as unknown as never, stale: false, observerAgentId: "scout" as unknown as never },
+  ],
+  agentPlans: [
     {
-      edgeId: "placeholder-edge-fire-patch-1",
-      cellIndex: 0,
-      burnState: "burning",
-      lastObservedAt: 0 as unknown as never,
-      stale: true,
-      observerAgentId: "crew-1" as unknown as never,
-    },
-    {
-      edgeId: "placeholder-edge-fire-patch-1",
-      cellIndex: 1,
-      burnState: "burning",
-      lastObservedAt: 0 as unknown as never,
-      stale: true,
-      observerAgentId: "crew-1" as unknown as never,
-    },
-    {
-      edgeId: "placeholder-edge-fire-patch-2",
-      cellIndex: 0,
-      burnState: "burning",
-      lastObservedAt: 0 as unknown as never,
-      stale: true,
-      observerAgentId: "crew-1" as unknown as never,
-    },
-    {
-      edgeId: "placeholder-edge-fire-patch-2",
-      cellIndex: 1,
-      burnState: "burning",
-      lastObservedAt: 0 as unknown as never,
-      stale: true,
-      observerAgentId: "crew-1" as unknown as never,
-    },
-    // Scout's fresh observations at t=85 s - not yet stale
-    {
-      edgeId: "placeholder-edge-north-spread-1",
-      cellIndex: 3,
-      burnState: "burning",
-      lastObservedAt: 85_000 as unknown as never,
-      stale: false,
-      observerAgentId: "scout" as unknown as never,
-    },
-    {
-      edgeId: "placeholder-edge-north-spread-2",
-      cellIndex: 0,
-      burnState: "burning",
-      lastObservedAt: 85_000 as unknown as never,
-      stale: false,
-      observerAgentId: "scout" as unknown as never,
+      agentId: "crew-1" as unknown as never,
+      planId: "plan-fixture-crew-1" as unknown as never,
+      legs: [{ edgeId: "placeholder-edge-refuge-west-site-a" as unknown as never, direction: "forward" as const }],
+      workInterval: { startMs: 120_000 as unknown as never, endMs: 420_000 as unknown as never },
+      refugeId: "placeholder-node-refuge-west" as unknown as never,
+      phase: "approach",
+      limitingReason: null,
     },
   ],
+  coordinatorForecast: {
+    reliability: "reliable",
+    supportedMemberCount: 24,
+    explanation: null,
+    edgeArrivals: [
+      {
+        edgeId: "placeholder-edge-refuge-west-site-a" as unknown as never,
+        earliestIgnitionMs: 600_000 as unknown as never,
+        latestIgnitionMs: 900_000 as unknown as never,
+      },
+    ],
+  },
 
   recentReports: [
     {
