@@ -4,6 +4,7 @@ import type { WebSocket } from "ws";
 import type { IncomingMessage } from "node:http";
 import { WIRE_PROTOCOL_VERSION } from "@ember/domain";
 import { IncidentRegistry } from "./incident-registry.js";
+import { stopReplayWorker } from "./replay-offloop.js";
 import { grokIntentEnabled, grokVoiceEnabled } from "./xai/env.js";
 import { transcribeAudio } from "./xai/stt.js";
 import type { MonotonicClock } from "./runner.js";
@@ -115,7 +116,7 @@ export async function startHttpApp(options: { port?: number; clock?: MonotonicCl
     const token = req.headers["x-incident-token"];
     const record = registry.authorize(req.params.id, typeof token === "string" ? token : undefined);
     if (record === undefined) return reply.code(401).send({ error: "unauthorized" });
-    const payload = registry.replayPayload(record);
+    const payload = await registry.replayPayload(record);
     if (payload === null) return reply.code(409).send({ error: "incident_active" });
     return payload;
   });
@@ -184,6 +185,7 @@ export async function startHttpApp(options: { port?: number; clock?: MonotonicCl
     for (const record of registry.all()) {
       if (!record.started) continue;
       record.live.safePump();
+      registry.prepareReplay(record);
     }
     for (const ws of [...sockets.keys()]) {
       try {
@@ -199,6 +201,7 @@ export async function startHttpApp(options: { port?: number; clock?: MonotonicCl
     registry,
     close: async () => {
       clearInterval(timer);
+      await stopReplayWorker();
       await new Promise<void>((resolve) => wss.close(() => resolve()));
       await fastify.close();
     },

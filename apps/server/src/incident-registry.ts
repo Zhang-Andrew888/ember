@@ -5,7 +5,7 @@ import { ConversationBridge } from "./conversation.js";
 import { grokVoiceEnabled } from "./xai/env.js";
 import { SpeechAudioStore } from "./xai/speech-audio-store.js";
 import { LiveRun, SessionHub } from "./hub.js";
-import { buildReplayExport } from "./replay-export.js";
+import { buildReplayExport, type IncidentReplayExport } from "./replay-export.js";
 import { IncidentSession, type SessionOptions } from "./session.js";
 import type { MonotonicClock } from "./runner.js";
 import { ViewRecorder } from "./view-recorder.js";
@@ -36,6 +36,8 @@ export interface CreateIncidentBody {
 export class IncidentRegistry {
   private readonly records = new Map<string, IncidentRecord>();
   private readonly byToken = new Map<string, string>();
+  /** Prefetch already started (or failed). A later GET still retries through `replayPayload`. */
+  private readonly replayKick = new WeakSet<IncidentRecord>();
 
   /**
    * @param defaultSeed Operator-chosen seed (server side only, e.g. `DEMO_SEED`) so a rehearsed fire can
@@ -94,8 +96,29 @@ export class IncidentRegistry {
     record.live.start();
   }
 
-  replayPayload(record: IncidentRecord): ReturnType<typeof buildReplayExport> {
+  replayPayload(record: IncidentRecord): Promise<IncidentReplayExport | null> {
     return buildReplayExport(record.session, record.viewRecorder);
+  }
+
+  /**
+   * Start the one-time export build after the incident has ended. Call this outside `pump`
+   * and do not await it: the reveal runs on a worker so the live interval stays free.
+   */
+  prepareReplay(record: IncidentRecord): void {
+    if (!record.session.incident.ended || this.replayKick.has(record)) return;
+    this.replayKick.add(record);
+    try {
+      void this.replayPayload(record).catch((error: unknown) => {
+        this.logReplayFailure(error);
+      });
+    } catch (error) {
+      this.logReplayFailure(error);
+    }
+  }
+
+  private logReplayFailure(error: unknown): void {
+    const message = error instanceof Error ? error.message : String(error);
+    process.stderr.write(`ember-server: replay export failed: ${message}\n`);
   }
 
   all(): Iterable<IncidentRecord> {
