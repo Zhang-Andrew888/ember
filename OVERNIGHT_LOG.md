@@ -53,11 +53,11 @@ real Oakland extract.
 - **Dependencies.** `zod` 3.24.2 added to `@ember/simulation` (same version as domain; scenario input is a boundary).
   Workspace-only edges added: simulation -> knowledge; forecast/navigation/agents/replay -> simulation (pure `./model`
   subpath for shared fire/road code, plus `Incident` for tests/replay); server -> knowledge/forecast/navigation.
-- **Cell observations use a pseudo edge id `"grid"`** with the flat 64x64 index as `cellIndex`, because the domain
-  `ObservedField` can only name road cells. See contract issues below.
+- **Cell observations** use `ObservedField` `gridCellIndex` (64×64 row-major); the legacy pseudo edge `"grid"` is
+  gone from domain (contract gap #3 item 2 closed). See `packages/simulation/CONTRACT_GAPS.md` for open gaps.
 - **`SimulationAPI` is not implemented as a class.** `evaluateMission` needs navigation, which depends on simulation;
   `replay(DomainEvent[])` cannot rebuild truth. The working equivalents are `Incident`, `replayRecord` and
-  `revealFire`.
+  `revealFire` (documented in `CONTRACT_GAPS.md`).
 - **Conservative planning.** Forecast rollouts record ignition at the start of a 5 s step. With the full prior the
   planner is cautious: crews often find no admissible mission once fire is near. That is reported as `idle` with a
   reason, never hidden.
