@@ -1,6 +1,8 @@
 import type { CoordinatorView } from "@ember/domain";
+import { EMPTY_SIDEBAND, appendSideband, type WireSidebandState } from "../conversation/transcript.js";
 import { applyIncomingView } from "../state/viewReducer.js";
 import { parseCoordinatorViewFrame } from "./wireProtocol.js";
+import { parseServerWireMessage } from "./serverWireParse.js";
 
 /**
  * Minimal subset of the browser WebSocket API this client needs. Injectable
@@ -21,6 +23,7 @@ export type ConnectionStatus = "connecting" | "open" | "closed" | "error";
 export interface CoordinatorViewClientState {
   readonly status: ConnectionStatus;
   readonly view: CoordinatorView | null;
+  readonly sideband: WireSidebandState;
 }
 
 export interface CoordinatorViewClient {
@@ -49,7 +52,7 @@ export function createCoordinatorViewClient(
 ): CoordinatorViewClient {
   const reconnectDelayMs = options.reconnectDelayMs ?? RECONNECT_DELAY_MS;
   const listeners = new Set<() => void>();
-  let state: CoordinatorViewClientState = { status: "connecting", view: null };
+  let state: CoordinatorViewClientState = { status: "connecting", view: null, sideband: EMPTY_SIDEBAND };
   let socket: WebSocketLike | null = null;
   let closedByClient = false;
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -68,30 +71,47 @@ export function createCoordinatorViewClient(
   }
 
   function connect(): void {
-    setState({ status: "connecting", view: state.view });
+    setState({ status: "connecting", view: state.view, sideband: state.sideband });
     const nextSocket = openSocket();
     socket = nextSocket;
 
     nextSocket.onopen = () => {
       if (socket !== nextSocket) return;
-      setState({ status: "open", view: state.view });
+      setState({ status: "open", view: state.view, sideband: state.sideband });
     };
 
     nextSocket.onmessage = (event) => {
       if (socket !== nextSocket) return;
-      const incoming = parseIncomingMessage(event.data);
-      if (!incoming) return;
-      setState({ status: "open", view: applyIncomingView(state.view, incoming) });
+      const wire = parseServerWireMessage(event.data);
+      if (wire === null) {
+        const incoming = parseIncomingMessage(event.data);
+        if (!incoming) return;
+        setState({ status: "open", view: applyIncomingView(state.view, incoming), sideband: state.sideband });
+        return;
+      }
+      if (wire.type === "view") {
+        setState({
+          status: "open",
+          view: applyIncomingView(state.view, wire.view),
+          sideband: state.sideband,
+        });
+        return;
+      }
+      setState({
+        status: "open",
+        view: state.view,
+        sideband: appendSideband(state.sideband, wire),
+      });
     };
 
     nextSocket.onerror = () => {
       if (socket !== nextSocket) return;
-      setState({ status: "error", view: state.view });
+      setState({ status: "error", view: state.view, sideband: state.sideband });
     };
 
     nextSocket.onclose = () => {
       if (socket !== nextSocket) return;
-      setState({ status: "closed", view: state.view });
+      setState({ status: "closed", view: state.view, sideband: state.sideband });
       scheduleReconnect();
     };
   }

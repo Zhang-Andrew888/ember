@@ -6,7 +6,9 @@ import {
   CommandGateway,
   RecordingSink,
   ScriptedInterpreter,
+  createGrokInterpreter,
   lossNarration,
+  type IntentEnvelope,
   replyForDecision,
   type Directory,
   type GatewayOutcome,
@@ -16,6 +18,11 @@ import {
   type SchedulerEvent,
 } from "@ember/communication";
 import type { IncidentSession } from "./session.js";
+import type { SpeechAudioStore } from "./xai/speech-audio-store.js";
+import { completeIntentInterpretation } from "./xai/chat.js";
+import { grokIntentEnabled } from "./xai/env.js";
+import { synthesizeSpeech } from "./xai/tts.js";
+import type { SpeechItem, SpeechTier } from "@ember/communication";
 
 const POINT_NAMES: Record<string, string> = { "n-n": "north road", "n-s": "south junction", "n-h": "hub" };
 
@@ -51,6 +58,9 @@ export interface TranscriptEntry {
 export interface BridgeOptions {
   readonly interpreter?: Interpreter;
   readonly phrasing?: Phrasing;
+  /** When set with `grokTts`, outgoing speech is synthesized before playback is marked ready. */
+  readonly speechStore?: SpeechAudioStore;
+  readonly grokTts?: boolean;
 }
 
 /**
@@ -69,16 +79,26 @@ export class ConversationBridge {
   private endAnnounced = false;
   private speechSeq = 0;
   private readonly phrasing: Phrasing;
+  private readonly speechStore: SpeechAudioStore | undefined;
+  private readonly grokTts: boolean;
 
   constructor(
     private readonly session: IncidentSession,
     options: BridgeOptions = {},
   ) {
     this.phrasing = options.phrasing ?? "plain";
+    this.speechStore = options.speechStore;
+    this.grokTts = options.grokTts ?? false;
     const inc = session.incident;
+    const asyncDeliver: { fn?: (seq: number, env: IntentEnvelope) => void } = {};
+    const interpreter =
+      options.interpreter ??
+      (grokIntentEnabled()
+        ? createGrokInterpreter(completeIntentInterpretation, (seq, env) => asyncDeliver.fn?.(seq, env))
+        : new ScriptedInterpreter());
     this.gateway = new CommandGateway({
       directory: directoryFor(inc.scenario),
-      interpreter: options.interpreter ?? new ScriptedInterpreter(),
+      interpreter,
       picture: () => this.picture(),
       status: (id) => {
         const c = session.controllers.get(id as AgentId);
@@ -87,6 +107,7 @@ export class ConversationBridge {
       nowSimMs: () => inc.simTimeMs,
       incidentEnded: () => inc.ended,
     });
+    asyncDeliver.fn = (seq, env) => this.applyOutcomes(this.gateway.deliver(seq, env));
     this.scheduler = new AudioScheduler({
       sink: this.sink,
       currentPlanRevision: (agent) => (inc.scenario.agents.some((a) => a.id === agent) ? inc.projectAgent(agent as AgentId).planRevision : 0),
@@ -165,7 +186,7 @@ export class ConversationBridge {
       const reply = replyForDecision(callsign, event, this.phrasing);
       const urgent = reply.tier <= 2;
       this.transcript.push({ kind: "agent", text: reply.text, simTimeMs: now, urgent });
-      this.scheduler.enqueue({
+      this.enqueueSpeech({
         id: `sp-${this.speechSeq++}`,
         eventId: `decision-${event.agentId}-${event.sequence}`,
         agentId: event.agentId,
@@ -182,14 +203,60 @@ export class ConversationBridge {
       const callsign = inc.scenario.agents.find((a) => a.id === n.agentId)?.callsign ?? n.agentId;
       const reply = lossNarration(callsign);
       this.transcript.push({ kind: "control", text: reply.text, simTimeMs: now, urgent: true });
-      this.scheduler.enqueue({ id: `sp-${this.speechSeq++}`, eventId: `loss-${n.agentId}`, agentId: "control", text: reply.text, tier: reply.tier, createdMs: now, planRevision: 0 });
+      this.enqueueSpeech({
+        id: `sp-${this.speechSeq++}`,
+        eventId: `loss-${n.agentId}`,
+        agentId: "control",
+        text: reply.text,
+        tier: reply.tier,
+        createdMs: now,
+        planRevision: 0,
+      });
     }
     if (inc.ended && !this.endAnnounced) {
       this.endAnnounced = true;
       for (const o of this.gateway.endIncident()) this.apply(o, false);
       const text = `The incident has ended. ${inc.end?.displayReason.replaceAll("_", " ") ?? ""}.`;
       this.transcript.push({ kind: "system", text, simTimeMs: now, urgent: false });
-      this.scheduler.endIncident({ id: `sp-${this.speechSeq++}`, eventId: "incident-end", agentId: "control", text, tier: 3, createdMs: SimTimeMs.parse(now), planRevision: 0 });
+      const endItem = {
+        id: `sp-${this.speechSeq++}`,
+        eventId: "incident-end",
+        agentId: "control",
+        text,
+        tier: 3 as SpeechTier,
+        createdMs: SimTimeMs.parse(now),
+        planRevision: 0,
+      };
+      this.finishEndSpeech(endItem);
     }
+  }
+
+  private finishEndSpeech(item: SpeechItem): void {
+    if (!this.grokTts || this.speechStore === undefined) {
+      this.scheduler.endIncident(item);
+      return;
+    }
+    void synthesizeSpeech({ text: item.text })
+      .then((bytes) => {
+        this.speechStore!.put(item.id, bytes);
+        this.scheduler.endIncident(item);
+      })
+      .catch(() => {
+        this.scheduler.endIncident(item);
+      });
+  }
+
+  private enqueueSpeech(item: SpeechItem): void {
+    const deferReady = this.grokTts && this.speechStore !== undefined;
+    this.scheduler.enqueue(item, !deferReady);
+    if (!deferReady || this.speechStore === undefined) return;
+    void synthesizeSpeech({ text: item.text })
+      .then((bytes) => {
+        this.speechStore!.put(item.id, bytes);
+        this.scheduler.markReady(item.id);
+      })
+      .catch(() => {
+        this.scheduler.markReady(item.id);
+      });
   }
 }

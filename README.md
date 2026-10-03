@@ -22,6 +22,10 @@ A five-minute wildfire coordination simulation with autonomous ground crews, inc
 
 Architectural decisions are in [docs/adr](docs/adr/README.md). The product specification consolidates the interview decisions; technical details live in the focused documents above.
 
+## Local development
+
+See **[DEVELOPMENT.md](DEVELOPMENT.md)** for install, mock vs live server, optional Grok Voice/intent env vars, and troubleshooting. Env templates: [apps/web/.env.example](apps/web/.env.example), [apps/server/.env.example](apps/server/.env.example).
+
 ## Chosen stack
 
 React + TypeScript + Vite; Three.js through React Three Fiber; a Node.js/TypeScript server; an authoritative simulation worker and separate forecast workers; Grok Voice APIs for push-to-talk and speech. Use a small custom agent runtime with deterministic planning. Defer openJiuwen from the MVP critical path.

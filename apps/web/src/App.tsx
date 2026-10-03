@@ -11,13 +11,16 @@ import {
   startIncident,
 } from "./net/incidentRestClient.js";
 import { createProtocolWebSocket, type ProtocolWebSocket } from "./net/protocolWebSocket.js";
+import { mockWireRepliesForSay } from "./net/mockCommandSimulator.js";
 import { useCoordinatorView } from "./state/useCoordinatorView.js";
 import { useReducedMotion } from "./state/useReducedMotion.js";
 import { createSpeechPlaybackStub } from "./state/speechPlaybackStub.js";
 import { useSpeechPlaybackStub } from "./state/useSpeechPlaybackStub.js";
+import { buildConversationTranscript } from "./conversation/transcript.js";
 import { buildSceneEntities } from "./components/scene/sceneEntities.js";
 import { scenarioMap } from "./map/activeScenario.js";
-import { routineReports, latestUrgentReport } from "./format/reports.js";
+import { latestUrgentReport } from "./format/reports.js";
+import { isDemoMode } from "./demo/demoMode.js";
 import { Briefing } from "./components/Briefing.js";
 import { TopBar } from "./components/TopBar.js";
 import { SceneView } from "./components/scene/SceneView.js";
@@ -26,6 +29,10 @@ import { UrgentStrip } from "./components/UrgentStrip.js";
 import { AgentRail } from "./components/AgentRail.js";
 import { EndOverlay } from "./components/EndOverlay.js";
 import { ReplayView } from "./components/ReplayView.js";
+import { ConnectionBanner } from "./components/ConnectionBanner.js";
+import { DemoBanner } from "./components/DemoBanner.js";
+import { playPreparedSpeech } from "./net/grokSpeechPlayback.js";
+import { transcribeViaServer } from "./net/grokStt.js";
 
 const INCIDENT_ID = import.meta.env.VITE_INCIDENT_ID ?? "demo";
 const INCIDENT_TOKEN = import.meta.env.VITE_INCIDENT_TOKEN as string | undefined;
@@ -34,12 +41,15 @@ const WS_URL = import.meta.env.VITE_INCIDENT_WS_URL as string | undefined;
 const REST_BASE_URL = import.meta.env.VITE_INCIDENT_REST_BASE_URL as string | undefined;
 const HAS_LIVE_REST = REST_BASE_URL !== undefined;
 const IS_MOCK_MODE = !WS_URL && !HAS_LIVE_REST;
+const USE_GROK_VOICE = import.meta.env.VITE_GROK_VOICE === "1";
+const GROK_LIVE = USE_GROK_VOICE && HAS_LIVE_REST;
 
 const EMPTY_ENTITIES = { agents: [], sites: [], fireCells: [], routes: [], forecast: null };
 
 type Phase = "briefing" | "live" | "replay";
 
 export function App() {
+  const demoMode = isDemoMode(typeof window !== "undefined" ? window.location.search : "");
   const [phase, setPhase] = useState<Phase>("briefing");
   const [starting, setStarting] = useState(false);
   const [client, setClient] = useState<CoordinatorViewClient | null>(null);
@@ -50,19 +60,15 @@ export function App() {
   const liveWsUrlRef = useRef<string | null>(null);
   const reducedMotion = useReducedMotion();
 
-  const { status: connectionStatus, view } = useCoordinatorView(client);
+  const { status: connectionStatus, view, sideband } = useCoordinatorView(client);
 
-  // Exact-text speech-playback stub (backlog item 4): drives UrgentStrip's
-  // audioState and the composer's outgoing-acknowledgement indicator from
-  // one shared single-channel stub, so an urgent report genuinely
-  // interrupts a routine acknowledgement rather than playing both at once.
   const speechStubRef = useRef(createSpeechPlaybackStub());
   useEffect(() => () => speechStubRef.current.dispose(), []);
   const speechSnapshot = useSpeechPlaybackStub(speechStubRef.current);
 
   const lastSpokenUrgentSequence = useRef<number | null>(null);
   useEffect(() => {
-    if (!view) return;
+    if (GROK_LIVE || !view) return;
     const urgent = latestUrgentReport(view);
     if (!urgent) return;
     const sequence = urgent.sequence as number;
@@ -71,28 +77,53 @@ export function App() {
     speechStubRef.current.speak(urgent.text, { urgent: true });
   }, [view]);
 
-  // docs/COMMUNICATION.md: "At incident end, stop capture, cancel unapplied
-  // commands and stale routine audio." Found via live testing that nothing
-  // did this - a routine acknowledgement already pending/playing when
-  // incidentEnd arrived just kept running past the debrief overlay, which
-  // is exactly "a backlog of obsolete radio traffic" the same doc says the
-  // debrief must not auto-play.
+  const lastReceiptCount = useRef(0);
+  useEffect(() => {
+    if (GROK_LIVE) return;
+    if (sideband.receipts.length <= lastReceiptCount.current) return;
+    const newReceipts = sideband.receipts.slice(lastReceiptCount.current);
+    lastReceiptCount.current = sideband.receipts.length;
+    for (const receipt of newReceipts) {
+      if (receipt.reply.trim().length > 0) {
+        speechStubRef.current.speak(receipt.reply, { urgent: false });
+      }
+    }
+  }, [sideband.receipts]);
+
+  const lastAudioCueCount = useRef(0);
+  useEffect(() => {
+    if (!GROK_LIVE) return;
+    const session = liveSessionRef.current;
+    if (session === null) return;
+    if (sideband.audioCues.length <= lastAudioCueCount.current) return;
+    const cues = sideband.audioCues.slice(lastAudioCueCount.current);
+    lastAudioCueCount.current = sideband.audioCues.length;
+    for (const cue of cues) {
+      if (cue.event !== "started") continue;
+      void playPreparedSpeech(REST_BASE_URL ?? "", session.incidentId, session.token, cue.itemId);
+    }
+  }, [sideband.audioCues]);
+
+  const grokStt = useMemo(() => {
+    if (!GROK_LIVE) return undefined;
+    return (audio: Blob) => {
+      const session = liveSessionRef.current;
+      if (session === null) return Promise.resolve(null);
+      return transcribeViaServer(REST_BASE_URL ?? "", session.incidentId, session.token, audio);
+    };
+  }, []);
+
   useEffect(() => {
     if (view?.incidentEnd) speechStubRef.current.cancel();
   }, [view?.incidentEnd]);
 
   const openSocket = useCallback(() => {
     if (IS_MOCK_MODE) {
-      // Dev/test-only state scenarios (backlog item 1), opted into via
-      // ?scenario=<name> - never reachable without that query param, so
-      // the default demo is unaffected. See net/scenarioSelection.ts.
       const scenarioOptions = resolveScenario(window.location.search);
       const socket = createMockIncidentSocket(scenarioOptions ?? undefined);
       mockSocketRef.current = socket;
       return socket;
     }
-    // The real WebSocket's richer onmessage/close signatures are a superset of
-    // WebSocketLike; narrowing through unknown avoids a brittle structural match.
     const url = liveWsUrlRef.current ?? WS_URL;
     if (url === undefined) {
       throw new Error("Live WebSocket URL is not configured");
@@ -136,22 +167,57 @@ export function App() {
   const handleReplay = useCallback(() => setPhase("replay"), []);
   const handleExitReplay = useCallback(() => setPhase("live"), []);
 
-  const handleSendMessage = useCallback((text: string) => {
-    // "Received: ..." (not "accepted"/applied) deliberately mirrors
-    // CommandReceipt's own "received" status - this stub only ever claims
-    // the message was received, never that a command was actually acted
-    // on, since there's no real backend behind it to make that true.
-    speechStubRef.current.speak(`Received: ${text}`, { urgent: false });
+  const dispatchSay = useCallback(
+    (text: string) => {
+      const commandId = crypto.randomUUID();
+      const simTimeMs = view ? (view.simTimeMs as number) : 0;
 
-    const socket = protocolSocketRef.current;
-    if (socket !== null) {
-      socket.sendCommand({
-        type: "say",
-        text,
-        idempotencyKey: crypto.randomUUID(),
-      });
-    }
+      const socket = protocolSocketRef.current;
+      if (socket !== null) {
+        socket.sendCommand({ type: "say", text, idempotencyKey: commandId });
+        return;
+      }
+
+      if (IS_MOCK_MODE) {
+        const frames = mockWireRepliesForSay(text, simTimeMs, commandId);
+        for (const [index, frame] of frames.entries()) {
+          setTimeout(() => mockSocketRef.current?.deliver(frame), 200 + index * 120);
+        }
+      }
+    },
+    [view],
+  );
+
+  const handleSendMessage = useCallback(
+    (text: string) => {
+      dispatchSay(text);
+    },
+    [dispatchSay],
+  );
+
+  const handlePttBegin = useCallback(() => {
+    speechStubRef.current.setRecording(true);
+    protocolSocketRef.current?.sendCommand({ type: "ptt_begin" });
   }, []);
+
+  const handlePttRelease = useCallback(
+    (text: string) => {
+      speechStubRef.current.setRecording(false);
+      protocolSocketRef.current?.sendCommand({ type: "ptt_release", transcript: text });
+      dispatchSay(text);
+    },
+    [dispatchSay],
+  );
+
+  const handlePttCancel = useCallback(() => {
+    speechStubRef.current.setRecording(false);
+    protocolSocketRef.current?.sendCommand({ type: "ptt_lost_focus", transcript: "" });
+  }, []);
+
+  const transcript = useMemo(
+    () => buildConversationTranscript(view, sideband),
+    [view, sideband],
+  );
 
   const entities = useMemo(
     () => (view ? buildSceneEntities(view, scenarioMap) : EMPTY_ENTITIES),
@@ -163,8 +229,16 @@ export function App() {
     return view.agents.find((agent) => agent.id === view.activeRecipientId)?.callsign ?? null;
   }, [view]);
 
+  const urgentCallsign = useMemo(() => {
+    const urgent = view ? latestUrgentReport(view) : null;
+    if (!urgent || !view) return null;
+    return view.agents.find((agent) => agent.id === urgent.agentId)?.callsign ?? null;
+  }, [view]);
+
+  const composerDisabled = connectionStatus !== "open" || Boolean(view?.incidentEnd);
+
   if (phase === "briefing") {
-    return <Briefing onStart={handleStart} starting={starting} />;
+    return <Briefing onStart={handleStart} starting={starting} demoMode={demoMode} />;
   }
 
   if (phase === "replay") {
@@ -175,19 +249,14 @@ export function App() {
 
   return (
     <div className="app-layout">
-      {/*
-        docs/FRONTEND.md: "freeze scene ... cancel unapplied commands" once
-        ended. `inert` removes this whole region from the tab order and the
-        accessibility tree (and blocks pointer events) while the end
-        overlay is up - found live via Playwright that without it, Tab
-        still reached the composer input and every scene control hidden
-        behind the modal, including the message box.
-      */}
+      {demoMode ? <DemoBanner /> : null}
+      <ConnectionBanner status={connectionStatus} />
       <div className="app-layout__content" inert={hasEnded || undefined}>
         <TopBar
           simTimeMs={view ? (view.simTimeMs as number) : null}
           wallElapsedMs={view ? (view.wallElapsedMs as number) : null}
           connectionStatus={connectionStatus}
+          speechSnapshot={speechSnapshot}
         />
         <div className="app-layout__main">
           <SceneView
@@ -198,15 +267,23 @@ export function App() {
             simTimeMs={view ? (view.simTimeMs as number) : null}
           />
           <ConversationPanel
-            reports={view ? routineReports(view) : []}
+            transcript={transcript}
             activeRecipientCallsign={activeRecipientCallsign}
             onSendMessage={handleSendMessage}
+            onPttBegin={handlePttBegin}
+            onPttRelease={handlePttRelease}
+            onPttCancel={handlePttCancel}
+            composerDisabled={composerDisabled}
+            demoMode={demoMode}
             speechSnapshot={speechSnapshot}
+            {...(grokStt === undefined ? {} : { grokStt })}
           />
         </div>
         <UrgentStrip
           report={view ? latestUrgentReport(view) : null}
+          callsign={urgentCallsign}
           audioState={speechSnapshot.urgent ? speechSnapshot.state : "idle"}
+          queuedUrgent={speechSnapshot.queuedUrgent}
         />
         <AgentRail
           agents={view?.agents ?? []}

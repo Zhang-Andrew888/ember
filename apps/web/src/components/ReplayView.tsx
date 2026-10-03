@@ -86,7 +86,12 @@ export function ReplayView({ onExit }: ReplayViewProps) {
         />
       </div>
 
-      <UrgentStrip report={latestUrgentReport(view)} audioState="idle" />
+      <UrgentStrip
+        report={latestUrgentReport(view)}
+        callsign={null}
+        audioState="idle"
+        queuedUrgent={false}
+      />
       <AgentRail agents={view.agents} selectedAgentId={selectedAgentId} onSelectAgent={setSelectedAgentId} />
 
       <div className="replay-controls">
