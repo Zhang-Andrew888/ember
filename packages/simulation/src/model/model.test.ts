@@ -177,3 +177,78 @@ describe("model/fire", () => {
     expect(copy.burningCount).toBeGreaterThan(1);
   });
 });
+
+describe("model/fire fast path", () => {
+  /** Reference implementation straight from the documented formula, one exp() per cell and direction. */
+  function referenceIgnitions(terrain: { fuel: Float64Array; height: Float64Array }, p: FireParams, steps: number): Float64Array {
+    const SIZE = 64;
+    const state = new Uint8Array(SIZE * SIZE).fill(CELL_UNBURNED);
+    const ign = new Float64Array(SIZE * SIZE).fill(Infinity);
+    const progress = new Float64Array(SIZE * SIZE * 8);
+    let burning: number[] = [];
+    const start = 32 * SIZE + 20;
+    state[start] = CELL_BURNING;
+    ign[start] = 0;
+    burning = [start];
+    const dirs: { dx: number; dy: number; dist: number; ux: number; uy: number }[] = [];
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        if (dx === 0 && dy === 0) continue;
+        const len = Math.hypot(dx, dy);
+        dirs.push({ dx, dy, dist: len * 25, ux: dx / len, uy: dy / len });
+      }
+    }
+    for (let s = 1; s <= steps; s++) {
+      const t = s * 1000;
+      burning = burning.filter((c) => {
+        if (t - ign[c]! >= SIM_DEFAULTS.cellBurnMs) {
+          state[c] = CELL_BURNED;
+          return false;
+        }
+        return true;
+      });
+      const wind = t >= p.windShiftMs ? p.postShiftWindRad : p.initialWindRad;
+      const reached: number[] = [];
+      for (const c of burning) {
+        const gx = c % SIZE;
+        const gy = (c - gx) / SIZE;
+        dirs.forEach((d, i) => {
+          const nx = gx + d.dx;
+          const ny = gy + d.dy;
+          if (nx < 0 || ny < 0 || nx >= SIZE || ny >= SIZE) return;
+          const target = ny * SIZE + nx;
+          if (state[target] !== CELL_UNBURNED) return;
+          const rate = spreadRate(p, wind, d, terrain.fuel[target]!, terrain.height[target]! - terrain.height[c]!);
+          progress[c * 8 + i] = progress[c * 8 + i]! + rate;
+          if (progress[c * 8 + i]! >= d.dist && !reached.includes(target)) reached.push(target);
+        });
+      }
+      for (const target of reached) {
+        state[target] = CELL_BURNING;
+        ign[target] = t;
+        burning.push(target);
+      }
+    }
+    return ign;
+  }
+
+  it("matches the documented per-cell formula for varied terrain, rates and wind shifts", () => {
+    const cases: FireParams[] = [
+      { spreadMultiplier: 1, initialWindRad: 0, windShiftMs: 1e9, postShiftWindRad: 0 },
+      { spreadMultiplier: 0.6, initialWindRad: 0.2, windShiftMs: 90_000, postShiftWindRad: 1.4 },
+      { spreadMultiplier: 1.6, initialWindRad: -0.25, windShiftMs: 60_000, postShiftWindRad: 1.75 },
+    ];
+    for (const [i, p] of cases.entries()) {
+      const terrain = createTerrain(`ref-${i}`);
+      const field = new FireField(terrain, new Set());
+      field.ignite([32 * 64 + 20], 0);
+      for (let t = 1000; t <= 200_000; t += 1000) field.step(t, 1000, p);
+      const ref = referenceIgnitions(terrain, p, 200);
+      let different = 0;
+      for (let c = 0; c < ref.length; c++) if (ref[c] !== field.ignitedAtMs[c]) different += 1;
+      // Floating-point association differs (exp(a)exp(b) vs exp(a+b)); allow only rare one-step ties.
+      expect(different).toBeLessThanOrEqual(3);
+      expect(field.burningCount + 1).toBeGreaterThan(10);
+    }
+  });
+});
