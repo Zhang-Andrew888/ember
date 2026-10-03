@@ -1,2 +1,4 @@
 {"protocolVersion":1,"message":{"type":"view","view":{"protocolVersion":1,"sequence":0,"simTimeMs":0,"wallElapsedMs":0,"incidentStatus":"active","activeRecipientId":null,"agents":[],"sites":[],"observedCells":[],"agentPlans":[],"coordinatorForecast":null,"recentReports":[],"incidentEnd":null}}}
 {"protocolVersion":1,"message":{"type":"notice","kind":"bad_message","detail":"Message was not understood and was ignored."}}
+{"protocolVersion":1,"message":{"type":"receipt","receipt":{"commandId":"cmd-fixture-1","status":"received","recipientId":null,"appliedTick":null,"explanation":"","planRevision":null},"reply":"Received."}}
+{"protocolVersion":1,"message":{"type":"ended","end":{"tick":300000,"wallElapsedMs":300000,"matchingReasons":["time_expired"],"displayReason":"time_expired","finalSnapshotHash":"fixture-hash"}}}
