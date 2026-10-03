@@ -28,8 +28,13 @@ export const SIM_DEFAULTS = {
   windSpeedMps: 0.215,
   /** Dead fuel moisture as a fraction of dry weight; the reference at which baseSpreadRate applies. */
   fuelMoisture: 0.08,
-  /** Calibration of the Rothermel rate to game scale; keeps overall burn area near the pre-Rothermel model. */
-  rothermelGain: 1.2,
+  /**
+   * Head-fire rate in m/s for the reference case: shrub fuel, reference moisture, effective wind, flat
+   * ground, spread multiplier 1. The Rothermel rate is scaled so this case lands exactly here.
+   */
+  referenceHeadRateMps: 1.1,
+  /** Factor from the effective midflame wind to the 20-ft wind that sets the fire ellipse's elongation. */
+  ellipseWindFactor: 2,
   slopeCoefficient: 1.5,
   slopeClamp: 0.5,
   fuelRange: [0.6, 1.4],

@@ -16,9 +16,6 @@ import {
   hashValue,
   spreadRate,
   type Terrain,
-  rothermelPhiW,
-  FUEL_MODELS,
-  FUEL_SHRUB,
   streamRng,
   type FireParams,
   type PublicMap,
@@ -107,7 +104,7 @@ describe("model/fire", () => {
     const down = spreadRate(params, 0, east, 1, 0);
     const up = spreadRate(params, 0, west, 1, 0);
     expect(down).toBeGreaterThan(up);
-    expect(down).toBeCloseTo(0.5 * SIM_DEFAULTS.rothermelGain * (1 + rothermelPhiW(FUEL_MODELS[FUEL_SHRUB]!, SIM_DEFAULTS.windSpeedMps)), 6);
+    expect(down).toBeCloseTo(SIM_DEFAULTS.referenceHeadRateMps, 6);
     expect(spreadRate({ ...params, spreadMultiplier: 10 }, 0, east, 1.4, 0)).toBe(2.0);
     expect(spreadRate({ ...params, spreadMultiplier: 0.01 }, 0, west, 0.6, 0)).toBe(0.1);
   });
@@ -126,7 +123,7 @@ describe("model/fire", () => {
       field.step(t, 1000, params);
       if (ignitedEast === Infinity && field.state[start + 1] !== CELL_UNBURNED) ignitedEast = t;
     }
-    // 25 m at 0.5 * 1.35 * (1 + phi_w) m/s is about 22.9 s, so ignition lands on step 23.
+    // 25 m at the 1.1 m/s reference head rate is about 22.7 s, so ignition lands on step 23.
     expect(ignitedEast).toBe(23_000);
     expect(field.ignitedAtMs[start + 1]).toBe(23_000);
     expect(field.state[start]).toBe(CELL_BURNED);

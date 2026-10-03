@@ -39,12 +39,11 @@ const MINERAL_TOTAL = 0.0555;
 const MINERAL_EFFECTIVE = 0.01;
 const FT_PER_MIN_PER_MPS = 196.85;
 
-/** Rate of spread with no wind and no slope, ft/min (Rothermel 1972 eq. 1 without the phi terms). */
-export function noWindRateFtMin(fuel: FuelModel, moisture: number): number {
+/** Optimum reaction velocity-based reaction intensity IR, BTU/ft^2/min (Rothermel 1972 eq. 27). */
+export function reactionIntensity(fuel: FuelModel, moisture: number): number {
   const { sigma, w0, depth, mx } = fuel;
   const beta = w0 / (depth * PARTICLE_DENSITY);
-  const betaOp = 3.348 * sigma ** -0.8189;
-  const ratio = beta / betaOp;
+  const ratio = beta / (3.348 * sigma ** -0.8189);
   const gammaMax = sigma ** 1.5 / (495 + 0.0594 * sigma ** 1.5);
   const a = 133 * sigma ** -0.7913;
   const gamma = gammaMax * ratio ** a * Math.exp(a * (1 - ratio));
@@ -52,12 +51,37 @@ export function noWindRateFtMin(fuel: FuelModel, moisture: number): number {
   const etaS = Math.min(1, 0.174 * MINERAL_EFFECTIVE ** -0.19);
   const rm = Math.min(1, moisture / mx);
   const etaM = Math.max(0, 1 - 2.59 * rm + 5.11 * rm * rm - 3.52 * rm * rm * rm);
-  const reactionIntensity = gamma * wn * HEAT_CONTENT * etaM * etaS;
+  return gamma * wn * HEAT_CONTENT * etaM * etaS;
+}
+
+/** Rate of spread with no wind and no slope, ft/min (Rothermel 1972 eq. 1 without the phi terms). */
+export function noWindRateFtMin(fuel: FuelModel, moisture: number): number {
+  const { sigma, w0, depth } = fuel;
+  const beta = w0 / (depth * PARTICLE_DENSITY);
   const xi = Math.exp((0.792 + 0.681 * Math.sqrt(sigma)) * (beta + 0.1)) / (192 + 0.2595 * sigma);
   const rhoBulk = w0 / depth;
   const epsilon = Math.exp(-138 / sigma);
   const heatOfIgnition = 250 + 1116 * moisture;
-  return (reactionIntensity * xi) / (rhoBulk * epsilon * heatOfIgnition);
+  return (reactionIntensity(fuel, moisture) * xi) / (rhoBulk * epsilon * heatOfIgnition);
+}
+
+/** BTU/ft/s to kW/m. */
+const BTU_FT_S_TO_KW_M = 3.4613;
+
+/**
+ * Byram fireline intensity in kW/m for a spread rate in m/s: reaction intensity times flame residence
+ * time (Albini: 384/sigma minutes) times the rate. Pass the rate the game actually uses, so intensity
+ * stays consistent with spread; it is a game-scale figure, not a predicted physical one.
+ */
+export function firelineIntensityKwM(fuel: FuelModel, moisture: number, rateMps: number): number {
+  const residenceMin = 384 / fuel.sigma;
+  const btuPerFtMin = reactionIntensity(fuel, moisture) * residenceMin * (Math.max(0, rateMps) * FT_PER_MIN_PER_MPS);
+  return (btuPerFtMin / 60) * BTU_FT_S_TO_KW_M;
+}
+
+/** Byram flame length in meters from fireline intensity in kW/m (L = 0.0775 I^0.46). */
+export function flameLengthM(intensityKwM: number): number {
+  return 0.0775 * Math.max(0, intensityKwM) ** 0.46;
 }
 
 /** Wind coefficient phi_w for a midflame wind in m/s (Rothermel 1972 eq. 47). */
@@ -80,12 +104,11 @@ export function rothermelPhiS(fuel: FuelModel, slope: number): number {
 }
 
 /**
- * Eccentricity of the head-fire ellipse from the 20-ft wind in m/s (Anderson 1983 length-to-breadth
- * ratio). Zero wind gives a circle.
+ * Eccentricity of the head-fire ellipse from the midflame wind in m/s scaled by `windFactor20ft` to a 20-ft
+ * wind (Anderson 1983 length-to-breadth ratio). Zero wind gives a circle.
  */
-export function ellipseEccentricity(windMps: number): number {
-  // Game-scale winds are small, so the 20-ft wind is taken as 2x the midflame value, as for a sheltered stand.
-  const mph = Math.max(0, windMps) * 2 * 2.23694;
+export function ellipseEccentricity(windMps: number, windFactor20ft: number): number {
+  const mph = Math.max(0, windMps) * windFactor20ft * 2.23694;
   const lb = Math.max(1, 0.936 * Math.exp(0.2566 * mph) + 0.461 * Math.exp(-0.1548 * mph) - 0.397);
   return Math.sqrt(1 - 1 / (lb * lb));
 }
