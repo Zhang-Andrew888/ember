@@ -1,9 +1,17 @@
 import { SIM_DEFAULTS } from "@ember/simulation/model";
 import type { ForecastEnsemble } from "./types.js";
 
+export type EnsembleValidity = "valid" | "empty" | "contradicted";
+
+/** Explicit safety state, including malformed or externally constructed empty ensembles. */
+export function ensembleValidity(ensemble: ForecastEnsemble | null): EnsembleValidity {
+  if (ensemble === null || ensemble.members.length === 0) return ensemble?.reliability === "unreliable" ? "contradicted" : "empty";
+  return ensemble.reliability === "reliable" ? "valid" : "contradicted";
+}
+
 /** Protection work is admitted only from a reliable, non-empty ensemble. */
 export function admitsProtection(ensemble: ForecastEnsemble | null): boolean {
-  return ensemble !== null && ensemble.reliability === "reliable" && ensemble.members.length > 0;
+  return ensembleValidity(ensemble) === "valid";
 }
 
 const earliestCache = new WeakMap<ForecastEnsemble, Float64Array>();

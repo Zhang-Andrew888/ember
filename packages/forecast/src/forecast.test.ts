@@ -8,6 +8,7 @@ import {
   briefingObservation,
   burnFractionAt,
   earliestIgnitionMs,
+  ensembleValidity,
   fitMember,
   fitObservations,
   observeFire,
@@ -126,7 +127,9 @@ describe("forecast service", () => {
     expect(e.members).toHaveLength(0);
     expect(e.provisional.length).toBeGreaterThan(0);
     expect(admitsProtection(e)).toBe(false);
+    expect(ensembleValidity(e)).toBe("contradicted");
     expect(admitsProtection(null)).toBe(false);
+    expect(ensembleValidity(null)).toBe("empty");
     const event = service.events.find((x) => x.kind === "contradiction");
     expect(event?.explanation).toMatch(/UNRELIABLE/);
     expect(event && "observationIds" in event ? event.observationIds.length : 0).toBeGreaterThan(0);
@@ -186,6 +189,33 @@ describe("forecast service", () => {
     expect(refreshed).not.toBe(a);
     expect(refreshed.version).toBe(2);
     expect(SIM_DEFAULTS.gridSize).toBe(64);
+  });
+
+  it("records version ancestry and observation-based weights without changing older versions", () => {
+    const service = new ForecastService(agent, map);
+    const first = service.update(snapshotOf("crew-1", [briefingObservation(map)], 0), 0);
+    const originalWeights = first.members.map((m) => m.weight);
+    const second = service.update(snapshotOf("crew-1", evidence(inPrior, 120_000), 120_000), 120_000);
+    expect(second.version).toBe(2);
+    expect(second.parentVersion).toBe(first.version);
+    expect(service.history.map((e) => e.version)).toEqual([1, 2]);
+    expect(service.getVersion(1)).toBe(first);
+    expect(second.observationIds!.length).toBeGreaterThan(first.observationIds!.length);
+    expect(second.members.reduce((sum, m) => sum + m.weight!, 0)).toBeCloseTo(1);
+    expect(second.members.every((m) => m.weight! > 0)).toBe(true);
+    expect(first.members.map((m) => m.weight)).toEqual(originalWeights);
+    const shared = second.members.find((m) => first.members.some((old) => old.id === m.id));
+    if (shared) expect(shared.weight).not.toBe(first.members.find((m) => m.id === shared.id)?.weight);
+  });
+
+  it("models dry fuels and downwind spotting as distinct candidate futures", () => {
+    const ctx = rolloutContext(map);
+    const base = { ...inPrior, initialProgress: 0, windShiftMs: Infinity };
+    const wet = rolloutIgnition(ctx, { ...base, moistureMultiplier: 1.3 }, 600_000, 5000);
+    const dry = rolloutIgnition(ctx, { ...base, moistureMultiplier: 0.7 }, 600_000, 5000);
+    const spotted = rolloutIgnition(ctx, { ...base, spotDistanceCells: 8, spotTimeMs: 200_000 }, 600_000, 5000);
+    expect(dry.some((t, i) => t < wet[i]!)).toBe(true);
+    expect(spotted.some((t, i) => t < wet[i]!)).toBe(true);
   });
 });
 

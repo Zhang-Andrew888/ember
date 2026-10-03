@@ -2,6 +2,8 @@
 // Must not: use hidden world state or truth seed
 export type {
   ForecastEnsemble,
+  ForecastParams,
+  ForecastParameterRanges,
   ForecastEvent,
   ForecastMember,
   ForecastReliability,
@@ -11,8 +13,9 @@ export type {
 } from "./types.js";
 export { DEFAULT_FORECAST_CONFIG, widenRanges, type ForecastConfig } from "./config.js";
 export { ForecastService, directlyObservedClosed, snapshotScopeHash } from "./service.js";
-export { admitsProtection, burnFractionAt, earliestIgnitionMs } from "./ensemble.js";
+export { admitsProtection, burnFractionAt, earliestIgnitionMs, ensembleValidity, type EnsembleValidity } from "./ensemble.js";
 export { fitMember, fitObservations, type FitObservation } from "./fit.js";
 export { rolloutContext, rolloutIgnition } from "./rollout.js";
 export { observeFire, briefingObservation, snapshotOf, type Observer } from "./testing.js";
 export { edgeArrivalBands, toCoordinatorForecastView } from "./coordinator-projection.js";
+export { calibrateArrivalPadding, arrivalCoverage, type ArrivalCalibrationCase } from "./calibration.js";

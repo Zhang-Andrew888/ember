@@ -62,6 +62,7 @@ function predicted(ign: number, t: number): number {
 
 export interface FitResult {
   readonly pass: boolean;
+  readonly disagreement: number;
   /** First observation the member could not explain, if any. */
   readonly failedObservationId: string | null;
 }
@@ -77,14 +78,18 @@ export function fitMember(
   startIndex = 0,
 ): FitResult {
   const ign = member.ignitionMs;
+  let mismatched = 0;
+  let compared = 0;
   for (let oi = startIndex; oi < observations.length; oi++) {
     const o = observations[oi]!;
     let mismatches = 0;
+    compared += o.cells.length;
     for (let i = 0; i < o.cells.length; i++) {
       const cell = o.cells[i]!;
       const want = o.states[i]!;
       if (predicted(ign[cell]!, o.timeMs) === want) continue;
       mismatches += 1;
+      mismatched += 1;
       const gx = cell % SIZE;
       const gy = (cell - gx) / SIZE;
       let explained = false;
@@ -99,11 +104,11 @@ export function fitMember(
           }
         }
       }
-      if (!explained) return { pass: false, failedObservationId: o.id };
+      if (!explained) return { pass: false, disagreement: 1, failedObservationId: o.id };
     }
-    if (mismatches / o.cells.length > tolerance) return { pass: false, failedObservationId: o.id };
+    if (mismatches / o.cells.length > tolerance) return { pass: false, disagreement: 1, failedObservationId: o.id };
   }
-  return { pass: true, failedObservationId: null };
+  return { pass: true, disagreement: compared === 0 ? 0 : mismatched / compared, failedObservationId: null };
 }
 
 /**

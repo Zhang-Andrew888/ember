@@ -17,7 +17,7 @@ describe("supported member cap", () => {
     const supported = [
       member("boundary-low", "boundary", 0.7, [0, 500, 500]),
       member("redundant", "rebuilt", 0.9, [0, 600, 600]),
-      member("early-east", "rebuilt", 1.0, [0, 100, 500]),
+      { ...member("early-east", "rebuilt", 1.0, [0, 100, 500]), weight: 0.0001 },
       member("early-west", "rebuilt", 1.1, [0, 500, 100]),
       member("boundary-high", "boundary", 1.3, [0, 500, 500]),
     ];

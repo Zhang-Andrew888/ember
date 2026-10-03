@@ -1,8 +1,7 @@
-import type { Rng} from "@ember/simulation/model";
-import { type FireParams } from "@ember/simulation/model";
-import type { ForecastConfig } from "./config.js";
+import type { Rng } from "@ember/simulation/model";
+import { priorRanges, type ForecastConfig } from "./config.js";
 import { rolloutEndFor, rolloutIgnition, type RolloutContext } from "./rollout.js";
-import type { ForecastMember, MemberKind, ParameterRanges } from "./types.js";
+import type { ForecastMember, ForecastParameterRanges, ForecastParams, MemberKind, ParameterRanges } from "./types.js";
 
 const RAD = Math.PI / 180;
 const NO_SHIFT_MS = 1e9;
@@ -13,13 +12,19 @@ export function paramsFrom(
   shiftMs: number,
   postShiftDeg: number,
   initialProgress: number,
-): FireParams {
+  moistureMultiplier = 1,
+  spotDistanceCells = 0,
+  spotTimeMs = Infinity,
+): ForecastParams {
   return {
     spreadMultiplier: mult,
     initialWindRad: windOffsetDeg * RAD,
     windShiftMs: shiftMs,
     postShiftWindRad: postShiftDeg * RAD,
     initialProgress,
+    moistureMultiplier,
+    spotDistanceCells,
+    spotTimeMs,
   };
 }
 
@@ -28,7 +33,7 @@ export function buildMember(
   config: ForecastConfig,
   id: string,
   kind: MemberKind,
-  params: FireParams,
+  params: ForecastParams,
   horizonEndMs: number,
 ): ForecastMember {
   return {
@@ -44,7 +49,7 @@ export function buildMember(
  * A member rolled out only to `untilMs`. Its predictions for any time up to `untilMs` equal a full
  * rollout's, so it can screen a candidate against observations at a fraction of the cost.
  */
-export function probeMember(ctx: RolloutContext, config: ForecastConfig, c: { id: string; kind: MemberKind; params: FireParams }, untilMs: number): ForecastMember {
+export function probeMember(ctx: RolloutContext, config: ForecastConfig, c: { id: string; kind: MemberKind; params: ForecastParams }, untilMs: number): ForecastMember {
   return {
     id: c.id,
     kind: c.kind,
@@ -58,7 +63,7 @@ export function probeMember(ctx: RolloutContext, config: ForecastConfig, c: { id
 export interface Candidate {
   readonly id: string;
   readonly kind: MemberKind;
-  readonly params: FireParams;
+  readonly params: ForecastParams;
 }
 
 /**
@@ -99,7 +104,7 @@ export function noShiftCandidates(ranges: ParameterRanges, prefix: string): Cand
 }
 
 export function sampledCandidates(
-  ranges: ParameterRanges,
+  ranges: ForecastParameterRanges,
   rng: Rng,
   count: number,
   prefix: string,
@@ -116,6 +121,9 @@ export function sampledCandidates(
         Math.round(rng.range(ranges.shiftTimeMs.min, ranges.shiftTimeMs.max) / 1000) * 1000,
         rng.range(ranges.postShiftDeg.min, ranges.postShiftDeg.max),
         rng.range(0, 0.5),
+        rng.range(ranges.moistureMultiplier.min, ranges.moistureMultiplier.max),
+        i % 4 === 0 ? Math.max(1, Math.round(rng.range(ranges.spotDistanceCells.min, ranges.spotDistanceCells.max))) : 0,
+        Math.round(rng.range(ranges.spotTimeMs.min, ranges.spotTimeMs.max) / 1000) * 1000,
       ),
     });
   }
@@ -124,13 +132,14 @@ export function sampledCandidates(
 
 /** The public prior: boundary cases, no-shift cases, and seeded samples up to memberCount. */
 export function priorCandidates(config: ForecastConfig, rng: Rng, prefix: string): Candidate[] {
-  const boundary = boundaryCandidates(config.prior, prefix);
-  const noShift = noShiftCandidates(config.prior, prefix);
+  const ranges = priorRanges(config);
+  const boundary = boundaryCandidates(ranges, prefix);
+  const noShift = noShiftCandidates(ranges, prefix);
   const rest = Math.max(0, config.memberCount - boundary.length - noShift.length);
-  return [...boundary, ...noShift, ...sampledCandidates(config.prior, rng, rest, prefix)];
+  return [...boundary, ...noShift, ...sampledCandidates(ranges, rng, rest, prefix)];
 }
 
-export function perturb(base: FireParams, rng: Rng, bounds: ParameterRanges, id: string): Candidate {
+export function perturb(base: ForecastParams, rng: Rng, bounds: ForecastParameterRanges, id: string): Candidate {
   const clamp = (v: number, r: { min: number; max: number }): number => Math.min(r.max, Math.max(r.min, v));
   const shift = Number.isFinite(base.windShiftMs) && base.windShiftMs < NO_SHIFT_MS / 2;
   return {
@@ -142,11 +151,14 @@ export function perturb(base: FireParams, rng: Rng, bounds: ParameterRanges, id:
       shift ? clamp(base.windShiftMs + rng.range(-15_000, 15_000), bounds.shiftTimeMs) : NO_SHIFT_MS,
       clamp(base.postShiftWindRad / RAD + rng.range(-3, 3), bounds.postShiftDeg),
       Math.min(0.5, Math.max(0, (base.initialProgress ?? 0) + rng.range(-0.05, 0.05))),
+      clamp((base.moistureMultiplier ?? 1) + rng.range(-0.04, 0.04), bounds.moistureMultiplier),
+      base.spotDistanceCells ?? 0,
+      base.spotTimeMs ?? Infinity,
     ),
   };
 }
 
-const EXTREME_KEYS = ["spreadMultiplier", "initialWindRad", "windShiftMs", "postShiftWindRad", "initialProgress"] as const;
+const EXTREME_KEYS = ["spreadMultiplier", "initialWindRad", "windShiftMs", "postShiftWindRad", "initialProgress", "moistureMultiplier", "spotDistanceCells", "spotTimeMs"] as const;
 
 /** Ids of members attaining a minimum or maximum of any uncertain parameter. */
 export function extremeIds(members: readonly ForecastMember[]): Set<string> {

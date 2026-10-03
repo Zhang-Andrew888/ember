@@ -24,7 +24,7 @@ Architectural decisions are in [docs/adr](docs/adr/README.md). The product speci
 
 ## Local development
 
-See **[DEVELOPMENT.md](DEVELOPMENT.md)** for install, mock vs live server, optional Grok Voice/intent env vars, and troubleshooting. Env templates: [apps/web/.env.example](apps/web/.env.example), [apps/server/.env.example](apps/server/.env.example).
+See **[DEVELOPMENT.md](DEVELOPMENT.md)** for install, mock vs live server, optional Grok Voice/intent, offline evaluation (`evaluate-cli`, `sensitivity-cli`, `nav-calibration-cli`), and troubleshooting. Env templates: [apps/web/.env.example](apps/web/.env.example), [apps/server/.env.example](apps/server/.env.example).
 
 ## Chosen stack
 
