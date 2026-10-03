@@ -8,7 +8,18 @@ import type { SiteProtectionStatus } from "../../../format/reports.js";
  */
 
 export type AgentState = CoordinatorAgentView["state"];
-export type AgentGlyph = "none" | "forward" | "back" | "work" | "warn" | "cross";
+/**
+ * What the screen calls an agent. The domain state has no "returning" value, so a crew heading back to
+ * its refuge reads as "approaching"; the plan phase in the coordinator view says which it really is.
+ */
+export type AgentDisplayState = AgentState | "returning";
+export type PlanPhase = "approach" | "work" | "return";
+
+/** Same state, except that an agent whose current plan is on its return leg is "returning". */
+export function displayState(state: AgentState, phase: PlanPhase | null | undefined): AgentDisplayState {
+  return state === "approaching" && phase === "return" ? "returning" : state;
+}
+export type AgentGlyph = "none" | "forward" | "back" | "return" | "work" | "warn" | "cross";
 
 export interface AgentCue {
   readonly glyph: AgentGlyph;
@@ -19,21 +30,22 @@ export interface AgentCue {
   readonly text: string;
 }
 
-const CUES: Record<AgentState, AgentCue> = {
+const CUES: Record<AgentDisplayState, AgentCue> = {
   idle: { glyph: "none", lying: false, muted: false, text: "idle" },
   approaching: { glyph: "forward", lying: false, muted: false, text: "approaching" },
+  returning: { glyph: "return", lying: false, muted: false, text: "returning" },
   working: { glyph: "work", lying: false, muted: false, text: "working" },
   withdrawing: { glyph: "back", lying: false, muted: false, text: "withdrawing" },
   retreating: { glyph: "warn", lying: false, muted: false, text: "retreating" },
   lost: { glyph: "cross", lying: true, muted: true, text: "lost" },
 };
 
-export function agentCue(state: AgentState): AgentCue {
+export function agentCue(state: AgentDisplayState): AgentCue {
   return CUES[state];
 }
 
 /** "Crew 1 · working": the label always spells the state out. */
-export function agentLabelText(callsign: string, state: AgentState): string {
+export function agentLabelText(callsign: string, state: AgentDisplayState): string {
   return `${callsign} · ${CUES[state].text}`;
 }
 

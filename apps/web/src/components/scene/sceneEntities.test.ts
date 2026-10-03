@@ -134,3 +134,22 @@ describe("components/scene/sceneEntities - agents sharing a node", () => {
     expect(direct.agents[0]!.position).toEqual(crew1.position);
   });
 });
+
+describe("components/scene/sceneEntities - agent display state", () => {
+  const crewState = (phase: "approach" | "work" | "return" | null) => {
+    const crew1 = fixtureCoordinatorView.agents.find((a) => a.id === "crew-1")!;
+    const plan = fixtureCoordinatorView.agentPlans[0]!;
+    const view = {
+      ...fixtureCoordinatorView,
+      agents: [{ ...crew1, state: "approaching" as const }],
+      agentPlans: phase === null ? [] : [{ ...plan, phase }],
+    };
+    return buildSceneEntities(view, scenarioMap).agents[0]!.state;
+  };
+
+  it("shows a crew on its return leg as returning, not approaching (the domain state has no returning)", () => {
+    expect(crewState("return")).toBe("returning");
+    expect(crewState("approach")).toBe("approaching");
+    expect(crewState(null)).toBe("approaching");
+  });
+});

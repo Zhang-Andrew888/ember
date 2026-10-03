@@ -366,6 +366,7 @@ export function App() {
         />
         <AgentRail
           agents={view?.agents ?? []}
+          plans={view?.agentPlans ?? []}
           selectedAgentId={selectedAgentId}
           onSelectAgent={setSelectedAgentId}
         />

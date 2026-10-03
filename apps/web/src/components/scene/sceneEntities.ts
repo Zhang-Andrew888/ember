@@ -10,13 +10,14 @@ import {
 } from "../../map/positions.js";
 import { buildForecastLayer, buildRouteLines, type ForecastLayer, type RouteLine } from "./sceneLayers.js";
 import { ageOf } from "./staleness.js";
+import { displayState, type AgentDisplayState } from "./models/markerCues.js";
 import { siteProtectionStatus, type SiteProtectionStatus } from "../../format/reports.js";
 
 export interface AgentMarker {
   readonly id: string;
   readonly callsign: string;
   readonly role: CoordinatorAgentView["role"];
-  readonly state: CoordinatorAgentView["state"];
+  readonly state: AgentDisplayState;
   readonly position: SceneVector;
   readonly heading: SceneHeading | null;
   /** Sim ms since the coordinator last heard from this agent (its position is that old). */
@@ -119,7 +120,7 @@ function resolveAgents(view: CoordinatorView, map: ScenarioMap): AgentMarker[] {
       id: agent.id,
       callsign: agent.callsign,
       role: agent.role,
-      state: agent.state,
+      state: displayState(agent.state, view.agentPlans.find((plan) => plan.agentId === agent.id)?.phase),
       position,
       heading,
       ageMs: ageOf(view.simTimeMs as number, agent.reportedAt as number),

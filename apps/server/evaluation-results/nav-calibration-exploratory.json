@@ -11,6 +11,8 @@
   "caveat": "Dev seeds only. Do not pick a preset by maximizing work delivered; use for sensitivity and documentation.",
   "presets": {
     "default": {
+      "name": "Default",
+      "description": "Baseline: every knob at its library default.",
       "nav": {},
       "switchMargin": 1.2,
       "switchCooldownMs": 30000,
@@ -33,6 +35,8 @@
       }
     },
     "buffer-tight": {
+      "name": "Tight safety buffer",
+      "description": "Safety buffer reduced to 25 s.",
       "nav": {
         "bufferMs": 25000
       },
@@ -57,6 +61,8 @@
       }
     },
     "buffer-loose": {
+      "name": "Loose safety buffer",
+      "description": "Safety buffer raised to 35 s.",
       "nav": {
         "bufferMs": 35000
       },
@@ -81,6 +87,8 @@
       }
     },
     "work-finer": {
+      "name": "Finer work intervals",
+      "description": "Minimum work interval and work step both 15 s, so shorter jobs are considered.",
       "nav": {
         "minWorkMs": 15000,
         "workStepMs": 15000
@@ -106,6 +114,8 @@
       }
     },
     "switch-eager": {
+      "name": "Eager mission switching",
+      "description": "Switch to a better mission at a 1.15 margin after a 25 s cooldown.",
       "switchMargin": 1.15,
       "switchCooldownMs": 25000,
       "summary": {
@@ -127,6 +137,8 @@
       }
     },
     "switch-cautious": {
+      "name": "Cautious mission switching",
+      "description": "Switch only at a 1.25 margin after a 35 s cooldown.",
       "switchMargin": 1.25,
       "switchCooldownMs": 35000,
       "summary": {

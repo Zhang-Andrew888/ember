@@ -9,6 +9,7 @@ import { grokIntentEnabled, grokVoiceEnabled } from "./xai/env.js";
 import { transcribeAudio } from "./xai/stt.js";
 import type { MonotonicClock } from "./runner.js";
 import type { ClientId } from "./hub.js";
+import { allowedHostsFromEnv, isAllowedHostHeader, isAllowedOrigin } from "./origin-guard.js";
 
 const FLUSH_EVERY_MS = 200;
 const MAX_MESSAGE_BYTES = 64 * 1024;
@@ -61,6 +62,11 @@ function tokenFromQuery(url: string | undefined): string | undefined {
   return new URLSearchParams(q).get("token") ?? undefined;
 }
 
+/** A header that Node may deliver as a list; only the first value matters for these checks. */
+function firstHeader(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
+
 function errorText(error: unknown): string {
   return error instanceof Error ? (error.stack ?? error.message) : String(error);
 }
@@ -74,8 +80,15 @@ export async function startHttpApp(options: { port?: number; clock?: MonotonicCl
   const registry = new IncidentRegistry(options.seed);
   const fastify = Fastify({ logger: false });
   const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_MESSAGE_BYTES });
+  const extraHosts = allowedHostsFromEnv(process.env.EMBER_ALLOWED_HOSTS);
   const sockets = new Map<WebSocket, { clientId: ClientId; record: NonNullable<ReturnType<IncidentRegistry["get"]>> }>();
   let closing = false;
+
+  // DNS-rebinding defence: refuse requests whose Host is a DNS name we do not serve (origin-guard.ts).
+  fastify.addHook("onRequest", async (req, reply) => {
+    if (!isAllowedHostHeader(req.headers.host, extraHosts)) return reply.code(403).send({ error: "host_not_allowed" });
+    return undefined;
+  });
 
   fastify.get("/health", async () => ({
     ok: true as const,
@@ -182,6 +195,16 @@ export async function startHttpApp(options: { port?: number; clock?: MonotonicCl
       rawSocket.destroy();
       return;
     }
+    // Cross-site WebSocket and DNS-rebinding defence, before any routing or auth.
+    if (
+      !isAllowedHostHeader(firstHeader(request.headers.host), extraHosts) ||
+      !isAllowedOrigin(firstHeader(request.headers.origin), extraHosts)
+    ) {
+      rawSocket.write("HTTP/1.1 403 Forbidden\r\n\r\n", () => {
+        rawSocket.destroy();
+      });
+      return;
+    }
     let route: ReturnType<typeof parseIncidentPath>;
     try {
       route = parseIncidentPath(request.url);
@@ -233,6 +256,9 @@ export async function startHttpApp(options: { port?: number; clock?: MonotonicCl
       if (!record.started) continue;
       record.live.safePump();
       registry.prepareReplay(record);
+    }
+    for (const dropped of registry.sweep(clock.nowMs())) {
+      for (const [ws, entry] of sockets) if (entry.record === dropped) ws.close(1001, "incident expired");
     }
     for (const ws of [...sockets.keys()]) {
       try {
