@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { RootState } from "@react-three/fiber";
 import type { Camera } from "three";
 import { SceneCanvas } from "./SceneCanvas.js";
@@ -29,6 +29,19 @@ export function SceneView({ entities, selectedAgentId, onInspectAgent, reducedMo
   const handleReady = useCallback((state: RootState) => {
     setRenderContext({ camera: state.camera, canvasElement: state.gl.domElement });
   }, []);
+
+  const entitiesRef = useRef(entities);
+  entitiesRef.current = entities;
+
+  // Selecting an agent (from the map or the agent rail) re-centers the
+  // camera once; it must not fight the user's own pan on every snapshot,
+  // so this only reacts to a changed selection, not to every tick's entities.
+  useEffect(() => {
+    if (!selectedAgentId) return;
+    const agent = entitiesRef.current.agents.find((candidate) => candidate.id === selectedAgentId);
+    if (!agent) return;
+    controlsRef.current?.focusOn(agent.position.x, agent.position.z);
+  }, [selectedAgentId]);
 
   const labels = useMemo<LabelDescriptor[]>(() => {
     const refugeLabels = listRefugeNodes(scenarioMap).map((refuge) => ({

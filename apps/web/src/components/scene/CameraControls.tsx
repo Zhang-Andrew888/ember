@@ -4,6 +4,8 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
 export interface CameraControlsHandle {
   reset(): void;
+  /** Re-centers the orbit target on a ground point, preserving current zoom/tilt. */
+  focusOn(x: number, z: number): void;
 }
 
 export interface CameraControlsProps {
@@ -48,8 +50,16 @@ export const CameraControls = forwardRef<CameraControlsHandle, CameraControlsPro
     ref,
     () => ({
       reset: () => controls.reset(),
+      focusOn: (x, z) => {
+        const deltaX = x - controls.target.x;
+        const deltaZ = z - controls.target.z;
+        controls.target.set(x, 0, z);
+        camera.position.x += deltaX;
+        camera.position.z += deltaZ;
+        controls.update();
+      },
     }),
-    [controls],
+    [controls, camera],
   );
 
   useFrame(() => {
