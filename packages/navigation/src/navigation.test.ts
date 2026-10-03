@@ -242,6 +242,16 @@ describe("certifying committed plans", () => {
     expect(result.ok).toBe(false);
   });
 
+  it("treats an agent held at a node past its planned departure as departing now", () => {
+    // Nothing is forecast to ignite for a while, but the first road closes to departures after ~140 s.
+    const ens = makeEnsemble(map, [{ id: "a", ignition: ignite(road, ["e-rw-j1"], 170_000) }]);
+    const onTime = certifyPlan({ ...input, ensemble: ens, nowMs: 0 });
+    expect(onTime.ok).toBe(true);
+    const held = certifyPlan({ ...input, ensemble: ens, nowMs: 200_000 });
+    expect(held.ok).toBe(false);
+    expect(held.failure?.kind).toBe("leg");
+  });
+
   it("does not certify from an unreliable ensemble", () => {
     const result = certifyPlan({ ...input, ensemble: makeEnsemble(map, [{ id: "a" }], { reliability: "unreliable" }) });
     expect(result.failure?.kind).toBe("forecast_unreliable");
