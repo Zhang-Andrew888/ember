@@ -1,8 +1,10 @@
 import type { NavConfig } from "@ember/navigation";
 import { DEFAULT_NAV_CONFIG } from "@ember/navigation";
 import { SIM_DEFAULTS } from "@ember/simulation/model";
-// zod: crew attributes are validated at the boundary where profiles are loaded from config.
-// The workspace already pins zod 3.24.2 in domain/simulation; agents had no direct dependency.
+// New direct dependency (zod 3.24.2, same pin as domain/simulation). Why the workspace is not enough:
+// pnpm resolves strictly, so domain's zod is not importable from packages/agents, and @ember/domain
+// does not re-export `z` (and packages/domain may not be edited by this lane). Crew attributes are
+// validated where profiles are loaded from configuration, which is a boundary.
 import { z } from "zod";
 
 /** Crew-internal kinds. The wire role (`AgentRole` in @ember/domain) stays protection_crew | scout. */
