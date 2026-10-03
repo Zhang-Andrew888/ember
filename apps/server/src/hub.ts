@@ -14,6 +14,8 @@ export type ClientId = number;
 /** Slow clients must reconnect after overflow; a reading client drains every flush (~200 ms). */
 const MAX_OUTBOX_MESSAGES = 4096;
 
+export const TECHNICAL_FAILURE_DETAIL = "A technical problem occurred on the server.";
+
 export class SessionHub {
   private readonly outboxes = new Map<ClientId, string[]>();
   /** Clients dropped because their outbound queue overflowed (backpressure). */
@@ -82,6 +84,11 @@ export class SessionHub {
 
   private broadcast(message: ServerMessage): void {
     for (const id of [...this.outboxes.keys()]) this.send(id, message);
+  }
+
+  /** Fixed-text notice: error details stay in the server log, never on the wire. */
+  notifyTechnicalFailure(): void {
+    this.broadcast({ type: "notice", kind: "technical_failure", detail: TECHNICAL_FAILURE_DETAIL });
   }
 
   handle(id: ClientId, raw: string, wallMs: number): void {
@@ -166,6 +173,7 @@ export class SessionHub {
 export class LiveRun {
   readonly failures: TechnicalFailure[] = [];
   private startedAt: number | null = null;
+  private halted = false;
 
   constructor(
     readonly session: IncidentSession,
@@ -181,6 +189,31 @@ export class LiveRun {
 
   start(): void {
     if (this.startedAt === null) this.startedAt = this.clock.nowMs();
+  }
+
+  /** True once a pump threw; the incident is frozen and clients were told once. */
+  get isHalted(): boolean {
+    return this.halted;
+  }
+
+  /**
+   * Pump that never throws. The world is only advanced by `pump`, so after an exception its state
+   * can't be trusted: stop pumping this incident, tell clients once, and keep serving the process.
+   */
+  safePump(): void {
+    if (this.halted) return;
+    try {
+      this.pump();
+    } catch (error) {
+      this.halted = true;
+      this.failures.push({ kind: "internal_error", atWallMs: this.wallElapsedMs });
+      process.stderr.write(`ember-server: incident pump failed: ${error instanceof Error ? (error.stack ?? error.message) : String(error)}\n`);
+      try {
+        this.hub.notifyTechnicalFailure();
+      } catch {
+        // Notifying is best effort; the halt above already protects the process.
+      }
+    }
   }
 
   pump(): void {
