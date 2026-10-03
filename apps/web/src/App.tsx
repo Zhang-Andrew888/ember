@@ -99,33 +99,45 @@ export function App() {
     return <Briefing onStart={handleStart} starting={starting} />;
   }
 
+  const hasEnded = Boolean(view?.incidentEnd);
+
   return (
     <div className="app-layout">
-      <TopBar
-        simTimeMs={view ? (view.simTimeMs as number) : null}
-        wallElapsedMs={view ? (view.wallElapsedMs as number) : null}
-        connectionStatus={connectionStatus}
-      />
-      <div className="app-layout__main">
-        <SceneView
-          entities={entities}
-          selectedAgentId={selectedAgentId}
-          onInspectAgent={setSelectedAgentId}
-          reducedMotion={reducedMotion}
+      {/*
+        docs/FRONTEND.md: "freeze scene ... cancel unapplied commands" once
+        ended. `inert` removes this whole region from the tab order and the
+        accessibility tree (and blocks pointer events) while the end
+        overlay is up - found live via Playwright that without it, Tab
+        still reached the composer input and every scene control hidden
+        behind the modal, including the message box.
+      */}
+      <div className="app-layout__content" inert={hasEnded || undefined}>
+        <TopBar
           simTimeMs={view ? (view.simTimeMs as number) : null}
+          wallElapsedMs={view ? (view.wallElapsedMs as number) : null}
+          connectionStatus={connectionStatus}
         />
-        <ConversationPanel
-          reports={view ? routineReports(view) : []}
-          activeRecipientCallsign={activeRecipientCallsign}
-          onSendMessage={handleSendMessage}
+        <div className="app-layout__main">
+          <SceneView
+            entities={entities}
+            selectedAgentId={selectedAgentId}
+            onInspectAgent={setSelectedAgentId}
+            reducedMotion={reducedMotion}
+            simTimeMs={view ? (view.simTimeMs as number) : null}
+          />
+          <ConversationPanel
+            reports={view ? routineReports(view) : []}
+            activeRecipientCallsign={activeRecipientCallsign}
+            onSendMessage={handleSendMessage}
+          />
+        </div>
+        <UrgentStrip report={view ? latestUrgentReport(view) : null} audioState="idle" />
+        <AgentRail
+          agents={view?.agents ?? []}
+          selectedAgentId={selectedAgentId}
+          onSelectAgent={setSelectedAgentId}
         />
       </div>
-      <UrgentStrip report={view ? latestUrgentReport(view) : null} audioState="idle" />
-      <AgentRail
-        agents={view?.agents ?? []}
-        selectedAgentId={selectedAgentId}
-        onSelectAgent={setSelectedAgentId}
-      />
       {view?.incidentEnd ? <EndOverlay incidentEnd={view.incidentEnd} onStartAgain={handleStartAgain} /> : null}
     </div>
   );

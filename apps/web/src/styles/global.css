@@ -89,6 +89,10 @@ input {
   flex-direction: column;
 }
 
+.app-layout__content {
+  display: contents;
+}
+
 .app-layout__main {
   flex: 1;
   display: flex;
