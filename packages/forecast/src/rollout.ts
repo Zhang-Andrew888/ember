@@ -47,11 +47,12 @@ function paramKey(ctx: RolloutContext, p: FireParams, stepMs: number): string {
  * Ignition is recorded at the start of the step in which it happens, so timing errs early
  * (conservative). Results are cached per parameter set and extended on demand.
  */
-export function rolloutIgnition(ctx: RolloutContext, params: FireParams, endMs: number, stepMs: number): Float64Array {
+export function rolloutIgnition(ctx: RolloutContext, params: FireParams, endMs: number, stepMs: number, exact = false): Float64Array {
   const key = paramKey(ctx, params, stepMs);
   const hit = cache.get(key);
   if (hit !== undefined && hit.endMs >= endMs) return hit.ign;
-  const target = Math.max(ROLLOUT_FLOOR_MS, Math.ceil(endMs / ROUND_MS) * ROUND_MS);
+  // `exact` rolls out only as far as asked: a cheap probe whose early times are identical to a full rollout.
+  const target = exact ? Math.ceil(endMs / stepMs) * stepMs : Math.max(ROLLOUT_FLOOR_MS, Math.ceil(endMs / ROUND_MS) * ROUND_MS);
   const field = new FireField(ctx.terrain, ctx.nonburnable);
   field.ignite(ctx.initialCells, 0, params.initialProgress ?? 0);
   for (let t = stepMs; t <= target; t += stepMs) field.step(t, stepMs, params);

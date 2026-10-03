@@ -7,6 +7,7 @@ import {
   boundaryCandidates,
   buildMember,
   extremeIds,
+  probeMember,
   noShiftCandidates,
   perturb,
   priorCandidates,
@@ -205,9 +206,24 @@ export class ForecastService {
   ): { members: ForecastMember[]; firstFailure: string | null } {
     const members: ForecastMember[] = [];
     let firstFailure: string | null = null;
+    const lastObsMs = fitObs.reduce((m, o) => Math.max(m, o.timeMs), 0);
     for (const c of candidates) {
-      const member =
-        "ignitionMs" in c ? c : buildMember(this.ctx, this.config, c.id, c.kind, c.params, horizonEndMs);
+      let member: ForecastMember;
+      if ("ignitionMs" in c) {
+        member = c;
+      } else {
+        // Screen with a short rollout; only supported candidates pay for the full horizon.
+        const probe = probeMember(this.ctx, this.config, c, lastObsMs);
+        const screen = fitMember(probe, fitObs, this.config.disagreementTolerance);
+        if (!screen.pass) {
+          if (firstFailure === null) firstFailure = screen.failedObservationId;
+          continue;
+        }
+        member = buildMember(this.ctx, this.config, c.id, c.kind, c.params, horizonEndMs);
+        this.verified.set(member, { generation: this.accum.generation, upTo: fitObs.length });
+        members.push(member);
+        continue;
+      }
       const seen = this.verified.get(member);
       const from = seen !== undefined && seen.generation === this.accum.generation ? seen.upTo : 0;
       const fit = fitMember(member, fitObs, this.config.disagreementTolerance, from);
@@ -249,11 +265,11 @@ export class ForecastService {
       const base = supported[attempts % supported.length]!;
       const cand = perturb(base.params, rng, bounds, `${base.id}~${attempts}`);
       attempts += 1;
+      const lastObsMs = fitObs.reduce((m, o) => Math.max(m, o.timeMs), 0);
+      if (!fitMember(probeMember(this.ctx, this.config, cand, lastObsMs), fitObs, this.config.disagreementTolerance).pass) continue;
       const member = buildMember(this.ctx, this.config, cand.id, cand.kind, cand.params, horizonEndMs);
-      if (fitMember(member, fitObs, this.config.disagreementTolerance).pass) {
-        this.verified.set(member, { generation: this.accum.generation, upTo: fitObs.length });
-        members.push(member);
-      }
+      this.verified.set(member, { generation: this.accum.generation, upTo: fitObs.length });
+      members.push(member);
     }
     return members;
   }

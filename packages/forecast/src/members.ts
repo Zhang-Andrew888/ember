@@ -40,6 +40,20 @@ export function buildMember(
   };
 }
 
+/**
+ * A member rolled out only to `untilMs`. Its predictions for any time up to `untilMs` equal a full
+ * rollout's, so it can screen a candidate against observations at a fraction of the cost.
+ */
+export function probeMember(ctx: RolloutContext, config: ForecastConfig, c: { id: string; kind: MemberKind; params: FireParams }, untilMs: number): ForecastMember {
+  return {
+    id: c.id,
+    kind: c.kind,
+    params: c.params,
+    ignitionMs: rolloutIgnition(ctx, c.params, untilMs + config.rolloutStepMs, config.rolloutStepMs, true),
+    rolloutEndMs: untilMs,
+  };
+}
+
 /** Parameter descriptions without rollouts, so candidates can be screened cheaply. */
 export interface Candidate {
   readonly id: string;
