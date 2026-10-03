@@ -372,7 +372,9 @@ export class Incident {
     }
     const view = {
       protocolVersion: WIRE_PROTOCOL_VERSION,
-      sequence: this.eventSequence,
+      // Rises with every authoritative step as well as every event, so a client that orders views by
+      // sequence never discards a newer snapshot while agents hold and nothing is being observed.
+      sequence: this.eventSequence + this.stepCount,
       simTimeMs: now,
       wallElapsedMs: this.wallMs,
       incidentStatus: this.ended ? "ended" : "active",

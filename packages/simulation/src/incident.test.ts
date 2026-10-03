@@ -249,3 +249,22 @@ describe("knowledge scoping and relay", () => {
     expect(inc.projectAgent(crew1).knowledge.observations.length).toBe(before);
   });
 });
+
+describe("coordinator view sequence", () => {
+  it("rises with every step even when nothing new is observed (clients order views by it)", () => {
+    // Fire far from every agent, site and road: no observations after the briefing.
+    const inc = new Incident({ scenario: small(farFire()), seed: "seq", overrides: noWindShift });
+    const seen: number[] = [];
+    for (let t = 1_000; t <= 20_000; t += 1_000) {
+      inc.advanceTo(t);
+      seen.push(inc.projectCoordinator().sequence);
+    }
+    for (let i = 1; i < seen.length; i += 1) expect(seen[i]!).toBeGreaterThan(seen[i - 1]!);
+  });
+
+  it("keeps the same sequence for repeated projections of the same state", () => {
+    const inc = new Incident({ scenario: small(farFire()), seed: "seq2", overrides: noWindShift });
+    inc.advanceTo(5_000);
+    expect(inc.projectCoordinator().sequence).toBe(inc.projectCoordinator().sequence);
+  });
+});

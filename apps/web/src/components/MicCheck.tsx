@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { MicPermissionState } from "../net/voiceCapture.js";
 
 export interface MicCheckProps {
@@ -8,20 +8,33 @@ export interface MicCheckProps {
 const LABEL: Record<MicPermissionState, string> = {
   unknown: "Not checked yet",
   granted: "Microphone available",
-  denied: "Microphone blocked — use text input",
-  unsupported: "Microphone not available in this browser — use text input",
+  denied: "Microphone blocked, use text input",
+  unsupported: "Microphone not available in this browser, use text input",
 };
 
+/**
+ * Microphone status for the briefing. The browser's permission prompt only appears when the presenter
+ * presses "Check microphone", never as a side effect of loading the page (issue #51).
+ */
 export function MicCheck({ onProbe }: MicCheckProps) {
   const [state, setState] = useState<MicPermissionState>("unknown");
+  const [checking, setChecking] = useState(false);
 
-  useEffect(() => {
-    void onProbe().then(setState);
-  }, [onProbe]);
+  const check = () => {
+    setChecking(true);
+    void onProbe()
+      .then(setState)
+      .finally(() => setChecking(false));
+  };
 
   return (
-    <p className="briefing__mic-status" role="status">
-      {LABEL[state]}. Push-to-talk uses demo speech capture until Grok Voice is connected; text input always works.
-    </p>
+    <div className="briefing__mic">
+      <p className="briefing__mic-status" role="status">
+        {LABEL[state]}. Push-to-talk uses demo speech capture until Grok Voice is connected; text input always works.
+      </p>
+      <button type="button" onClick={check} disabled={checking}>
+        {checking ? "Checking…" : "Check microphone"}
+      </button>
+    </div>
   );
 }

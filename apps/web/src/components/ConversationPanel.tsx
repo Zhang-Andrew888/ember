@@ -245,8 +245,8 @@ export function ConversationPanel({
         </span>
         <div aria-live="polite" className="conversation-panel__speech-ack">
           {showOutgoingAck ? `🔊 ${speechSnapshot.text}` : ""}
-          {speechSnapshot.queuedUrgent ? " — urgent audio queued" : ""}
-          {speechSnapshot.queuedRoutineCount > 0 ? ` — ${speechSnapshot.queuedRoutineCount} routine queued` : ""}
+          {speechSnapshot.queuedUrgent ? ", urgent audio queued" : ""}
+          {speechSnapshot.queuedRoutineCount > 0 ? `, ${speechSnapshot.queuedRoutineCount} routine queued` : ""}
         </div>
       </form>
     </section>

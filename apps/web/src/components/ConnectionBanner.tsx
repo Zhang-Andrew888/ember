@@ -6,8 +6,8 @@ export interface ConnectionBannerProps {
 
 const MESSAGE: Record<Exclude<ConnectionStatus, "open">, string> = {
   connecting: "Connecting to incident channel…",
-  closed: "Connection lost. Reconnecting — messages are paused until the channel is back.",
-  error: "Connection error. Retrying — messages are paused until the channel is back.",
+  closed: "Connection lost. Reconnecting. Messages are paused until the channel is back.",
+  error: "Connection error. Retrying. Messages are paused until the channel is back.",
 };
 
 /** Visible disconnect / reconnect state (feat/web-ui); complements the top-bar status line. */

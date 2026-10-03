@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from "react";
-import { BufferGeometry, Float32BufferAttribute, MeshLambertMaterial, MeshStandardMaterial, Uint32BufferAttribute } from "three";
+import { BufferGeometry, CanvasTexture, Float32BufferAttribute, MeshLambertMaterial, MeshStandardMaterial, SRGBColorSpace, Uint32BufferAttribute } from "three";
 import { useQuality } from "./quality/QualityContext.js";
 import { sceneTerrain, waterCells, waterLevel } from "./terrain/sceneTerrain.js";
 import { fuelDensity, terrainColor } from "./terrain/terrainColor.js";
@@ -68,7 +68,62 @@ export function Terrain() {
         <primitive object={groundMaterial} attach="material" />
       </mesh>
       <Water />
+      <Apron />
     </>
+  );
+}
+
+/** Ground beyond the map fades from a dim edge tone to near-black, so it reads as the map's surround. */
+const APRON_OUTER = [0.086, 0.125, 0.114] as const;
+const APRON_SPAN = 3; // the apron is this many map-widths across
+const APRON_TEXTURE_SIZE = 128;
+
+function createApronTexture(): CanvasTexture | null {
+  if (typeof document === "undefined") return null;
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = APRON_TEXTURE_SIZE;
+  const ctx = canvas.getContext("2d");
+  if (ctx === null) return null;
+  const inner = terrainColor(0.35, 0.3);
+  const edge = [inner[0] * 0.5, inner[1] * 0.5, inner[2] * 0.5];
+  const image = ctx.createImageData(APRON_TEXTURE_SIZE, APRON_TEXTURE_SIZE);
+  const half = APRON_TEXTURE_SIZE / 2;
+  const innerHalf = half / APRON_SPAN; // the map's own footprint, half-width in texels
+  const fade = half - innerHalf;
+  for (let y = 0; y < APRON_TEXTURE_SIZE; y++) {
+    for (let x = 0; x < APRON_TEXTURE_SIZE; x++) {
+      const dx = Math.abs(x + 0.5 - half) - innerHalf;
+      const dy = Math.abs(y + 0.5 - half) - innerHalf;
+      const t = Math.min(1, Math.max(0, Math.max(dx, dy) / fade));
+      const k = t * t * (3 - 2 * t); // smoothstep
+      const o = (y * APRON_TEXTURE_SIZE + x) * 4;
+      for (let c = 0; c < 3; c++) image.data[o + c] = Math.round(255 * (edge[c]! + (APRON_OUTER[c]! - edge[c]!) * k));
+      image.data[o + 3] = 255;
+    }
+  }
+  ctx.putImageData(image, 0, 0);
+  const texture = new CanvasTexture(canvas);
+  texture.colorSpace = SRGBColorSpace;
+  return texture;
+}
+
+/**
+ * A large unlit plane just below the lowest terrain corner. Without it, wide canvases show hard
+ * background-coloured bands past the map edge (issue #52); with it, the edge fades out softly.
+ */
+function Apron() {
+  const y = useMemo(() => {
+    let lowest = Infinity;
+    for (const height of sceneTerrain.corners) lowest = Math.min(lowest, height);
+    return (Number.isFinite(lowest) ? lowest : 0) - 2;
+  }, []);
+  const texture = useMemo(createApronTexture, []);
+  useEffect(() => () => texture?.dispose(), [texture]);
+  return (
+    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, y, 0]}>
+      <planeGeometry args={[SCENE_SIZE * APRON_SPAN, SCENE_SIZE * APRON_SPAN]} />
+      <meshBasicMaterial color={texture ? "#ffffff" : "#16201d"} map={texture} fog={false} />
+    </mesh>
   );
 }
 

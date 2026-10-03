@@ -119,8 +119,8 @@ function bandLabel(earliest: number | null, latest: number | null, simTimeMs: nu
 
 const HEADLINE: Record<ForecastReliability, (members: number) => string> = {
   reliable: (members) => `Forecast reliable (${members} supported scenarios)`,
-  unreliable: () => "Forecast unreliable — treat bands as unknown",
-  rebuilding: () => "Forecast rebuilding — bands may change",
+  unreliable: () => "Forecast unreliable: treat bands as unknown",
+  rebuilding: () => "Forecast rebuilding: bands may change",
 };
 
 /** Null before the coordinator's first forecast build. */

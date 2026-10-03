@@ -111,6 +111,13 @@ function parseViewMessage(message: Record<string, unknown>): WireView | null {
   return { type: "view", view: view.data };
 }
 
+/**
+ * Server message types this client deliberately does not act on (issue #52): the transcript and the
+ * coordinator view already carry the same facts (`decision` is spoken through transcripts, `ended` is
+ * `view.incidentEnd`), and `inspection` has no screen yet. They parse to null on purpose.
+ */
+export const INTENTIONALLY_IGNORED_WIRE_TYPES: readonly string[] = ["decision", "ended", "inspection"];
+
 export function parseServerWireMessage(raw: string): ServerWireMessage | null {
   try {
     const data = JSON.parse(raw) as unknown;

@@ -1,5 +1,5 @@
-import { forwardRef, useMemo } from "react";
-import { Canvas, type RootState } from "@react-three/fiber";
+import { forwardRef, useMemo, useRef } from "react";
+import { Canvas, useFrame, type RootState } from "@react-three/fiber";
 import { Terrain } from "./Terrain.js";
 import { Trees } from "./Trees.js";
 import { Fire } from "./Fire.js";
@@ -34,11 +34,25 @@ export interface SceneCanvasProps {
   readonly onInspectAgent: (agentId: string) => void;
   readonly onInspectCell: (cell: FireCellMarker) => void;
   readonly onReady: (state: RootState) => void;
+  /** Called once, after the first frame has been drawn (shaders compiled, geometry uploaded). */
+  readonly onFirstFrame?: () => void;
   readonly reducedMotion: boolean;
 }
 
+/** Fires `onFirstFrame` once the first frame has been rendered, so the page can drop its loading cover. */
+function FirstFrame({ onFirstFrame }: { readonly onFirstFrame: () => void }) {
+  const done = useRef(false);
+  useFrame(() => {
+    if (done.current) return;
+    done.current = true;
+    // useFrame runs before the draw; wait one animation frame so the picture is actually on screen.
+    requestAnimationFrame(() => requestAnimationFrame(onFirstFrame));
+  });
+  return null;
+}
+
 export const SceneCanvas = forwardRef<CameraControlsHandle, SceneCanvasProps>(function SceneCanvas(
-  { entities, showFireCells, showRoutes, showForecast, selectedAgentId, followTarget, onUserPan, onInspectAgent, onInspectCell, onReady, reducedMotion },
+  { entities, showFireCells, showRoutes, showForecast, selectedAgentId, followTarget, onUserPan, onInspectAgent, onInspectCell, onReady, onFirstFrame, reducedMotion },
   controlsRef,
 ) {
   const qualityState = useQualityState();
@@ -84,6 +98,7 @@ export const SceneCanvas = forwardRef<CameraControlsHandle, SceneCanvasProps>(fu
         shadow-camera-far={1800}
         shadow-bias={-0.0006}
       />
+      {onFirstFrame ? <FirstFrame onFirstFrame={onFirstFrame} /> : null}
       <RenderPipeline config={quality} params={params} autoEnabled={qualityState.mode === "auto"} />
       <QualityProvider value={quality}>
       <Terrain />
