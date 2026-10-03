@@ -145,6 +145,9 @@ importers:
       '@ember/domain':
         specifier: workspace:*
         version: link:../domain
+      '@ember/simulation':
+        specifier: workspace:*
+        version: link:../simulation
 
   packages/simulation:
     dependencies:

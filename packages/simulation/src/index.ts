@@ -14,3 +14,4 @@ export {
   type SimNotice,
 } from "./world.js";
 export * from "./record.js";
+export { canonicalJson, hashText, hashValue } from "./model/index.js";

@@ -15,6 +15,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@ember/domain": "workspace:*"
+    "@ember/domain": "workspace:*",
+    "@ember/simulation": "workspace:*"
   }
 }
