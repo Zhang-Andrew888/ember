@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { useThree, type ThreeEvent } from "@react-three/fiber";
 import { Color, Object3D, type InstancedMesh } from "three";
 import type { FireCellMarker } from "./sceneEntities.js";
+import { sceneTerrain } from "./terrain/sceneTerrain.js";
 import { colors } from "../../styles/colors.js";
 
 const CELL_SIZE = 14;
@@ -81,7 +82,7 @@ function FireCellGroup({
     const mesh = meshRef.current;
     if (!mesh) return;
     cells.forEach((cell, index) => {
-      dummy.position.set(cell.position.x, CELL_Y, cell.position.z);
+      dummy.position.set(cell.position.x, sceneTerrain.groundY(cell.position.x, cell.position.z) + CELL_Y, cell.position.z);
       dummy.scale.setScalar(1);
       dummy.updateMatrix();
       mesh.setMatrixAt(index, dummy.matrix);
@@ -108,7 +109,7 @@ function FireCellGroup({
       if (!mesh) return;
       const pulse = 1 + Math.sin((performance.now() / 1000) * 3) * 0.08;
       cells.forEach((cell, index) => {
-        dummy.position.set(cell.position.x, CELL_Y, cell.position.z);
+        dummy.position.set(cell.position.x, sceneTerrain.groundY(cell.position.x, cell.position.z) + CELL_Y, cell.position.z);
         dummy.scale.setScalar(pulse);
         dummy.updateMatrix();
         mesh.setMatrixAt(index, dummy.matrix);

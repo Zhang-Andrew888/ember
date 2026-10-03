@@ -16,7 +16,7 @@ export interface LabelDescriptor {
   readonly y: number;
   readonly z: number;
   readonly text: string;
-  readonly variant: "agent" | "site" | "refuge";
+  readonly variant: "agent" | "site" | "refuge" | "route" | "forecast";
 }
 
 export interface SceneLabelLayerProps {

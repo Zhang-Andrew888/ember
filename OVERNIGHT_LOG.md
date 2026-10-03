@@ -1407,3 +1407,70 @@ status, testing performed, and explicit merge instructions) and, at
 finer grain with the reasoning behind every non-obvious decision, in the
 log entries above this one in this same file. Nothing is pending beyond
 human review: `lane/web` is green, pushed, and PR'd.
+
+# feat/web-scene
+
+Branch `feat/web-scene`, created from the checked-out branch `claude/upbeat-carson-qdm8ud`. That branch already
+contains all of `origin/lane/web` plus 58 newer commits from `main` (contract sync, #7), so the PR into `lane/web`
+will also show those main commits. Andrew authorised this branch explicitly (AGENTS.md still lists two lanes).
+
+## Setup notes
+- `pnpm` via corepack is broken in this VM (cached 12.8.1 ships `pnpm.mjs`, shim wants `pnpm.cjs`). Used the
+  installed pnpm 10.28.0 through a wrapper outside the repo. `pnpm install --frozen-lockfile` succeeds.
+- Contract status: `packages/domain` on this branch ALREADY has `agentPlans` (#1) and `coordinatorForecast` (#2).
+  So item 1 uses the real fields; no local "pending contract" types are needed.
+- Item 2 risk: `scenarios/` holds only `scenario-v1.placeholder.json` (all `PENDING`, no coordinates). The synthetic
+  topology exists only as code in sim-lane `packages/simulation/src/scenario.ts`. Decision recorded below at item 2.
+- Art direction saved at `apps/web/ART_DIRECTION.md`.
+
+### Commit 1: art direction file
+Changed: added `apps/web/ART_DIRECTION.md`. Blocked: nothing. Next: item 1 (route + forecast layers).
+
+### Commit 2: item 1 - route emphasis + forecast layers (real domain fields)
+Changed: `sceneLayers.ts` (pure builders from `agentPlans` / `coordinatorForecast`), `ribbon.ts` (polyline ribbon
+geometry), `patternTextures.ts`, `RouteLayer.tsx`, `ForecastLayer.tsx`, legend toggles + reliability line, labels.
+Phase is carried by pattern (chevrons = approach, solid = work, dashes = return) plus label text. Forecast is amber
+hatching, ribbon width encodes arrival-time spread, labels give incident-time windows; unreliable/rebuilding is dimmed
+and labelled. No "pending contract" shim was needed: `packages/domain` already has both fields.
+Self-critique (screenshots 1440x900 + 1024x720): first render's forecast ribbon swamped the route -> narrowed band
+(6-16), thickened route (4.5/8). Still off: at 1024x720 the legend covers the route start; fire cells sit far from
+roads because the hand-authored map and the 64x64 fire grid use different coordinate frames (item 2 fixes this).
+Blocked: nothing. Next: open PR; item 2 (scenario loader).
+
+### Commit 3: item 2 - scenario loader replaces the hand-authored map
+Changed: removed the hand-authored topology in `map/scenarioMap.ts`. New `map/scenarioSchema.ts` (Zod),
+`map/loadScenario.ts` (first valid `scenarios/*.json` wins; invalid files are skipped with the reason),
+`map/activeScenario.ts` (`import.meta.glob` of `scenarios/*.json?strip`), `map/worldScale.ts`, polyline-aware
+`map/positions.ts` (roads with `via` bends, heading at the agent's leg), Roads over full polylines.
+Fire cells, roads, sites and routes now share one coordinate frame (they did not before).
+Decisions (nobody to ask):
+- `scenarios/` has only `scenario-v1.placeholder.json`, all `PENDING`, which fails validation (skipped and reported).
+  The synthetic topology exists only as code in sim-lane `packages/simulation`. I did NOT import sim packages. A
+  one-off script outside the repo generated `map/synthetic-v1.snapshot.json` (topology + public height/fuel grids,
+  needed by item 3) from `buildSyntheticScenario()`/`createTerrain()`. It is machine-generated, not hand-authored,
+  and is only a fallback: any valid `scenarios/*.json` wins. Needs: someone with sim-lane access to freeze a real
+  file into `scenarios/` (then delete the snapshot).
+- `requiredWork` (site truth) is stripped from anything read out of `scenarios/` by `scenarioPlugin.ts` before
+  bundling, is absent from the Zod schema, and is absent from the snapshot. Tests cover all three.
+- New direct dependency: `zod` 3.24.2 in `apps/web` (same exact version as `@ember/domain`, no second copy).
+  Why: scenario files are a boundary needing runtime validation and `@ember/domain` does not re-export `z`.
+- The frozen fixture and the mock data use `placeholder-*` ids. `net/mockBase.ts` remaps mock views onto the real
+  scenario ids (and authors a 4-leg plan, forecast bands and fire cells on the real roads); the fixture is untouched.
+- Camera now fits the scene to the canvas on creation (`fitZoom`), and that pose is the reset target.
+Self-critique (1440x900 and 1024x720): whole scenario now visible, route/forecast/fire line up on the same roads.
+Still off: terrain is the old flat sage/ochre plane (item 3), legend is tall at 1024x720, fire cells are tiny.
+PR #8 (open, CI green, no reviews as of 13:01 ET) carries all commits since the branch is the same.
+Blocked: nothing. Next: item 3 terrain composition.
+
+### Commit 4: item 3a - terrain heightfield, water, draped roads/routes, dusk lighting
+Changed: `terrain/heightField.ts` (public height+fuel grids -> scene ground), `sceneTerrain.ts` (water level + wet
+cells that keep 60 units clear of every road/node, tested), `terrainColor.ts` (sage/ochre by vegetation density,
+quiet elevation bands), `Terrain.tsx`, draped `Roads.tsx` (constrained segments get a dashed centre marking),
+routes/forecast/markers/labels follow ground height, hemisphere fill + warm key + fog.
+PR status: #8 was MERGED into lane/web at 17:02Z by Zhang-Andrew888 (first commit only). Andrew then said PRs
+must go to main, not lane/web. Next PR: feat/web-scene -> main (branch synced by merge from main and lane/web).
+Self-critique: first render was muddy brown with an oversized dark pond and almost no relief. Raised vertical
+scale (0.55 -> 0.9), shrank the water quantile (0.07 -> 0.035), more saturated sage, cooler fill, lighter water.
+Now reads cool-dusk with ochre patches; still foggy and low-contrast at the far edge, no trees or fire light yet
+(3b/3c). Legend is still tall at 1024x720.
+Blocked: nothing. Next: merge main + lane/web, open PR to main, then trees (3b).
