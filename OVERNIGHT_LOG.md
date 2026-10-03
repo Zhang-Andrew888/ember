@@ -606,3 +606,57 @@ API). 109 web-lane tests as of `00701a9`.
 
 **Next:** backlog item 5, replay/debrief view driven by recorded mock
 event logs (no sim imports).
+
+## 2026-10-03 08:3x UTC (04:3x ET) - backlog item 5: replay/debrief view from recorded mock event logs
+
+One commit (`dff2847`). `net/replayLog.ts` is an authored array of 5
+`CoordinatorView` snapshots (schema-validated against `@ember/domain`,
+strictly increasing `sequence`, non-decreasing `simTimeMs`, starts active
+and ends with a real `incidentEnd`) - deliberately not the live session's
+own history, since `CoordinatorViewClient` only ever keeps the latest
+snapshot rather than a running log, and not a "full simulated fire" truth
+view either, since no truth-data channel exists in the schema to drive
+one without fabricating data (would need a contract-change issue, not
+this). `components/ReplayView.tsx` plays the log back through a seekable
+range-input timeline, reusing `SceneView`/`UrgentStrip`/`AgentRail`
+as-is. Commands are disabled by omission: no `ConversationPanel` /
+composer / push-to-talk is rendered in replay at all, so there is no
+control surface to even accidentally wire up. `App.tsx` gained a third
+`"replay"` phase; `EndOverlay.tsx`'s Replay button (previously
+permanently `disabled`, "Full replay lands in Slice 7") now actually
+opens it.
+
+**Critical bug found and fixed while verifying live, not from code
+reading alone:** `CameraControls.tsx`'s cleanup effect was
+`useEffect(() => controls.dispose, [controls])` - returning the *unbound
+method* as the cleanup function. React later calls that as a bare
+function, so `this` is `undefined` inside `OrbitControls.dispose()` ->
+`this.disconnect()`, throwing `TypeError: Cannot read properties of
+undefined (reading 'disconnect')`. This has been in the code since the
+very first scene commit this session, but every previous Canvas has
+lived for the whole page lifetime - ReplayView is the first thing that
+actually mounts/unmounts a `<CameraControls>` (live -> replay ->
+live), so it's the first thing that ever ran this cleanup path. Caught it
+because the first live Playwright pass of the replay flow logged two
+`pageerror`s; traced the stack through bundled OrbitControls to the
+effect cleanup via a dedicated debug script. Fix wraps the call: `return
+() => controls.dispose();`.
+
+**Verified:** typecheck/lint/`pnpm vitest run apps/web/src` all green
+(114 tests, 16 files, incl. 5 new `replayLog.test.ts` cases). Live
+Playwright pass of the full replay flow (REPLAY banner and commands-
+disabled copy shown, 0:00 at start, seek slider to the last event shows
+5:00 and "5 / 5", Next/Previous disabled at the respective ends, zero
+Send buttons rendered during replay, Exit replay returns to the
+"Incident ended" debrief) now shows **zero page errors**, down from two.
+Re-ran the full 8-scenario regression smoke test (empty,
+stale-contradiction, all 4 end reasons, connection-error, disconnect) -
+all clean, zero errors, confirming the dispose fix and the new phase
+didn't regress anything already shipped.
+
+**Status:** CI green on `dff2847` (verified via the GitHub Actions API).
+114 web-lane tests as of this commit.
+
+**Next:** backlog item 6, component/unit tests for any logic still
+lacking coverage; then, if the backlog is exhausted before 10:00 ET,
+review the diff for bugs/dead code/missing tests instead of adding scope.
