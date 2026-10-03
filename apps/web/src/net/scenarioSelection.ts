@@ -5,6 +5,7 @@ import {
   siteDamageScenario,
   runEndedScenarios,
 } from "./scenarios.js";
+import { fixtureCoordinatorView } from "../../../../tests/fixtures/coordinator-view.fixture.js";
 
 export const SCENARIO_QUERY_KEY = "scenario";
 
@@ -12,6 +13,7 @@ export const SCENARIO_NAMES = [
   "empty",
   "stale-contradiction",
   "site-damage",
+  "ends-while-active",
   "ended-time-expired",
   "ended-fire-extinguished",
   "ended-all-sites-resolved",
@@ -43,6 +45,14 @@ export function resolveScenario(search: string): MockIncidentSocketOptions | nul
       return { snapshots: [staleContradictionScenario] };
     case "site-damage":
       return { snapshots: [siteDamageScenario] };
+    case "ends-while-active":
+      // Starts live (so there's time to send a message / start a
+      // push-to-talk hold), then transitions to ended 1.5s later - unlike
+      // every other ended-* scenario, which is already ended on the very
+      // first snapshot and so can never test what happens *during* the
+      // active -> ended transition itself (docs/COMMUNICATION.md: "At
+      // incident end, stop capture, cancel ... stale routine audio").
+      return { snapshots: [fixtureCoordinatorView, runEndedScenarios.time_expired], intervalMs: 1500 };
     case "ended-time-expired":
       return { snapshots: [runEndedScenarios.time_expired] };
     case "ended-fire-extinguished":

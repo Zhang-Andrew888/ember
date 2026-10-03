@@ -61,6 +61,16 @@ export function App() {
     speechStubRef.current.speak(urgent.text, { urgent: true });
   }, [view]);
 
+  // docs/COMMUNICATION.md: "At incident end, stop capture, cancel unapplied
+  // commands and stale routine audio." Found via live testing that nothing
+  // did this - a routine acknowledgement already pending/playing when
+  // incidentEnd arrived just kept running past the debrief overlay, which
+  // is exactly "a backlog of obsolete radio traffic" the same doc says the
+  // debrief must not auto-play.
+  useEffect(() => {
+    if (view?.incidentEnd) speechStubRef.current.cancel();
+  }, [view?.incidentEnd]);
+
   const openSocket = useCallback(() => {
     if (IS_MOCK_MODE) {
       // Dev/test-only state scenarios (backlog item 1), opted into via

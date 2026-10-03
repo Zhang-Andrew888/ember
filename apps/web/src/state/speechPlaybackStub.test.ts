@@ -70,6 +70,47 @@ describe("state/speechPlaybackStub", () => {
     expect(stub.getSnapshot().text).toBe("urgent message");
   });
 
+  it("cancel() drops playing audio back to idle immediately", () => {
+    const stub = createSpeechPlaybackStub();
+    stub.speak("routine message");
+    vi.advanceTimersByTime(200); // now playing
+    stub.cancel();
+    expect(stub.getSnapshot()).toEqual({ state: "idle", text: null, urgent: false });
+  });
+
+  it("cancel() drops a pending (not yet playing) message too", () => {
+    const stub = createSpeechPlaybackStub();
+    stub.speak("routine message"); // still pending
+    stub.cancel();
+    expect(stub.getSnapshot().state).toBe("idle");
+  });
+
+  it("cancel() leaves no stale timer that could resurrect the cancelled message", () => {
+    const stub = createSpeechPlaybackStub();
+    const listener = vi.fn();
+    stub.subscribe(listener);
+    stub.speak("routine message");
+    vi.advanceTimersByTime(200); // now playing
+    stub.cancel();
+    listener.mockClear();
+
+    vi.advanceTimersByTime(10_000);
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it("cancel() does not remove subscribers - a later speak() still notifies them", () => {
+    const stub = createSpeechPlaybackStub();
+    const listener = vi.fn();
+    stub.subscribe(listener);
+    stub.speak("first");
+    stub.cancel();
+    listener.mockClear();
+
+    stub.speak("second");
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(stub.getSnapshot().text).toBe("second");
+  });
+
   it("dispose() clears pending timers so a stale speak() never lands after unmount", () => {
     const stub = createSpeechPlaybackStub();
     const listener = vi.fn();

@@ -29,6 +29,8 @@ export interface SpeechPlaybackStub {
   getSnapshot(): SpeechPlaybackSnapshot;
   subscribe(listener: () => void): () => void;
   speak(text: string, options?: { urgent?: boolean }): void;
+  /** Drops whatever is pending/playing and returns to idle, without removing subscribers (see dispose() for that). */
+  cancel(): void;
   dispose(): void;
 }
 
@@ -81,6 +83,10 @@ export function createSpeechPlaybackStub(): SpeechPlaybackStub {
           setSnapshot(IDLE_SNAPSHOT);
         }, playingDurationFor(text));
       }, PENDING_MS);
+    },
+    cancel: () => {
+      clearTimers();
+      setSnapshot(IDLE_SNAPSHOT);
     },
     dispose: () => {
       clearTimers();

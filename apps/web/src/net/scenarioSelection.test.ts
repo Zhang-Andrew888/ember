@@ -22,6 +22,14 @@ describe("net/scenarioSelection - resolveScenario", () => {
     expect(options?.snapshots).toHaveLength(1);
   });
 
+  it("maps ends-while-active to a two-snapshot timed sequence, the only scenario that isn't already ended on arrival", () => {
+    const options = resolveScenario("?scenario=ends-while-active");
+    expect(options?.snapshots).toHaveLength(2);
+    expect(options?.snapshots?.[0]?.incidentEnd).toBeNull();
+    expect(options?.snapshots?.[1]?.incidentEnd).not.toBeNull();
+    expect(options?.intervalMs).toBeGreaterThan(0);
+  });
+
   it("maps connection-error to failToOpen", () => {
     expect(resolveScenario("?scenario=connection-error")).toEqual({ failToOpen: true });
   });
