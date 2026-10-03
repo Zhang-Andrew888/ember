@@ -1,0 +1,53 @@
+{
+  "default": {
+    "runs": 5,
+    "meanWorkDelivered": 648.4,
+    "meanSitesProtectedAndStanding": 1,
+    "meanSitesDestroyed": 0.4,
+    "meanCrewsLost": 0,
+    "totalMissionsStarted": 18,
+    "totalReturnsCompleted": 18,
+    "totalInterrupted": 0,
+    "totalSuperseded": 16,
+    "totalLostBeforeReturn": 0,
+    "meanSimSeconds": 1447,
+    "endingCounts": {
+      "time_expired": 4,
+      "all_sites_resolved": 1
+    }
+  },
+  "world_ranges": {
+    "runs": 5,
+    "meanWorkDelivered": 600,
+    "meanSitesProtectedAndStanding": 1,
+    "meanSitesDestroyed": 0.4,
+    "meanCrewsLost": 0,
+    "totalMissionsStarted": 15,
+    "totalReturnsCompleted": 15,
+    "totalInterrupted": 0,
+    "totalSuperseded": 10,
+    "totalLostBeforeReturn": 0,
+    "meanSimSeconds": 1447,
+    "endingCounts": {
+      "time_expired": 4,
+      "all_sites_resolved": 1
+    }
+  },
+  "narrow": {
+    "runs": 5,
+    "meanWorkDelivered": 600,
+    "meanSitesProtectedAndStanding": 1,
+    "meanSitesDestroyed": 0.4,
+    "meanCrewsLost": 0,
+    "totalMissionsStarted": 15,
+    "totalReturnsCompleted": 15,
+    "totalInterrupted": 0,
+    "totalSuperseded": 15,
+    "totalLostBeforeReturn": 0,
+    "meanSimSeconds": 1447,
+    "endingCounts": {
+      "time_expired": 4,
+      "all_sites_resolved": 1
+    }
+  }
+}

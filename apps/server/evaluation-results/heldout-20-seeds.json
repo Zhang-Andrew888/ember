@@ -1,0 +1,4260 @@
+{
+  "format": "ember-evaluation-v1",
+  "scenarioVersion": "synthetic-v1",
+  "scenarioHash": "9c5ecd7133a15661350556bd6ec5096f",
+  "policy": {
+    "name": "scripted-relay",
+    "version": "2"
+  },
+  "seeds": [
+    "heldout-01",
+    "heldout-02",
+    "heldout-03",
+    "heldout-04",
+    "heldout-05",
+    "heldout-06",
+    "heldout-07",
+    "heldout-08",
+    "heldout-09",
+    "heldout-10",
+    "heldout-11",
+    "heldout-12",
+    "heldout-13",
+    "heldout-14",
+    "heldout-15",
+    "heldout-16",
+    "heldout-17",
+    "heldout-18",
+    "heldout-19",
+    "heldout-20"
+  ],
+  "untilMs": 1500000,
+  "variants": [
+    {
+      "variant": "dispatch",
+      "summary": {
+        "runs": 20,
+        "meanWorkDelivered": 802.5,
+        "meanSitesProtectedAndStanding": 1.45,
+        "meanSitesDestroyed": 1.2,
+        "meanCrewsLost": 0.5,
+        "totalMissionsStarted": 173,
+        "totalReturnsCompleted": 93,
+        "totalInterrupted": 30,
+        "totalSuperseded": 104,
+        "totalLostBeforeReturn": 6,
+        "meanSimSeconds": 1281.3,
+        "endingCounts": {
+          "all_sites_resolved": 14,
+          "time_expired": 5,
+          "all_protection_crews_lost": 1
+        }
+      },
+      "runs": [
+        {
+          "seed": "heldout-01",
+          "scenarioVersion": "synthetic-v1",
+          "sites": [
+            {
+              "id": "site-a",
+              "requiredWork": 300,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-b",
+              "requiredWork": 450,
+              "completedWork": 450,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            },
+            {
+              "id": "site-c",
+              "requiredWork": 600,
+              "completedWork": 600,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            }
+          ],
+          "protectionWorkDelivered": 1050,
+          "sitesProtectedAndStanding": 2,
+          "sitesDestroyed": 1,
+          "sitesCompletedThenDestroyed": 0,
+          "crewsLiving": 3,
+          "crewsLost": 0,
+          "scoutLost": false,
+          "missionsStarted": 6,
+          "returnsCompleted": 3,
+          "lostBeforeReturn": 0,
+          "supersededMissions": 6,
+          "interruptedByIncidentEnd": 0,
+          "returnPlanFailures": 3,
+          "strandedSeconds": 180,
+          "withdrawals": 6,
+          "retreats": 0,
+          "refusals": 0,
+          "relays": 235,
+          "endingReasons": [
+            "all_sites_resolved"
+          ],
+          "displayReason": "all_sites_resolved",
+          "simSeconds": 1179,
+          "wallElapsedMs": 0,
+          "replanLatencyMs": [
+            78,
+            62,
+            46,
+            2,
+            3,
+            3,
+            22,
+            18,
+            21,
+            2,
+            3,
+            2,
+            6,
+            2,
+            3,
+            3,
+            2,
+            2
+          ]
+        },
+        {
+          "seed": "heldout-02",
+          "scenarioVersion": "synthetic-v1",
+          "sites": [
+            {
+              "id": "site-a",
+              "requiredWork": 300,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-b",
+              "requiredWork": 450,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-c",
+              "requiredWork": 600,
+              "completedWork": 600,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            }
+          ],
+          "protectionWorkDelivered": 600,
+          "sitesProtectedAndStanding": 1,
+          "sitesDestroyed": 2,
+          "sitesCompletedThenDestroyed": 0,
+          "crewsLiving": 2,
+          "crewsLost": 1,
+          "scoutLost": false,
+          "missionsStarted": 6,
+          "returnsCompleted": 3,
+          "lostBeforeReturn": 1,
+          "supersededMissions": 4,
+          "interruptedByIncidentEnd": 2,
+          "returnPlanFailures": 0,
+          "strandedSeconds": 0,
+          "withdrawals": 3,
+          "retreats": 0,
+          "refusals": 0,
+          "relays": 178,
+          "endingReasons": [
+            "all_sites_resolved"
+          ],
+          "displayReason": "all_sites_resolved",
+          "simSeconds": 1204,
+          "wallElapsedMs": 0,
+          "replanLatencyMs": [
+            45,
+            36,
+            30,
+            3,
+            2,
+            25,
+            2,
+            25,
+            22,
+            2,
+            2
+          ]
+        },
+        {
+          "seed": "heldout-03",
+          "scenarioVersion": "synthetic-v1",
+          "sites": [
+            {
+              "id": "site-a",
+              "requiredWork": 300,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-b",
+              "requiredWork": 450,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-c",
+              "requiredWork": 600,
+              "completedWork": 600,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            }
+          ],
+          "protectionWorkDelivered": 600,
+          "sitesProtectedAndStanding": 1,
+          "sitesDestroyed": 2,
+          "sitesCompletedThenDestroyed": 0,
+          "crewsLiving": 3,
+          "crewsLost": 0,
+          "scoutLost": false,
+          "missionsStarted": 13,
+          "returnsCompleted": 9,
+          "lostBeforeReturn": 0,
+          "supersededMissions": 6,
+          "interruptedByIncidentEnd": 0,
+          "returnPlanFailures": 0,
+          "strandedSeconds": 0,
+          "withdrawals": 6,
+          "retreats": 0,
+          "refusals": 0,
+          "relays": 256,
+          "endingReasons": [
+            "all_sites_resolved"
+          ],
+          "displayReason": "all_sites_resolved",
+          "simSeconds": 1282,
+          "wallElapsedMs": 0,
+          "replanLatencyMs": [
+            37,
+            47,
+            37,
+            2,
+            2,
+            3,
+            22,
+            19,
+            21,
+            2,
+            2,
+            3,
+            20,
+            15,
+            19,
+            3,
+            2,
+            2,
+            18,
+            18,
+            18,
+            17
+          ]
+        },
+        {
+          "seed": "heldout-04",
+          "scenarioVersion": "synthetic-v1",
+          "sites": [
+            {
+              "id": "site-a",
+              "requiredWork": 300,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-b",
+              "requiredWork": 450,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-c",
+              "requiredWork": 600,
+              "completedWork": 600,
+              "damage": 0.03480000000000001,
+              "destroyed": false,
+              "protectionComplete": true
+            }
+          ],
+          "protectionWorkDelivered": 600,
+          "sitesProtectedAndStanding": 1,
+          "sitesDestroyed": 2,
+          "sitesCompletedThenDestroyed": 0,
+          "crewsLiving": 3,
+          "crewsLost": 0,
+          "scoutLost": false,
+          "missionsStarted": 21,
+          "returnsCompleted": 5,
+          "lostBeforeReturn": 0,
+          "supersededMissions": 4,
+          "interruptedByIncidentEnd": 0,
+          "returnPlanFailures": 0,
+          "strandedSeconds": 0,
+          "withdrawals": 3,
+          "retreats": 0,
+          "refusals": 0,
+          "relays": 197,
+          "endingReasons": [
+            "all_sites_resolved"
+          ],
+          "displayReason": "all_sites_resolved",
+          "simSeconds": 987,
+          "wallElapsedMs": 0,
+          "replanLatencyMs": [
+            31,
+            28,
+            29,
+            2,
+            3,
+            3,
+            19,
+            17,
+            20,
+            20,
+            21,
+            18,
+            22,
+            22,
+            1,
+            3,
+            21,
+            2,
+            21,
+            19,
+            25,
+            20,
+            18,
+            15,
+            18,
+            14,
+            12
+          ]
+        },
+        {
+          "seed": "heldout-05",
+          "scenarioVersion": "synthetic-v1",
+          "sites": [
+            {
+              "id": "site-a",
+              "requiredWork": 300,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-b",
+              "requiredWork": 450,
+              "completedWork": 450,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            },
+            {
+              "id": "site-c",
+              "requiredWork": 600,
+              "completedWork": 600,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            }
+          ],
+          "protectionWorkDelivered": 1050,
+          "sitesProtectedAndStanding": 2,
+          "sitesDestroyed": 1,
+          "sitesCompletedThenDestroyed": 0,
+          "crewsLiving": 3,
+          "crewsLost": 0,
+          "scoutLost": false,
+          "missionsStarted": 9,
+          "returnsCompleted": 6,
+          "lostBeforeReturn": 0,
+          "supersededMissions": 6,
+          "interruptedByIncidentEnd": 3,
+          "returnPlanFailures": 0,
+          "strandedSeconds": 0,
+          "withdrawals": 0,
+          "retreats": 0,
+          "refusals": 0,
+          "relays": 284,
+          "endingReasons": [
+            "all_sites_resolved"
+          ],
+          "displayReason": "all_sites_resolved",
+          "simSeconds": 1424,
+          "wallElapsedMs": 0,
+          "replanLatencyMs": [
+            27,
+            27,
+            22,
+            2,
+            2,
+            3,
+            19,
+            18,
+            18,
+            3,
+            3,
+            3,
+            10,
+            9,
+            14
+          ]
+        },
+        {
+          "seed": "heldout-06",
+          "scenarioVersion": "synthetic-v1",
+          "sites": [
+            {
+              "id": "site-a",
+              "requiredWork": 300,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-b",
+              "requiredWork": 450,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-c",
+              "requiredWork": 600,
+              "completedWork": 600,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            }
+          ],
+          "protectionWorkDelivered": 600,
+          "sitesProtectedAndStanding": 1,
+          "sitesDestroyed": 2,
+          "sitesCompletedThenDestroyed": 0,
+          "crewsLiving": 2,
+          "crewsLost": 1,
+          "scoutLost": false,
+          "missionsStarted": 6,
+          "returnsCompleted": 3,
+          "lostBeforeReturn": 1,
+          "supersededMissions": 4,
+          "interruptedByIncidentEnd": 2,
+          "returnPlanFailures": 0,
+          "strandedSeconds": 0,
+          "withdrawals": 3,
+          "retreats": 0,
+          "refusals": 0,
+          "relays": 178,
+          "endingReasons": [
+            "all_sites_resolved"
+          ],
+          "displayReason": "all_sites_resolved",
+          "simSeconds": 1145,
+          "wallElapsedMs": 0,
+          "replanLatencyMs": [
+            30,
+            33,
+            22,
+            3,
+            2,
+            30,
+            2,
+            19,
+            18,
+            2,
+            2
+          ]
+        },
+        {
+          "seed": "heldout-07",
+          "scenarioVersion": "synthetic-v1",
+          "sites": [
+            {
+              "id": "site-a",
+              "requiredWork": 300,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-b",
+              "requiredWork": 450,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-c",
+              "requiredWork": 600,
+              "completedWork": 600,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            }
+          ],
+          "protectionWorkDelivered": 600,
+          "sitesProtectedAndStanding": 1,
+          "sitesDestroyed": 2,
+          "sitesCompletedThenDestroyed": 0,
+          "crewsLiving": 3,
+          "crewsLost": 0,
+          "scoutLost": false,
+          "missionsStarted": 20,
+          "returnsCompleted": 7,
+          "lostBeforeReturn": 0,
+          "supersededMissions": 5,
+          "interruptedByIncidentEnd": 2,
+          "returnPlanFailures": 0,
+          "strandedSeconds": 0,
+          "withdrawals": 6,
+          "retreats": 0,
+          "refusals": 0,
+          "relays": 253,
+          "endingReasons": [
+            "all_sites_resolved"
+          ],
+          "displayReason": "all_sites_resolved",
+          "simSeconds": 1267,
+          "wallElapsedMs": 0,
+          "replanLatencyMs": [
+            35,
+            31,
+            26,
+            2,
+            3,
+            2,
+            24,
+            20,
+            19,
+            3,
+            1,
+            3,
+            13,
+            11,
+            25,
+            23,
+            20,
+            20,
+            18,
+            2,
+            19,
+            1,
+            18,
+            19,
+            18,
+            18,
+            17,
+            12,
+            0
+          ]
+        },
+        {
+          "seed": "heldout-08",
+          "scenarioVersion": "synthetic-v1",
+          "sites": [
+            {
+              "id": "site-a",
+              "requiredWork": 300,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-b",
+              "requiredWork": 450,
+              "completedWork": 450,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            },
+            {
+              "id": "site-c",
+              "requiredWork": 600,
+              "completedWork": 600,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            }
+          ],
+          "protectionWorkDelivered": 1050,
+          "sitesProtectedAndStanding": 2,
+          "sitesDestroyed": 1,
+          "sitesCompletedThenDestroyed": 0,
+          "crewsLiving": 3,
+          "crewsLost": 0,
+          "scoutLost": false,
+          "missionsStarted": 6,
+          "returnsCompleted": 3,
+          "lostBeforeReturn": 0,
+          "supersededMissions": 6,
+          "interruptedByIncidentEnd": 0,
+          "returnPlanFailures": 3,
+          "strandedSeconds": 105,
+          "withdrawals": 21,
+          "retreats": 0,
+          "refusals": 0,
+          "relays": 246,
+          "endingReasons": [
+            "all_sites_resolved"
+          ],
+          "displayReason": "all_sites_resolved",
+          "simSeconds": 1231,
+          "wallElapsedMs": 0,
+          "replanLatencyMs": [
+            30,
+            29,
+            23,
+            5,
+            4,
+            3,
+            26,
+            24,
+            22,
+            4,
+            3,
+            3,
+            3,
+            3,
+            4,
+            3,
+            2,
+            3,
+            3,
+            2,
+            2,
+            3,
+            2,
+            3,
+            3,
+            2,
+            3,
+            3,
+            2,
+            3,
+            2,
+            2,
+            2
+          ]
+        },
+        {
+          "seed": "heldout-09",
+          "scenarioVersion": "synthetic-v1",
+          "sites": [
+            {
+              "id": "site-a",
+              "requiredWork": 300,
+              "completedWork": 0,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-b",
+              "requiredWork": 450,
+              "completedWork": 450,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            },
+            {
+              "id": "site-c",
+              "requiredWork": 600,
+              "completedWork": 600,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            }
+          ],
+          "protectionWorkDelivered": 1050,
+          "sitesProtectedAndStanding": 2,
+          "sitesDestroyed": 0,
+          "sitesCompletedThenDestroyed": 0,
+          "crewsLiving": 3,
+          "crewsLost": 0,
+          "scoutLost": false,
+          "missionsStarted": 9,
+          "returnsCompleted": 6,
+          "lostBeforeReturn": 0,
+          "supersededMissions": 6,
+          "interruptedByIncidentEnd": 3,
+          "returnPlanFailures": 0,
+          "strandedSeconds": 0,
+          "withdrawals": 0,
+          "retreats": 0,
+          "refusals": 0,
+          "relays": 299,
+          "endingReasons": [
+            "time_expired"
+          ],
+          "displayReason": "time_expired",
+          "simSeconds": 1500,
+          "wallElapsedMs": 0,
+          "replanLatencyMs": [
+            34,
+            34,
+            27,
+            2,
+            2,
+            3,
+            22,
+            29,
+            35,
+            4,
+            3,
+            4,
+            12,
+            10,
+            10
+          ]
+        },
+        {
+          "seed": "heldout-10",
+          "scenarioVersion": "synthetic-v1",
+          "sites": [
+            {
+              "id": "site-a",
+              "requiredWork": 300,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-b",
+              "requiredWork": 450,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-c",
+              "requiredWork": 600,
+              "completedWork": 600,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            }
+          ],
+          "protectionWorkDelivered": 600,
+          "sitesProtectedAndStanding": 1,
+          "sitesDestroyed": 2,
+          "sitesCompletedThenDestroyed": 0,
+          "crewsLiving": 2,
+          "crewsLost": 1,
+          "scoutLost": false,
+          "missionsStarted": 6,
+          "returnsCompleted": 3,
+          "lostBeforeReturn": 1,
+          "supersededMissions": 4,
+          "interruptedByIncidentEnd": 2,
+          "returnPlanFailures": 0,
+          "strandedSeconds": 0,
+          "withdrawals": 3,
+          "retreats": 0,
+          "refusals": 0,
+          "relays": 177,
+          "endingReasons": [
+            "all_sites_resolved"
+          ],
+          "displayReason": "all_sites_resolved",
+          "simSeconds": 1129,
+          "wallElapsedMs": 0,
+          "replanLatencyMs": [
+            31,
+            34,
+            28,
+            4,
+            2,
+            34,
+            2,
+            12,
+            13,
+            0,
+            1
+          ]
+        },
+        {
+          "seed": "heldout-11",
+          "scenarioVersion": "synthetic-v1",
+          "sites": [
+            {
+              "id": "site-a",
+              "requiredWork": 300,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-b",
+              "requiredWork": 450,
+              "completedWork": 450,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            },
+            {
+              "id": "site-c",
+              "requiredWork": 600,
+              "completedWork": 600,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            }
+          ],
+          "protectionWorkDelivered": 1050,
+          "sitesProtectedAndStanding": 2,
+          "sitesDestroyed": 1,
+          "sitesCompletedThenDestroyed": 0,
+          "crewsLiving": 3,
+          "crewsLost": 0,
+          "scoutLost": false,
+          "missionsStarted": 6,
+          "returnsCompleted": 3,
+          "lostBeforeReturn": 0,
+          "supersededMissions": 6,
+          "interruptedByIncidentEnd": 3,
+          "returnPlanFailures": 0,
+          "strandedSeconds": 0,
+          "withdrawals": 1,
+          "retreats": 0,
+          "refusals": 0,
+          "relays": 276,
+          "endingReasons": [
+            "all_sites_resolved"
+          ],
+          "displayReason": "all_sites_resolved",
+          "simSeconds": 1384,
+          "wallElapsedMs": 0,
+          "replanLatencyMs": [
+            35,
+            37,
+            38,
+            3,
+            2,
+            2,
+            19,
+            20,
+            18,
+            7,
+            5,
+            4,
+            4
+          ]
+        },
+        {
+          "seed": "heldout-12",
+          "scenarioVersion": "synthetic-v1",
+          "sites": [
+            {
+              "id": "site-a",
+              "requiredWork": 300,
+              "completedWork": 0,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-b",
+              "requiredWork": 450,
+              "completedWork": 450,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            },
+            {
+              "id": "site-c",
+              "requiredWork": 600,
+              "completedWork": 600,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            }
+          ],
+          "protectionWorkDelivered": 1050,
+          "sitesProtectedAndStanding": 2,
+          "sitesDestroyed": 0,
+          "sitesCompletedThenDestroyed": 0,
+          "crewsLiving": 3,
+          "crewsLost": 0,
+          "scoutLost": false,
+          "missionsStarted": 9,
+          "returnsCompleted": 6,
+          "lostBeforeReturn": 0,
+          "supersededMissions": 6,
+          "interruptedByIncidentEnd": 3,
+          "returnPlanFailures": 0,
+          "strandedSeconds": 0,
+          "withdrawals": 0,
+          "retreats": 0,
+          "refusals": 0,
+          "relays": 299,
+          "endingReasons": [
+            "time_expired"
+          ],
+          "displayReason": "time_expired",
+          "simSeconds": 1500,
+          "wallElapsedMs": 0,
+          "replanLatencyMs": [
+            31,
+            31,
+            26,
+            4,
+            3,
+            3,
+            21,
+            20,
+            21,
+            3,
+            2,
+            4,
+            15,
+            15,
+            11
+          ]
+        },
+        {
+          "seed": "heldout-13",
+          "scenarioVersion": "synthetic-v1",
+          "sites": [
+            {
+              "id": "site-a",
+              "requiredWork": 300,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-b",
+              "requiredWork": 450,
+              "completedWork": 450,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            },
+            {
+              "id": "site-c",
+              "requiredWork": 600,
+              "completedWork": 600,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            }
+          ],
+          "protectionWorkDelivered": 1050,
+          "sitesProtectedAndStanding": 2,
+          "sitesDestroyed": 1,
+          "sitesCompletedThenDestroyed": 0,
+          "crewsLiving": 3,
+          "crewsLost": 0,
+          "scoutLost": false,
+          "missionsStarted": 6,
+          "returnsCompleted": 3,
+          "lostBeforeReturn": 0,
+          "supersededMissions": 6,
+          "interruptedByIncidentEnd": 0,
+          "returnPlanFailures": 3,
+          "strandedSeconds": 51,
+          "withdrawals": 21,
+          "retreats": 0,
+          "refusals": 0,
+          "relays": 236,
+          "endingReasons": [
+            "all_sites_resolved"
+          ],
+          "displayReason": "all_sites_resolved",
+          "simSeconds": 1181,
+          "wallElapsedMs": 0,
+          "replanLatencyMs": [
+            35,
+            32,
+            25,
+            2,
+            3,
+            2,
+            19,
+            17,
+            19,
+            2,
+            2,
+            2,
+            3,
+            2,
+            2,
+            3,
+            2,
+            3,
+            2,
+            2,
+            3,
+            3,
+            1,
+            3,
+            2,
+            2,
+            3,
+            2,
+            2,
+            3,
+            2,
+            2,
+            2
+          ]
+        },
+        {
+          "seed": "heldout-14",
+          "scenarioVersion": "synthetic-v1",
+          "sites": [
+            {
+              "id": "site-a",
+              "requiredWork": 300,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-b",
+              "requiredWork": 450,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-c",
+              "requiredWork": 600,
+              "completedWork": 600,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            }
+          ],
+          "protectionWorkDelivered": 600,
+          "sitesProtectedAndStanding": 1,
+          "sitesDestroyed": 2,
+          "sitesCompletedThenDestroyed": 0,
+          "crewsLiving": 2,
+          "crewsLost": 1,
+          "scoutLost": false,
+          "missionsStarted": 6,
+          "returnsCompleted": 3,
+          "lostBeforeReturn": 1,
+          "supersededMissions": 4,
+          "interruptedByIncidentEnd": 2,
+          "returnPlanFailures": 0,
+          "strandedSeconds": 0,
+          "withdrawals": 3,
+          "retreats": 0,
+          "refusals": 0,
+          "relays": 178,
+          "endingReasons": [
+            "all_sites_resolved"
+          ],
+          "displayReason": "all_sites_resolved",
+          "simSeconds": 1147,
+          "wallElapsedMs": 0,
+          "replanLatencyMs": [
+            31,
+            30,
+            24,
+            2,
+            3,
+            19,
+            2,
+            11,
+            11,
+            1,
+            1
+          ]
+        },
+        {
+          "seed": "heldout-15",
+          "scenarioVersion": "synthetic-v1",
+          "sites": [
+            {
+              "id": "site-a",
+              "requiredWork": 300,
+              "completedWork": 0,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-b",
+              "requiredWork": 450,
+              "completedWork": 0,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-c",
+              "requiredWork": 600,
+              "completedWork": 600,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            }
+          ],
+          "protectionWorkDelivered": 600,
+          "sitesProtectedAndStanding": 1,
+          "sitesDestroyed": 0,
+          "sitesCompletedThenDestroyed": 0,
+          "crewsLiving": 0,
+          "crewsLost": 3,
+          "scoutLost": false,
+          "missionsStarted": 6,
+          "returnsCompleted": 3,
+          "lostBeforeReturn": 1,
+          "supersededMissions": 4,
+          "interruptedByIncidentEnd": 0,
+          "returnPlanFailures": 0,
+          "strandedSeconds": 0,
+          "withdrawals": 1,
+          "retreats": 0,
+          "refusals": 0,
+          "relays": 180,
+          "endingReasons": [
+            "all_protection_crews_lost"
+          ],
+          "displayReason": "all_protection_crews_lost",
+          "simSeconds": 904,
+          "wallElapsedMs": 0,
+          "replanLatencyMs": [
+            28,
+            28,
+            26,
+            3,
+            2,
+            2,
+            25,
+            26,
+            34,
+            1
+          ]
+        },
+        {
+          "seed": "heldout-16",
+          "scenarioVersion": "synthetic-v1",
+          "sites": [
+            {
+              "id": "site-a",
+              "requiredWork": 300,
+              "completedWork": 0,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-b",
+              "requiredWork": 450,
+              "completedWork": 450,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            },
+            {
+              "id": "site-c",
+              "requiredWork": 600,
+              "completedWork": 600,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            }
+          ],
+          "protectionWorkDelivered": 1050,
+          "sitesProtectedAndStanding": 2,
+          "sitesDestroyed": 0,
+          "sitesCompletedThenDestroyed": 0,
+          "crewsLiving": 3,
+          "crewsLost": 0,
+          "scoutLost": false,
+          "missionsStarted": 9,
+          "returnsCompleted": 6,
+          "lostBeforeReturn": 0,
+          "supersededMissions": 6,
+          "interruptedByIncidentEnd": 3,
+          "returnPlanFailures": 0,
+          "strandedSeconds": 0,
+          "withdrawals": 0,
+          "retreats": 0,
+          "refusals": 0,
+          "relays": 299,
+          "endingReasons": [
+            "time_expired"
+          ],
+          "displayReason": "time_expired",
+          "simSeconds": 1500,
+          "wallElapsedMs": 0,
+          "replanLatencyMs": [
+            33,
+            33,
+            25,
+            2,
+            5,
+            2,
+            21,
+            24,
+            24,
+            2,
+            2,
+            3,
+            10,
+            10,
+            10
+          ]
+        },
+        {
+          "seed": "heldout-17",
+          "scenarioVersion": "synthetic-v1",
+          "sites": [
+            {
+              "id": "site-a",
+              "requiredWork": 300,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-b",
+              "requiredWork": 450,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-c",
+              "requiredWork": 600,
+              "completedWork": 600,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            }
+          ],
+          "protectionWorkDelivered": 600,
+          "sitesProtectedAndStanding": 1,
+          "sitesDestroyed": 2,
+          "sitesCompletedThenDestroyed": 0,
+          "crewsLiving": 3,
+          "crewsLost": 0,
+          "scoutLost": false,
+          "missionsStarted": 9,
+          "returnsCompleted": 7,
+          "lostBeforeReturn": 0,
+          "supersededMissions": 6,
+          "interruptedByIncidentEnd": 2,
+          "returnPlanFailures": 0,
+          "strandedSeconds": 0,
+          "withdrawals": 6,
+          "retreats": 0,
+          "refusals": 0,
+          "relays": 244,
+          "endingReasons": [
+            "all_sites_resolved"
+          ],
+          "displayReason": "all_sites_resolved",
+          "simSeconds": 1223,
+          "wallElapsedMs": 0,
+          "replanLatencyMs": [
+            29,
+            28,
+            24,
+            2,
+            3,
+            3,
+            26,
+            17,
+            17,
+            4,
+            2,
+            3,
+            12,
+            10,
+            12,
+            1,
+            2,
+            1
+          ]
+        },
+        {
+          "seed": "heldout-18",
+          "scenarioVersion": "synthetic-v1",
+          "sites": [
+            {
+              "id": "site-a",
+              "requiredWork": 300,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-b",
+              "requiredWork": 450,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-c",
+              "requiredWork": 600,
+              "completedWork": 600,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            }
+          ],
+          "protectionWorkDelivered": 600,
+          "sitesProtectedAndStanding": 1,
+          "sitesDestroyed": 2,
+          "sitesCompletedThenDestroyed": 0,
+          "crewsLiving": 2,
+          "crewsLost": 1,
+          "scoutLost": false,
+          "missionsStarted": 5,
+          "returnsCompleted": 4,
+          "lostBeforeReturn": 1,
+          "supersededMissions": 3,
+          "interruptedByIncidentEnd": 0,
+          "returnPlanFailures": 0,
+          "strandedSeconds": 0,
+          "withdrawals": 2,
+          "retreats": 0,
+          "refusals": 0,
+          "relays": 184,
+          "endingReasons": [
+            "all_sites_resolved"
+          ],
+          "displayReason": "all_sites_resolved",
+          "simSeconds": 1439,
+          "wallElapsedMs": 0,
+          "replanLatencyMs": [
+            29,
+            30,
+            26,
+            2,
+            4,
+            22,
+            21,
+            1,
+            2
+          ]
+        },
+        {
+          "seed": "heldout-19",
+          "scenarioVersion": "synthetic-v1",
+          "sites": [
+            {
+              "id": "site-a",
+              "requiredWork": 300,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-b",
+              "requiredWork": 450,
+              "completedWork": 0,
+              "damage": 0.8700000000000007,
+              "destroyed": false,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-c",
+              "requiredWork": 600,
+              "completedWork": 600,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            }
+          ],
+          "protectionWorkDelivered": 600,
+          "sitesProtectedAndStanding": 1,
+          "sitesDestroyed": 1,
+          "sitesCompletedThenDestroyed": 0,
+          "crewsLiving": 1,
+          "crewsLost": 2,
+          "scoutLost": false,
+          "missionsStarted": 6,
+          "returnsCompleted": 4,
+          "lostBeforeReturn": 0,
+          "supersededMissions": 6,
+          "interruptedByIncidentEnd": 0,
+          "returnPlanFailures": 2,
+          "strandedSeconds": 422,
+          "withdrawals": 1,
+          "retreats": 0,
+          "refusals": 0,
+          "relays": 230,
+          "endingReasons": [
+            "time_expired"
+          ],
+          "displayReason": "time_expired",
+          "simSeconds": 1500,
+          "wallElapsedMs": 0,
+          "replanLatencyMs": [
+            49,
+            33,
+            25,
+            4,
+            2,
+            3,
+            26,
+            22,
+            24,
+            3,
+            1,
+            0
+          ]
+        },
+        {
+          "seed": "heldout-20",
+          "scenarioVersion": "synthetic-v1",
+          "sites": [
+            {
+              "id": "site-a",
+              "requiredWork": 300,
+              "completedWork": 0,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-b",
+              "requiredWork": 450,
+              "completedWork": 450,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            },
+            {
+              "id": "site-c",
+              "requiredWork": 600,
+              "completedWork": 600,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            }
+          ],
+          "protectionWorkDelivered": 1050,
+          "sitesProtectedAndStanding": 2,
+          "sitesDestroyed": 0,
+          "sitesCompletedThenDestroyed": 0,
+          "crewsLiving": 3,
+          "crewsLost": 0,
+          "scoutLost": false,
+          "missionsStarted": 9,
+          "returnsCompleted": 6,
+          "lostBeforeReturn": 0,
+          "supersededMissions": 6,
+          "interruptedByIncidentEnd": 3,
+          "returnPlanFailures": 0,
+          "strandedSeconds": 0,
+          "withdrawals": 0,
+          "retreats": 0,
+          "refusals": 0,
+          "relays": 299,
+          "endingReasons": [
+            "time_expired"
+          ],
+          "displayReason": "time_expired",
+          "simSeconds": 1500,
+          "wallElapsedMs": 0,
+          "replanLatencyMs": [
+            29,
+            28,
+            25,
+            2,
+            3,
+            2,
+            20,
+            23,
+            19,
+            3,
+            3,
+            2,
+            15,
+            18,
+            11
+          ]
+        }
+      ],
+      "replanLatencyP50Ms": 10,
+      "replanLatencyP95Ms": 34,
+      "simStepMeanMs": 0.1503160852259424,
+      "simStepP50Ms": 0,
+      "simStepP95Ms": 1,
+      "simStepMaxMs": 6,
+      "controllerTickP95Ms": 22
+    },
+    {
+      "variant": "forecast_no_scout",
+      "summary": {
+        "runs": 20,
+        "meanWorkDelivered": 639.4,
+        "meanSitesProtectedAndStanding": 1,
+        "meanSitesDestroyed": 1.3,
+        "meanCrewsLost": 0,
+        "totalMissionsStarted": 74,
+        "totalReturnsCompleted": 74,
+        "totalInterrupted": 0,
+        "totalSuperseded": 68,
+        "totalLostBeforeReturn": 0,
+        "meanSimSeconds": 1363.95,
+        "endingCounts": {
+          "time_expired": 10,
+          "all_sites_resolved": 10
+        }
+      },
+      "runs": [
+        {
+          "seed": "heldout-01",
+          "scenarioVersion": "synthetic-v1",
+          "sites": [
+            {
+              "id": "site-a",
+              "requiredWork": 300,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-b",
+              "requiredWork": 450,
+              "completedWork": 0,
+              "damage": 0.8820000000000007,
+              "destroyed": false,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-c",
+              "requiredWork": 600,
+              "completedWork": 600,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            }
+          ],
+          "protectionWorkDelivered": 600,
+          "sitesProtectedAndStanding": 1,
+          "sitesDestroyed": 1,
+          "sitesCompletedThenDestroyed": 0,
+          "crewsLiving": 3,
+          "crewsLost": 0,
+          "scoutLost": false,
+          "missionsStarted": 4,
+          "returnsCompleted": 4,
+          "lostBeforeReturn": 0,
+          "supersededMissions": 4,
+          "interruptedByIncidentEnd": 0,
+          "returnPlanFailures": 0,
+          "strandedSeconds": 0,
+          "withdrawals": 2,
+          "retreats": 0,
+          "refusals": 0,
+          "relays": 255,
+          "endingReasons": [
+            "time_expired"
+          ],
+          "displayReason": "time_expired",
+          "simSeconds": 1500,
+          "wallElapsedMs": 0,
+          "replanLatencyMs": [
+            281,
+            134,
+            128,
+            125,
+            8,
+            65,
+            0,
+            1
+          ]
+        },
+        {
+          "seed": "heldout-02",
+          "scenarioVersion": "synthetic-v1",
+          "sites": [
+            {
+              "id": "site-a",
+              "requiredWork": 300,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-b",
+              "requiredWork": 450,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-c",
+              "requiredWork": 600,
+              "completedWork": 600,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            }
+          ],
+          "protectionWorkDelivered": 600,
+          "sitesProtectedAndStanding": 1,
+          "sitesDestroyed": 2,
+          "sitesCompletedThenDestroyed": 0,
+          "crewsLiving": 3,
+          "crewsLost": 0,
+          "scoutLost": false,
+          "missionsStarted": 4,
+          "returnsCompleted": 4,
+          "lostBeforeReturn": 0,
+          "supersededMissions": 4,
+          "interruptedByIncidentEnd": 0,
+          "returnPlanFailures": 0,
+          "strandedSeconds": 0,
+          "withdrawals": 2,
+          "retreats": 0,
+          "refusals": 0,
+          "relays": 204,
+          "endingReasons": [
+            "all_sites_resolved"
+          ],
+          "displayReason": "all_sites_resolved",
+          "simSeconds": 1204,
+          "wallElapsedMs": 0,
+          "replanLatencyMs": [
+            15,
+            14,
+            12,
+            255,
+            12,
+            3,
+            2,
+            1
+          ]
+        },
+        {
+          "seed": "heldout-03",
+          "scenarioVersion": "synthetic-v1",
+          "sites": [
+            {
+              "id": "site-a",
+              "requiredWork": 300,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-b",
+              "requiredWork": 450,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-c",
+              "requiredWork": 600,
+              "completedWork": 600,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            }
+          ],
+          "protectionWorkDelivered": 600,
+          "sitesProtectedAndStanding": 1,
+          "sitesDestroyed": 2,
+          "sitesCompletedThenDestroyed": 0,
+          "crewsLiving": 3,
+          "crewsLost": 0,
+          "scoutLost": false,
+          "missionsStarted": 3,
+          "returnsCompleted": 3,
+          "lostBeforeReturn": 0,
+          "supersededMissions": 3,
+          "interruptedByIncidentEnd": 0,
+          "returnPlanFailures": 0,
+          "strandedSeconds": 0,
+          "withdrawals": 0,
+          "retreats": 0,
+          "refusals": 0,
+          "relays": 216,
+          "endingReasons": [
+            "all_sites_resolved"
+          ],
+          "displayReason": "all_sites_resolved",
+          "simSeconds": 1282,
+          "wallElapsedMs": 0,
+          "replanLatencyMs": [
+            244,
+            127,
+            121,
+            0,
+            1,
+            0
+          ]
+        },
+        {
+          "seed": "heldout-04",
+          "scenarioVersion": "synthetic-v1",
+          "sites": [
+            {
+              "id": "site-a",
+              "requiredWork": 300,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-b",
+              "requiredWork": 450,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-c",
+              "requiredWork": 600,
+              "completedWork": 600,
+              "damage": 0.03480000000000001,
+              "destroyed": false,
+              "protectionComplete": true
+            }
+          ],
+          "protectionWorkDelivered": 600,
+          "sitesProtectedAndStanding": 1,
+          "sitesDestroyed": 2,
+          "sitesCompletedThenDestroyed": 0,
+          "crewsLiving": 3,
+          "crewsLost": 0,
+          "scoutLost": false,
+          "missionsStarted": 4,
+          "returnsCompleted": 4,
+          "lostBeforeReturn": 0,
+          "supersededMissions": 4,
+          "interruptedByIncidentEnd": 0,
+          "returnPlanFailures": 0,
+          "strandedSeconds": 0,
+          "withdrawals": 2,
+          "retreats": 0,
+          "refusals": 0,
+          "relays": 197,
+          "endingReasons": [
+            "all_sites_resolved"
+          ],
+          "displayReason": "all_sites_resolved",
+          "simSeconds": 987,
+          "wallElapsedMs": 0,
+          "replanLatencyMs": [
+            15,
+            14,
+            11,
+            76,
+            12,
+            8,
+            0,
+            0
+          ]
+        },
+        {
+          "seed": "heldout-05",
+          "scenarioVersion": "synthetic-v1",
+          "sites": [
+            {
+              "id": "site-a",
+              "requiredWork": 300,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-b",
+              "requiredWork": 450,
+              "completedWork": 0,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-c",
+              "requiredWork": 600,
+              "completedWork": 600,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            }
+          ],
+          "protectionWorkDelivered": 600,
+          "sitesProtectedAndStanding": 1,
+          "sitesDestroyed": 1,
+          "sitesCompletedThenDestroyed": 0,
+          "crewsLiving": 3,
+          "crewsLost": 0,
+          "scoutLost": false,
+          "missionsStarted": 3,
+          "returnsCompleted": 3,
+          "lostBeforeReturn": 0,
+          "supersededMissions": 3,
+          "interruptedByIncidentEnd": 0,
+          "returnPlanFailures": 0,
+          "strandedSeconds": 0,
+          "withdrawals": 0,
+          "retreats": 0,
+          "refusals": 0,
+          "relays": 216,
+          "endingReasons": [
+            "time_expired"
+          ],
+          "displayReason": "time_expired",
+          "simSeconds": 1500,
+          "wallElapsedMs": 0,
+          "replanLatencyMs": [
+            14,
+            14,
+            11,
+            0,
+            0,
+            1
+          ]
+        },
+        {
+          "seed": "heldout-06",
+          "scenarioVersion": "synthetic-v1",
+          "sites": [
+            {
+              "id": "site-a",
+              "requiredWork": 300,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-b",
+              "requiredWork": 450,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-c",
+              "requiredWork": 600,
+              "completedWork": 600,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            }
+          ],
+          "protectionWorkDelivered": 600,
+          "sitesProtectedAndStanding": 1,
+          "sitesDestroyed": 2,
+          "sitesCompletedThenDestroyed": 0,
+          "crewsLiving": 3,
+          "crewsLost": 0,
+          "scoutLost": false,
+          "missionsStarted": 4,
+          "returnsCompleted": 4,
+          "lostBeforeReturn": 0,
+          "supersededMissions": 3,
+          "interruptedByIncidentEnd": 0,
+          "returnPlanFailures": 0,
+          "strandedSeconds": 0,
+          "withdrawals": 1,
+          "retreats": 0,
+          "refusals": 0,
+          "relays": 228,
+          "endingReasons": [
+            "all_sites_resolved"
+          ],
+          "displayReason": "all_sites_resolved",
+          "simSeconds": 1145,
+          "wallElapsedMs": 0,
+          "replanLatencyMs": [
+            24,
+            15,
+            16,
+            306,
+            9,
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "seed": "heldout-07",
+          "scenarioVersion": "synthetic-v1",
+          "sites": [
+            {
+              "id": "site-a",
+              "requiredWork": 300,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-b",
+              "requiredWork": 450,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-c",
+              "requiredWork": 600,
+              "completedWork": 600,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            }
+          ],
+          "protectionWorkDelivered": 600,
+          "sitesProtectedAndStanding": 1,
+          "sitesDestroyed": 2,
+          "sitesCompletedThenDestroyed": 0,
+          "crewsLiving": 3,
+          "crewsLost": 0,
+          "scoutLost": false,
+          "missionsStarted": 3,
+          "returnsCompleted": 3,
+          "lostBeforeReturn": 0,
+          "supersededMissions": 3,
+          "interruptedByIncidentEnd": 0,
+          "returnPlanFailures": 1,
+          "strandedSeconds": 0,
+          "withdrawals": 0,
+          "retreats": 1,
+          "refusals": 0,
+          "relays": 204,
+          "endingReasons": [
+            "all_sites_resolved"
+          ],
+          "displayReason": "all_sites_resolved",
+          "simSeconds": 1267,
+          "wallElapsedMs": 0,
+          "replanLatencyMs": [
+            13,
+            13,
+            10,
+            47,
+            1,
+            1
+          ]
+        },
+        {
+          "seed": "heldout-08",
+          "scenarioVersion": "synthetic-v1",
+          "sites": [
+            {
+              "id": "site-a",
+              "requiredWork": 300,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-b",
+              "requiredWork": 450,
+              "completedWork": 0,
+              "damage": 0.4500000000000003,
+              "destroyed": false,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-c",
+              "requiredWork": 600,
+              "completedWork": 600,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            }
+          ],
+          "protectionWorkDelivered": 600,
+          "sitesProtectedAndStanding": 1,
+          "sitesDestroyed": 1,
+          "sitesCompletedThenDestroyed": 0,
+          "crewsLiving": 3,
+          "crewsLost": 0,
+          "scoutLost": false,
+          "missionsStarted": 4,
+          "returnsCompleted": 4,
+          "lostBeforeReturn": 0,
+          "supersededMissions": 4,
+          "interruptedByIncidentEnd": 0,
+          "returnPlanFailures": 0,
+          "strandedSeconds": 0,
+          "withdrawals": 2,
+          "retreats": 0,
+          "refusals": 0,
+          "relays": 204,
+          "endingReasons": [
+            "time_expired"
+          ],
+          "displayReason": "time_expired",
+          "simSeconds": 1500,
+          "wallElapsedMs": 0,
+          "replanLatencyMs": [
+            222,
+            122,
+            116,
+            74,
+            6,
+            182,
+            1,
+            2
+          ]
+        },
+        {
+          "seed": "heldout-09",
+          "scenarioVersion": "synthetic-v1",
+          "sites": [
+            {
+              "id": "site-a",
+              "requiredWork": 300,
+              "completedWork": 0,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-b",
+              "requiredWork": 450,
+              "completedWork": 212,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-c",
+              "requiredWork": 600,
+              "completedWork": 600,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            }
+          ],
+          "protectionWorkDelivered": 812,
+          "sitesProtectedAndStanding": 1,
+          "sitesDestroyed": 0,
+          "sitesCompletedThenDestroyed": 0,
+          "crewsLiving": 3,
+          "crewsLost": 0,
+          "scoutLost": false,
+          "missionsStarted": 4,
+          "returnsCompleted": 4,
+          "lostBeforeReturn": 0,
+          "supersededMissions": 3,
+          "interruptedByIncidentEnd": 0,
+          "returnPlanFailures": 0,
+          "strandedSeconds": 0,
+          "withdrawals": 0,
+          "retreats": 0,
+          "refusals": 0,
+          "relays": 299,
+          "endingReasons": [
+            "time_expired"
+          ],
+          "displayReason": "time_expired",
+          "simSeconds": 1500,
+          "wallElapsedMs": 0,
+          "replanLatencyMs": [
+            23,
+            15,
+            13,
+            1,
+            1,
+            0,
+            7
+          ]
+        },
+        {
+          "seed": "heldout-10",
+          "scenarioVersion": "synthetic-v1",
+          "sites": [
+            {
+              "id": "site-a",
+              "requiredWork": 300,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-b",
+              "requiredWork": 450,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-c",
+              "requiredWork": 600,
+              "completedWork": 600,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            }
+          ],
+          "protectionWorkDelivered": 600,
+          "sitesProtectedAndStanding": 1,
+          "sitesDestroyed": 2,
+          "sitesCompletedThenDestroyed": 0,
+          "crewsLiving": 3,
+          "crewsLost": 0,
+          "scoutLost": false,
+          "missionsStarted": 4,
+          "returnsCompleted": 4,
+          "lostBeforeReturn": 0,
+          "supersededMissions": 4,
+          "interruptedByIncidentEnd": 0,
+          "returnPlanFailures": 0,
+          "strandedSeconds": 0,
+          "withdrawals": 2,
+          "retreats": 0,
+          "refusals": 0,
+          "relays": 203,
+          "endingReasons": [
+            "all_sites_resolved"
+          ],
+          "displayReason": "all_sites_resolved",
+          "simSeconds": 1129,
+          "wallElapsedMs": 0,
+          "replanLatencyMs": [
+            16,
+            17,
+            14,
+            2,
+            7,
+            131,
+            1,
+            2
+          ]
+        },
+        {
+          "seed": "heldout-11",
+          "scenarioVersion": "synthetic-v1",
+          "sites": [
+            {
+              "id": "site-a",
+              "requiredWork": 300,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-b",
+              "requiredWork": 450,
+              "completedWork": 92,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-c",
+              "requiredWork": 600,
+              "completedWork": 600,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            }
+          ],
+          "protectionWorkDelivered": 692,
+          "sitesProtectedAndStanding": 1,
+          "sitesDestroyed": 1,
+          "sitesCompletedThenDestroyed": 0,
+          "crewsLiving": 3,
+          "crewsLost": 0,
+          "scoutLost": false,
+          "missionsStarted": 4,
+          "returnsCompleted": 4,
+          "lostBeforeReturn": 0,
+          "supersededMissions": 3,
+          "interruptedByIncidentEnd": 0,
+          "returnPlanFailures": 0,
+          "strandedSeconds": 0,
+          "withdrawals": 1,
+          "retreats": 0,
+          "refusals": 0,
+          "relays": 299,
+          "endingReasons": [
+            "time_expired"
+          ],
+          "displayReason": "time_expired",
+          "simSeconds": 1500,
+          "wallElapsedMs": 0,
+          "replanLatencyMs": [
+            223,
+            118,
+            118,
+            1,
+            1,
+            0,
+            6,
+            671
+          ]
+        },
+        {
+          "seed": "heldout-12",
+          "scenarioVersion": "synthetic-v1",
+          "sites": [
+            {
+              "id": "site-a",
+              "requiredWork": 300,
+              "completedWork": 0,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-b",
+              "requiredWork": 450,
+              "completedWork": 242,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-c",
+              "requiredWork": 600,
+              "completedWork": 600,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            }
+          ],
+          "protectionWorkDelivered": 842,
+          "sitesProtectedAndStanding": 1,
+          "sitesDestroyed": 0,
+          "sitesCompletedThenDestroyed": 0,
+          "crewsLiving": 3,
+          "crewsLost": 0,
+          "scoutLost": false,
+          "missionsStarted": 4,
+          "returnsCompleted": 4,
+          "lostBeforeReturn": 0,
+          "supersededMissions": 3,
+          "interruptedByIncidentEnd": 0,
+          "returnPlanFailures": 0,
+          "strandedSeconds": 0,
+          "withdrawals": 0,
+          "retreats": 0,
+          "refusals": 0,
+          "relays": 299,
+          "endingReasons": [
+            "time_expired"
+          ],
+          "displayReason": "time_expired",
+          "simSeconds": 1500,
+          "wallElapsedMs": 0,
+          "replanLatencyMs": [
+            15,
+            15,
+            13,
+            1,
+            1,
+            0,
+            9
+          ]
+        },
+        {
+          "seed": "heldout-13",
+          "scenarioVersion": "synthetic-v1",
+          "sites": [
+            {
+              "id": "site-a",
+              "requiredWork": 300,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-b",
+              "requiredWork": 450,
+              "completedWork": 0,
+              "damage": 0.7800000000000006,
+              "destroyed": false,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-c",
+              "requiredWork": 600,
+              "completedWork": 600,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            }
+          ],
+          "protectionWorkDelivered": 600,
+          "sitesProtectedAndStanding": 1,
+          "sitesDestroyed": 1,
+          "sitesCompletedThenDestroyed": 0,
+          "crewsLiving": 3,
+          "crewsLost": 0,
+          "scoutLost": false,
+          "missionsStarted": 3,
+          "returnsCompleted": 3,
+          "lostBeforeReturn": 0,
+          "supersededMissions": 3,
+          "interruptedByIncidentEnd": 0,
+          "returnPlanFailures": 0,
+          "strandedSeconds": 0,
+          "withdrawals": 2,
+          "retreats": 0,
+          "refusals": 0,
+          "relays": 267,
+          "endingReasons": [
+            "time_expired"
+          ],
+          "displayReason": "time_expired",
+          "simSeconds": 1500,
+          "wallElapsedMs": 0,
+          "replanLatencyMs": [
+            15,
+            13,
+            13,
+            4,
+            2,
+            2,
+            3
+          ]
+        },
+        {
+          "seed": "heldout-14",
+          "scenarioVersion": "synthetic-v1",
+          "sites": [
+            {
+              "id": "site-a",
+              "requiredWork": 300,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-b",
+              "requiredWork": 450,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-c",
+              "requiredWork": 600,
+              "completedWork": 600,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            }
+          ],
+          "protectionWorkDelivered": 600,
+          "sitesProtectedAndStanding": 1,
+          "sitesDestroyed": 2,
+          "sitesCompletedThenDestroyed": 0,
+          "crewsLiving": 3,
+          "crewsLost": 0,
+          "scoutLost": false,
+          "missionsStarted": 4,
+          "returnsCompleted": 4,
+          "lostBeforeReturn": 0,
+          "supersededMissions": 4,
+          "interruptedByIncidentEnd": 0,
+          "returnPlanFailures": 0,
+          "strandedSeconds": 0,
+          "withdrawals": 2,
+          "retreats": 0,
+          "refusals": 0,
+          "relays": 201,
+          "endingReasons": [
+            "all_sites_resolved"
+          ],
+          "displayReason": "all_sites_resolved",
+          "simSeconds": 1147,
+          "wallElapsedMs": 0,
+          "replanLatencyMs": [
+            224,
+            117,
+            122,
+            76,
+            7,
+            218,
+            1,
+            2
+          ]
+        },
+        {
+          "seed": "heldout-15",
+          "scenarioVersion": "synthetic-v1",
+          "sites": [
+            {
+              "id": "site-a",
+              "requiredWork": 300,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-b",
+              "requiredWork": 450,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-c",
+              "requiredWork": 600,
+              "completedWork": 600,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            }
+          ],
+          "protectionWorkDelivered": 600,
+          "sitesProtectedAndStanding": 1,
+          "sitesDestroyed": 2,
+          "sitesCompletedThenDestroyed": 0,
+          "crewsLiving": 3,
+          "crewsLost": 0,
+          "scoutLost": false,
+          "missionsStarted": 4,
+          "returnsCompleted": 4,
+          "lostBeforeReturn": 0,
+          "supersededMissions": 4,
+          "interruptedByIncidentEnd": 0,
+          "returnPlanFailures": 0,
+          "strandedSeconds": 0,
+          "withdrawals": 3,
+          "retreats": 0,
+          "refusals": 0,
+          "relays": 205,
+          "endingReasons": [
+            "all_sites_resolved"
+          ],
+          "displayReason": "all_sites_resolved",
+          "simSeconds": 1456,
+          "wallElapsedMs": 0,
+          "replanLatencyMs": [
+            16,
+            16,
+            12,
+            148,
+            9,
+            37,
+            1,
+            2,
+            5
+          ]
+        },
+        {
+          "seed": "heldout-16",
+          "scenarioVersion": "synthetic-v1",
+          "sites": [
+            {
+              "id": "site-a",
+              "requiredWork": 300,
+              "completedWork": 0,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-b",
+              "requiredWork": 450,
+              "completedWork": 242,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-c",
+              "requiredWork": 600,
+              "completedWork": 600,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            }
+          ],
+          "protectionWorkDelivered": 842,
+          "sitesProtectedAndStanding": 1,
+          "sitesDestroyed": 0,
+          "sitesCompletedThenDestroyed": 0,
+          "crewsLiving": 3,
+          "crewsLost": 0,
+          "scoutLost": false,
+          "missionsStarted": 4,
+          "returnsCompleted": 4,
+          "lostBeforeReturn": 0,
+          "supersededMissions": 3,
+          "interruptedByIncidentEnd": 0,
+          "returnPlanFailures": 0,
+          "strandedSeconds": 0,
+          "withdrawals": 0,
+          "retreats": 0,
+          "refusals": 0,
+          "relays": 299,
+          "endingReasons": [
+            "time_expired"
+          ],
+          "displayReason": "time_expired",
+          "simSeconds": 1500,
+          "wallElapsedMs": 0,
+          "replanLatencyMs": [
+            238,
+            119,
+            119,
+            0,
+            1,
+            0,
+            8
+          ]
+        },
+        {
+          "seed": "heldout-17",
+          "scenarioVersion": "synthetic-v1",
+          "sites": [
+            {
+              "id": "site-a",
+              "requiredWork": 300,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-b",
+              "requiredWork": 450,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-c",
+              "requiredWork": 600,
+              "completedWork": 600,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            }
+          ],
+          "protectionWorkDelivered": 600,
+          "sitesProtectedAndStanding": 1,
+          "sitesDestroyed": 2,
+          "sitesCompletedThenDestroyed": 0,
+          "crewsLiving": 3,
+          "crewsLost": 0,
+          "scoutLost": false,
+          "missionsStarted": 4,
+          "returnsCompleted": 4,
+          "lostBeforeReturn": 0,
+          "supersededMissions": 4,
+          "interruptedByIncidentEnd": 0,
+          "returnPlanFailures": 0,
+          "strandedSeconds": 0,
+          "withdrawals": 2,
+          "retreats": 0,
+          "refusals": 0,
+          "relays": 202,
+          "endingReasons": [
+            "all_sites_resolved"
+          ],
+          "displayReason": "all_sites_resolved",
+          "simSeconds": 1223,
+          "wallElapsedMs": 0,
+          "replanLatencyMs": [
+            15,
+            14,
+            14,
+            65,
+            7,
+            165,
+            2,
+            2
+          ]
+        },
+        {
+          "seed": "heldout-18",
+          "scenarioVersion": "synthetic-v1",
+          "sites": [
+            {
+              "id": "site-a",
+              "requiredWork": 300,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-b",
+              "requiredWork": 450,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-c",
+              "requiredWork": 600,
+              "completedWork": 600,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            }
+          ],
+          "protectionWorkDelivered": 600,
+          "sitesProtectedAndStanding": 1,
+          "sitesDestroyed": 2,
+          "sitesCompletedThenDestroyed": 0,
+          "crewsLiving": 3,
+          "crewsLost": 0,
+          "scoutLost": false,
+          "missionsStarted": 4,
+          "returnsCompleted": 4,
+          "lostBeforeReturn": 0,
+          "supersededMissions": 3,
+          "interruptedByIncidentEnd": 0,
+          "returnPlanFailures": 0,
+          "strandedSeconds": 0,
+          "withdrawals": 1,
+          "retreats": 0,
+          "refusals": 0,
+          "relays": 257,
+          "endingReasons": [
+            "all_sites_resolved"
+          ],
+          "displayReason": "all_sites_resolved",
+          "simSeconds": 1439,
+          "wallElapsedMs": 0,
+          "replanLatencyMs": [
+            23,
+            21,
+            19,
+            263,
+            11,
+            2,
+            1,
+            1
+          ]
+        },
+        {
+          "seed": "heldout-19",
+          "scenarioVersion": "synthetic-v1",
+          "sites": [
+            {
+              "id": "site-a",
+              "requiredWork": 300,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-b",
+              "requiredWork": 450,
+              "completedWork": 0,
+              "damage": 0.8700000000000007,
+              "destroyed": false,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-c",
+              "requiredWork": 600,
+              "completedWork": 600,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            }
+          ],
+          "protectionWorkDelivered": 600,
+          "sitesProtectedAndStanding": 1,
+          "sitesDestroyed": 1,
+          "sitesCompletedThenDestroyed": 0,
+          "crewsLiving": 3,
+          "crewsLost": 0,
+          "scoutLost": false,
+          "missionsStarted": 3,
+          "returnsCompleted": 3,
+          "lostBeforeReturn": 0,
+          "supersededMissions": 3,
+          "interruptedByIncidentEnd": 0,
+          "returnPlanFailures": 0,
+          "strandedSeconds": 0,
+          "withdrawals": 0,
+          "retreats": 0,
+          "refusals": 0,
+          "relays": 216,
+          "endingReasons": [
+            "time_expired"
+          ],
+          "displayReason": "time_expired",
+          "simSeconds": 1500,
+          "wallElapsedMs": 0,
+          "replanLatencyMs": [
+            15,
+            24,
+            22,
+            0,
+            1,
+            0
+          ]
+        },
+        {
+          "seed": "heldout-20",
+          "scenarioVersion": "synthetic-v1",
+          "sites": [
+            {
+              "id": "site-a",
+              "requiredWork": 300,
+              "completedWork": 0,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-b",
+              "requiredWork": 450,
+              "completedWork": 0,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-c",
+              "requiredWork": 600,
+              "completedWork": 600,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            }
+          ],
+          "protectionWorkDelivered": 600,
+          "sitesProtectedAndStanding": 1,
+          "sitesDestroyed": 0,
+          "sitesCompletedThenDestroyed": 0,
+          "crewsLiving": 3,
+          "crewsLost": 0,
+          "scoutLost": false,
+          "missionsStarted": 3,
+          "returnsCompleted": 3,
+          "lostBeforeReturn": 0,
+          "supersededMissions": 3,
+          "interruptedByIncidentEnd": 0,
+          "returnPlanFailures": 0,
+          "strandedSeconds": 0,
+          "withdrawals": 0,
+          "retreats": 0,
+          "refusals": 0,
+          "relays": 216,
+          "endingReasons": [
+            "time_expired"
+          ],
+          "displayReason": "time_expired",
+          "simSeconds": 1500,
+          "wallElapsedMs": 0,
+          "replanLatencyMs": [
+            14,
+            13,
+            11,
+            0,
+            1,
+            1
+          ]
+        }
+      ],
+      "replanLatencyP50Ms": 12,
+      "replanLatencyP95Ms": 224,
+      "simStepMeanMs": 0.12313501228050881,
+      "simStepP50Ms": 0,
+      "simStepP95Ms": 1,
+      "simStepMaxMs": 18,
+      "controllerTickP95Ms": 31
+    },
+    {
+      "variant": "ember_line",
+      "summary": {
+        "runs": 20,
+        "meanWorkDelivered": 633.3,
+        "meanSitesProtectedAndStanding": 1,
+        "meanSitesDestroyed": 1.3,
+        "meanCrewsLost": 0,
+        "totalMissionsStarted": 75,
+        "totalReturnsCompleted": 75,
+        "totalInterrupted": 0,
+        "totalSuperseded": 66,
+        "totalLostBeforeReturn": 0,
+        "meanSimSeconds": 1363.95,
+        "endingCounts": {
+          "time_expired": 10,
+          "all_sites_resolved": 10
+        }
+      },
+      "runs": [
+        {
+          "seed": "heldout-01",
+          "scenarioVersion": "synthetic-v1",
+          "sites": [
+            {
+              "id": "site-a",
+              "requiredWork": 300,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-b",
+              "requiredWork": 450,
+              "completedWork": 0,
+              "damage": 0.8820000000000007,
+              "destroyed": false,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-c",
+              "requiredWork": 600,
+              "completedWork": 600,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            }
+          ],
+          "protectionWorkDelivered": 600,
+          "sitesProtectedAndStanding": 1,
+          "sitesDestroyed": 1,
+          "sitesCompletedThenDestroyed": 0,
+          "crewsLiving": 3,
+          "crewsLost": 0,
+          "scoutLost": false,
+          "missionsStarted": 3,
+          "returnsCompleted": 3,
+          "lostBeforeReturn": 0,
+          "supersededMissions": 3,
+          "interruptedByIncidentEnd": 0,
+          "returnPlanFailures": 1,
+          "strandedSeconds": 0,
+          "withdrawals": 0,
+          "retreats": 1,
+          "refusals": 0,
+          "relays": 268,
+          "endingReasons": [
+            "time_expired"
+          ],
+          "displayReason": "time_expired",
+          "simSeconds": 1500,
+          "wallElapsedMs": 0,
+          "replanLatencyMs": [
+            233,
+            137,
+            129,
+            108,
+            248,
+            5,
+            1,
+            2
+          ]
+        },
+        {
+          "seed": "heldout-02",
+          "scenarioVersion": "synthetic-v1",
+          "sites": [
+            {
+              "id": "site-a",
+              "requiredWork": 300,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-b",
+              "requiredWork": 450,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-c",
+              "requiredWork": 600,
+              "completedWork": 600,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            }
+          ],
+          "protectionWorkDelivered": 600,
+          "sitesProtectedAndStanding": 1,
+          "sitesDestroyed": 2,
+          "sitesCompletedThenDestroyed": 0,
+          "crewsLiving": 3,
+          "crewsLost": 0,
+          "scoutLost": false,
+          "missionsStarted": 4,
+          "returnsCompleted": 4,
+          "lostBeforeReturn": 0,
+          "supersededMissions": 4,
+          "interruptedByIncidentEnd": 0,
+          "returnPlanFailures": 0,
+          "strandedSeconds": 0,
+          "withdrawals": 2,
+          "retreats": 0,
+          "refusals": 0,
+          "relays": 240,
+          "endingReasons": [
+            "all_sites_resolved"
+          ],
+          "displayReason": "all_sites_resolved",
+          "simSeconds": 1204,
+          "wallElapsedMs": 0,
+          "replanLatencyMs": [
+            19,
+            14,
+            17,
+            8,
+            86,
+            15,
+            4,
+            221,
+            1,
+            1
+          ]
+        },
+        {
+          "seed": "heldout-03",
+          "scenarioVersion": "synthetic-v1",
+          "sites": [
+            {
+              "id": "site-a",
+              "requiredWork": 300,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-b",
+              "requiredWork": 450,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-c",
+              "requiredWork": 600,
+              "completedWork": 600,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            }
+          ],
+          "protectionWorkDelivered": 600,
+          "sitesProtectedAndStanding": 1,
+          "sitesDestroyed": 2,
+          "sitesCompletedThenDestroyed": 0,
+          "crewsLiving": 3,
+          "crewsLost": 0,
+          "scoutLost": false,
+          "missionsStarted": 4,
+          "returnsCompleted": 4,
+          "lostBeforeReturn": 0,
+          "supersededMissions": 3,
+          "interruptedByIncidentEnd": 0,
+          "returnPlanFailures": 0,
+          "strandedSeconds": 0,
+          "withdrawals": 1,
+          "retreats": 0,
+          "refusals": 0,
+          "relays": 256,
+          "endingReasons": [
+            "all_sites_resolved"
+          ],
+          "displayReason": "all_sites_resolved",
+          "simSeconds": 1282,
+          "wallElapsedMs": 0,
+          "replanLatencyMs": [
+            236,
+            123,
+            126,
+            116,
+            41,
+            6,
+            4,
+            0,
+            2,
+            0
+          ]
+        },
+        {
+          "seed": "heldout-04",
+          "scenarioVersion": "synthetic-v1",
+          "sites": [
+            {
+              "id": "site-a",
+              "requiredWork": 300,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-b",
+              "requiredWork": 450,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-c",
+              "requiredWork": 600,
+              "completedWork": 600,
+              "damage": 0.03480000000000001,
+              "destroyed": false,
+              "protectionComplete": true
+            }
+          ],
+          "protectionWorkDelivered": 600,
+          "sitesProtectedAndStanding": 1,
+          "sitesDestroyed": 2,
+          "sitesCompletedThenDestroyed": 0,
+          "crewsLiving": 3,
+          "crewsLost": 0,
+          "scoutLost": false,
+          "missionsStarted": 4,
+          "returnsCompleted": 4,
+          "lostBeforeReturn": 0,
+          "supersededMissions": 4,
+          "interruptedByIncidentEnd": 0,
+          "returnPlanFailures": 0,
+          "strandedSeconds": 0,
+          "withdrawals": 3,
+          "retreats": 0,
+          "refusals": 0,
+          "relays": 197,
+          "endingReasons": [
+            "all_sites_resolved"
+          ],
+          "displayReason": "all_sites_resolved",
+          "simSeconds": 987,
+          "wallElapsedMs": 0,
+          "replanLatencyMs": [
+            15,
+            17,
+            13,
+            7,
+            164,
+            9,
+            4,
+            128,
+            3,
+            0
+          ]
+        },
+        {
+          "seed": "heldout-05",
+          "scenarioVersion": "synthetic-v1",
+          "sites": [
+            {
+              "id": "site-a",
+              "requiredWork": 300,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-b",
+              "requiredWork": 450,
+              "completedWork": 0,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-c",
+              "requiredWork": 600,
+              "completedWork": 600,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            }
+          ],
+          "protectionWorkDelivered": 600,
+          "sitesProtectedAndStanding": 1,
+          "sitesDestroyed": 1,
+          "sitesCompletedThenDestroyed": 0,
+          "crewsLiving": 3,
+          "crewsLost": 0,
+          "scoutLost": false,
+          "missionsStarted": 4,
+          "returnsCompleted": 4,
+          "lostBeforeReturn": 0,
+          "supersededMissions": 3,
+          "interruptedByIncidentEnd": 0,
+          "returnPlanFailures": 0,
+          "strandedSeconds": 0,
+          "withdrawals": 1,
+          "retreats": 0,
+          "refusals": 0,
+          "relays": 299,
+          "endingReasons": [
+            "time_expired"
+          ],
+          "displayReason": "time_expired",
+          "simSeconds": 1500,
+          "wallElapsedMs": 0,
+          "replanLatencyMs": [
+            15,
+            15,
+            12,
+            7,
+            41,
+            8,
+            6,
+            2,
+            1,
+            1
+          ]
+        },
+        {
+          "seed": "heldout-06",
+          "scenarioVersion": "synthetic-v1",
+          "sites": [
+            {
+              "id": "site-a",
+              "requiredWork": 300,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-b",
+              "requiredWork": 450,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-c",
+              "requiredWork": 600,
+              "completedWork": 600,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            }
+          ],
+          "protectionWorkDelivered": 600,
+          "sitesProtectedAndStanding": 1,
+          "sitesDestroyed": 2,
+          "sitesCompletedThenDestroyed": 0,
+          "crewsLiving": 3,
+          "crewsLost": 0,
+          "scoutLost": false,
+          "missionsStarted": 4,
+          "returnsCompleted": 4,
+          "lostBeforeReturn": 0,
+          "supersededMissions": 3,
+          "interruptedByIncidentEnd": 0,
+          "returnPlanFailures": 0,
+          "strandedSeconds": 0,
+          "withdrawals": 1,
+          "retreats": 0,
+          "refusals": 0,
+          "relays": 228,
+          "endingReasons": [
+            "all_sites_resolved"
+          ],
+          "displayReason": "all_sites_resolved",
+          "simSeconds": 1145,
+          "wallElapsedMs": 0,
+          "replanLatencyMs": [
+            15,
+            16,
+            13,
+            7,
+            353,
+            7,
+            3,
+            2,
+            1,
+            0
+          ]
+        },
+        {
+          "seed": "heldout-07",
+          "scenarioVersion": "synthetic-v1",
+          "sites": [
+            {
+              "id": "site-a",
+              "requiredWork": 300,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-b",
+              "requiredWork": 450,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-c",
+              "requiredWork": 600,
+              "completedWork": 600,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            }
+          ],
+          "protectionWorkDelivered": 600,
+          "sitesProtectedAndStanding": 1,
+          "sitesDestroyed": 2,
+          "sitesCompletedThenDestroyed": 0,
+          "crewsLiving": 3,
+          "crewsLost": 0,
+          "scoutLost": false,
+          "missionsStarted": 3,
+          "returnsCompleted": 3,
+          "lostBeforeReturn": 0,
+          "supersededMissions": 3,
+          "interruptedByIncidentEnd": 0,
+          "returnPlanFailures": 0,
+          "strandedSeconds": 0,
+          "withdrawals": 1,
+          "retreats": 0,
+          "refusals": 0,
+          "relays": 253,
+          "endingReasons": [
+            "all_sites_resolved"
+          ],
+          "displayReason": "all_sites_resolved",
+          "simSeconds": 1267,
+          "wallElapsedMs": 0,
+          "replanLatencyMs": [
+            248,
+            127,
+            130,
+            119,
+            39,
+            5,
+            1,
+            1
+          ]
+        },
+        {
+          "seed": "heldout-08",
+          "scenarioVersion": "synthetic-v1",
+          "sites": [
+            {
+              "id": "site-a",
+              "requiredWork": 300,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-b",
+              "requiredWork": 450,
+              "completedWork": 0,
+              "damage": 0.4500000000000003,
+              "destroyed": false,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-c",
+              "requiredWork": 600,
+              "completedWork": 600,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            }
+          ],
+          "protectionWorkDelivered": 600,
+          "sitesProtectedAndStanding": 1,
+          "sitesDestroyed": 1,
+          "sitesCompletedThenDestroyed": 0,
+          "crewsLiving": 3,
+          "crewsLost": 0,
+          "scoutLost": false,
+          "missionsStarted": 3,
+          "returnsCompleted": 3,
+          "lostBeforeReturn": 0,
+          "supersededMissions": 3,
+          "interruptedByIncidentEnd": 0,
+          "returnPlanFailures": 0,
+          "strandedSeconds": 0,
+          "withdrawals": 0,
+          "retreats": 0,
+          "refusals": 0,
+          "relays": 271,
+          "endingReasons": [
+            "time_expired"
+          ],
+          "displayReason": "time_expired",
+          "simSeconds": 1500,
+          "wallElapsedMs": 0,
+          "replanLatencyMs": [
+            14,
+            15,
+            13,
+            7,
+            4,
+            0,
+            0,
+            1
+          ]
+        },
+        {
+          "seed": "heldout-09",
+          "scenarioVersion": "synthetic-v1",
+          "sites": [
+            {
+              "id": "site-a",
+              "requiredWork": 300,
+              "completedWork": 0,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-b",
+              "requiredWork": 450,
+              "completedWork": 212,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-c",
+              "requiredWork": 600,
+              "completedWork": 600,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            }
+          ],
+          "protectionWorkDelivered": 812,
+          "sitesProtectedAndStanding": 1,
+          "sitesDestroyed": 0,
+          "sitesCompletedThenDestroyed": 0,
+          "crewsLiving": 3,
+          "crewsLost": 0,
+          "scoutLost": false,
+          "missionsStarted": 4,
+          "returnsCompleted": 4,
+          "lostBeforeReturn": 0,
+          "supersededMissions": 3,
+          "interruptedByIncidentEnd": 0,
+          "returnPlanFailures": 0,
+          "strandedSeconds": 0,
+          "withdrawals": 0,
+          "retreats": 0,
+          "refusals": 0,
+          "relays": 299,
+          "endingReasons": [
+            "time_expired"
+          ],
+          "displayReason": "time_expired",
+          "simSeconds": 1500,
+          "wallElapsedMs": 0,
+          "replanLatencyMs": [
+            15,
+            15,
+            13,
+            7,
+            6,
+            0,
+            2,
+            0,
+            6
+          ]
+        },
+        {
+          "seed": "heldout-10",
+          "scenarioVersion": "synthetic-v1",
+          "sites": [
+            {
+              "id": "site-a",
+              "requiredWork": 300,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-b",
+              "requiredWork": 450,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-c",
+              "requiredWork": 600,
+              "completedWork": 600,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            }
+          ],
+          "protectionWorkDelivered": 600,
+          "sitesProtectedAndStanding": 1,
+          "sitesDestroyed": 2,
+          "sitesCompletedThenDestroyed": 0,
+          "crewsLiving": 3,
+          "crewsLost": 0,
+          "scoutLost": false,
+          "missionsStarted": 5,
+          "returnsCompleted": 5,
+          "lostBeforeReturn": 0,
+          "supersededMissions": 5,
+          "interruptedByIncidentEnd": 0,
+          "returnPlanFailures": 0,
+          "strandedSeconds": 0,
+          "withdrawals": 4,
+          "retreats": 0,
+          "refusals": 0,
+          "relays": 225,
+          "endingReasons": [
+            "all_sites_resolved"
+          ],
+          "displayReason": "all_sites_resolved",
+          "simSeconds": 1129,
+          "wallElapsedMs": 0,
+          "replanLatencyMs": [
+            17,
+            12,
+            11,
+            7,
+            248,
+            7,
+            4,
+            61,
+            4,
+            3,
+            0,
+            1,
+            3
+          ]
+        },
+        {
+          "seed": "heldout-11",
+          "scenarioVersion": "synthetic-v1",
+          "sites": [
+            {
+              "id": "site-a",
+              "requiredWork": 300,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-b",
+              "requiredWork": 450,
+              "completedWork": 0,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-c",
+              "requiredWork": 600,
+              "completedWork": 600,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            }
+          ],
+          "protectionWorkDelivered": 600,
+          "sitesProtectedAndStanding": 1,
+          "sitesDestroyed": 1,
+          "sitesCompletedThenDestroyed": 0,
+          "crewsLiving": 3,
+          "crewsLost": 0,
+          "scoutLost": false,
+          "missionsStarted": 4,
+          "returnsCompleted": 4,
+          "lostBeforeReturn": 0,
+          "supersededMissions": 3,
+          "interruptedByIncidentEnd": 0,
+          "returnPlanFailures": 0,
+          "strandedSeconds": 0,
+          "withdrawals": 1,
+          "retreats": 0,
+          "refusals": 0,
+          "relays": 299,
+          "endingReasons": [
+            "time_expired"
+          ],
+          "displayReason": "time_expired",
+          "simSeconds": 1500,
+          "wallElapsedMs": 0,
+          "replanLatencyMs": [
+            223,
+            120,
+            121,
+            105,
+            40,
+            7,
+            3,
+            2,
+            2,
+            0
+          ]
+        },
+        {
+          "seed": "heldout-12",
+          "scenarioVersion": "synthetic-v1",
+          "sites": [
+            {
+              "id": "site-a",
+              "requiredWork": 300,
+              "completedWork": 0,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-b",
+              "requiredWork": 450,
+              "completedWork": 242,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-c",
+              "requiredWork": 600,
+              "completedWork": 600,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            }
+          ],
+          "protectionWorkDelivered": 842,
+          "sitesProtectedAndStanding": 1,
+          "sitesDestroyed": 0,
+          "sitesCompletedThenDestroyed": 0,
+          "crewsLiving": 3,
+          "crewsLost": 0,
+          "scoutLost": false,
+          "missionsStarted": 4,
+          "returnsCompleted": 4,
+          "lostBeforeReturn": 0,
+          "supersededMissions": 3,
+          "interruptedByIncidentEnd": 0,
+          "returnPlanFailures": 0,
+          "strandedSeconds": 0,
+          "withdrawals": 0,
+          "retreats": 0,
+          "refusals": 0,
+          "relays": 299,
+          "endingReasons": [
+            "time_expired"
+          ],
+          "displayReason": "time_expired",
+          "simSeconds": 1500,
+          "wallElapsedMs": 0,
+          "replanLatencyMs": [
+            17,
+            14,
+            12,
+            8,
+            4,
+            0,
+            2,
+            0,
+            7
+          ]
+        },
+        {
+          "seed": "heldout-13",
+          "scenarioVersion": "synthetic-v1",
+          "sites": [
+            {
+              "id": "site-a",
+              "requiredWork": 300,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-b",
+              "requiredWork": 450,
+              "completedWork": 0,
+              "damage": 0.7800000000000006,
+              "destroyed": false,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-c",
+              "requiredWork": 600,
+              "completedWork": 600,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            }
+          ],
+          "protectionWorkDelivered": 600,
+          "sitesProtectedAndStanding": 1,
+          "sitesDestroyed": 1,
+          "sitesCompletedThenDestroyed": 0,
+          "crewsLiving": 3,
+          "crewsLost": 0,
+          "scoutLost": false,
+          "missionsStarted": 3,
+          "returnsCompleted": 3,
+          "lostBeforeReturn": 0,
+          "supersededMissions": 3,
+          "interruptedByIncidentEnd": 0,
+          "returnPlanFailures": 0,
+          "strandedSeconds": 0,
+          "withdrawals": 0,
+          "retreats": 0,
+          "refusals": 0,
+          "relays": 271,
+          "endingReasons": [
+            "time_expired"
+          ],
+          "displayReason": "time_expired",
+          "simSeconds": 1500,
+          "wallElapsedMs": 0,
+          "replanLatencyMs": [
+            15,
+            14,
+            11,
+            7,
+            4,
+            1,
+            1,
+            1
+          ]
+        },
+        {
+          "seed": "heldout-14",
+          "scenarioVersion": "synthetic-v1",
+          "sites": [
+            {
+              "id": "site-a",
+              "requiredWork": 300,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-b",
+              "requiredWork": 450,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-c",
+              "requiredWork": 600,
+              "completedWork": 600,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            }
+          ],
+          "protectionWorkDelivered": 600,
+          "sitesProtectedAndStanding": 1,
+          "sitesDestroyed": 2,
+          "sitesCompletedThenDestroyed": 0,
+          "crewsLiving": 3,
+          "crewsLost": 0,
+          "scoutLost": false,
+          "missionsStarted": 4,
+          "returnsCompleted": 4,
+          "lostBeforeReturn": 0,
+          "supersededMissions": 4,
+          "interruptedByIncidentEnd": 0,
+          "returnPlanFailures": 0,
+          "strandedSeconds": 0,
+          "withdrawals": 2,
+          "retreats": 0,
+          "refusals": 0,
+          "relays": 229,
+          "endingReasons": [
+            "all_sites_resolved"
+          ],
+          "displayReason": "all_sites_resolved",
+          "simSeconds": 1147,
+          "wallElapsedMs": 0,
+          "replanLatencyMs": [
+            15,
+            16,
+            12,
+            13,
+            222,
+            8,
+            5,
+            82,
+            1,
+            2
+          ]
+        },
+        {
+          "seed": "heldout-15",
+          "scenarioVersion": "synthetic-v1",
+          "sites": [
+            {
+              "id": "site-a",
+              "requiredWork": 300,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-b",
+              "requiredWork": 450,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-c",
+              "requiredWork": 600,
+              "completedWork": 600,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            }
+          ],
+          "protectionWorkDelivered": 600,
+          "sitesProtectedAndStanding": 1,
+          "sitesDestroyed": 2,
+          "sitesCompletedThenDestroyed": 0,
+          "crewsLiving": 3,
+          "crewsLost": 0,
+          "scoutLost": false,
+          "missionsStarted": 3,
+          "returnsCompleted": 3,
+          "lostBeforeReturn": 0,
+          "supersededMissions": 3,
+          "interruptedByIncidentEnd": 0,
+          "returnPlanFailures": 1,
+          "strandedSeconds": 0,
+          "withdrawals": 0,
+          "retreats": 1,
+          "refusals": 0,
+          "relays": 268,
+          "endingReasons": [
+            "all_sites_resolved"
+          ],
+          "displayReason": "all_sites_resolved",
+          "simSeconds": 1456,
+          "wallElapsedMs": 0,
+          "replanLatencyMs": [
+            210,
+            113,
+            159,
+            115,
+            100,
+            5,
+            1,
+            1
+          ]
+        },
+        {
+          "seed": "heldout-16",
+          "scenarioVersion": "synthetic-v1",
+          "sites": [
+            {
+              "id": "site-a",
+              "requiredWork": 300,
+              "completedWork": 0,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-b",
+              "requiredWork": 450,
+              "completedWork": 212,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-c",
+              "requiredWork": 600,
+              "completedWork": 600,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            }
+          ],
+          "protectionWorkDelivered": 812,
+          "sitesProtectedAndStanding": 1,
+          "sitesDestroyed": 0,
+          "sitesCompletedThenDestroyed": 0,
+          "crewsLiving": 3,
+          "crewsLost": 0,
+          "scoutLost": false,
+          "missionsStarted": 4,
+          "returnsCompleted": 4,
+          "lostBeforeReturn": 0,
+          "supersededMissions": 3,
+          "interruptedByIncidentEnd": 0,
+          "returnPlanFailures": 0,
+          "strandedSeconds": 0,
+          "withdrawals": 0,
+          "retreats": 0,
+          "refusals": 0,
+          "relays": 299,
+          "endingReasons": [
+            "time_expired"
+          ],
+          "displayReason": "time_expired",
+          "simSeconds": 1500,
+          "wallElapsedMs": 0,
+          "replanLatencyMs": [
+            21,
+            14,
+            11,
+            7,
+            6,
+            0,
+            2,
+            0,
+            9
+          ]
+        },
+        {
+          "seed": "heldout-17",
+          "scenarioVersion": "synthetic-v1",
+          "sites": [
+            {
+              "id": "site-a",
+              "requiredWork": 300,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-b",
+              "requiredWork": 450,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-c",
+              "requiredWork": 600,
+              "completedWork": 600,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            }
+          ],
+          "protectionWorkDelivered": 600,
+          "sitesProtectedAndStanding": 1,
+          "sitesDestroyed": 2,
+          "sitesCompletedThenDestroyed": 0,
+          "crewsLiving": 3,
+          "crewsLost": 0,
+          "scoutLost": false,
+          "missionsStarted": 4,
+          "returnsCompleted": 4,
+          "lostBeforeReturn": 0,
+          "supersededMissions": 3,
+          "interruptedByIncidentEnd": 0,
+          "returnPlanFailures": 1,
+          "strandedSeconds": 0,
+          "withdrawals": 0,
+          "retreats": 1,
+          "refusals": 0,
+          "relays": 244,
+          "endingReasons": [
+            "all_sites_resolved"
+          ],
+          "displayReason": "all_sites_resolved",
+          "simSeconds": 1223,
+          "wallElapsedMs": 0,
+          "replanLatencyMs": [
+            223,
+            120,
+            120,
+            112,
+            22,
+            4,
+            4,
+            11,
+            2,
+            0
+          ]
+        },
+        {
+          "seed": "heldout-18",
+          "scenarioVersion": "synthetic-v1",
+          "sites": [
+            {
+              "id": "site-a",
+              "requiredWork": 300,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-b",
+              "requiredWork": 450,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-c",
+              "requiredWork": 600,
+              "completedWork": 600,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            }
+          ],
+          "protectionWorkDelivered": 600,
+          "sitesProtectedAndStanding": 1,
+          "sitesDestroyed": 2,
+          "sitesCompletedThenDestroyed": 0,
+          "crewsLiving": 3,
+          "crewsLost": 0,
+          "scoutLost": false,
+          "missionsStarted": 4,
+          "returnsCompleted": 4,
+          "lostBeforeReturn": 0,
+          "supersededMissions": 3,
+          "interruptedByIncidentEnd": 0,
+          "returnPlanFailures": 0,
+          "strandedSeconds": 0,
+          "withdrawals": 1,
+          "retreats": 0,
+          "refusals": 0,
+          "relays": 287,
+          "endingReasons": [
+            "all_sites_resolved"
+          ],
+          "displayReason": "all_sites_resolved",
+          "simSeconds": 1439,
+          "wallElapsedMs": 0,
+          "replanLatencyMs": [
+            17,
+            15,
+            12,
+            7,
+            265,
+            12,
+            4,
+            1,
+            2,
+            1
+          ]
+        },
+        {
+          "seed": "heldout-19",
+          "scenarioVersion": "synthetic-v1",
+          "sites": [
+            {
+              "id": "site-a",
+              "requiredWork": 300,
+              "completedWork": 0,
+              "damage": 1,
+              "destroyed": true,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-b",
+              "requiredWork": 450,
+              "completedWork": 0,
+              "damage": 0.8700000000000007,
+              "destroyed": false,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-c",
+              "requiredWork": 600,
+              "completedWork": 600,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            }
+          ],
+          "protectionWorkDelivered": 600,
+          "sitesProtectedAndStanding": 1,
+          "sitesDestroyed": 1,
+          "sitesCompletedThenDestroyed": 0,
+          "crewsLiving": 3,
+          "crewsLost": 0,
+          "scoutLost": false,
+          "missionsStarted": 4,
+          "returnsCompleted": 4,
+          "lostBeforeReturn": 0,
+          "supersededMissions": 4,
+          "interruptedByIncidentEnd": 0,
+          "returnPlanFailures": 0,
+          "strandedSeconds": 0,
+          "withdrawals": 1,
+          "retreats": 0,
+          "refusals": 0,
+          "relays": 299,
+          "endingReasons": [
+            "time_expired"
+          ],
+          "displayReason": "time_expired",
+          "simSeconds": 1500,
+          "wallElapsedMs": 0,
+          "replanLatencyMs": [
+            15,
+            13,
+            10,
+            7,
+            65,
+            3,
+            1,
+            1,
+            3,
+            0
+          ]
+        },
+        {
+          "seed": "heldout-20",
+          "scenarioVersion": "synthetic-v1",
+          "sites": [
+            {
+              "id": "site-a",
+              "requiredWork": 300,
+              "completedWork": 0,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-b",
+              "requiredWork": 450,
+              "completedWork": 0,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": false
+            },
+            {
+              "id": "site-c",
+              "requiredWork": 600,
+              "completedWork": 600,
+              "damage": 0,
+              "destroyed": false,
+              "protectionComplete": true
+            }
+          ],
+          "protectionWorkDelivered": 600,
+          "sitesProtectedAndStanding": 1,
+          "sitesDestroyed": 0,
+          "sitesCompletedThenDestroyed": 0,
+          "crewsLiving": 3,
+          "crewsLost": 0,
+          "scoutLost": false,
+          "missionsStarted": 3,
+          "returnsCompleted": 3,
+          "lostBeforeReturn": 0,
+          "supersededMissions": 3,
+          "interruptedByIncidentEnd": 0,
+          "returnPlanFailures": 0,
+          "strandedSeconds": 0,
+          "withdrawals": 0,
+          "retreats": 0,
+          "refusals": 0,
+          "relays": 271,
+          "endingReasons": [
+            "time_expired"
+          ],
+          "displayReason": "time_expired",
+          "simSeconds": 1500,
+          "wallElapsedMs": 0,
+          "replanLatencyMs": [
+            13,
+            13,
+            10,
+            6,
+            4,
+            1,
+            0,
+            1
+          ]
+        }
+      ],
+      "replanLatencyP50Ms": 7,
+      "replanLatencyP95Ms": 222,
+      "simStepMeanMs": 0.1261043293375857,
+      "simStepP50Ms": 0,
+      "simStepP95Ms": 1,
+      "simStepMaxMs": 3,
+      "controllerTickP95Ms": 29
+    }
+  ],
+  "failures": [
+    {
+      "variant": "dispatch",
+      "seed": "heldout-01",
+      "kind": "stranded",
+      "detail": "180 stranded seconds"
+    },
+    {
+      "variant": "dispatch",
+      "seed": "heldout-02",
+      "kind": "crew_lost",
+      "detail": "1 crew(s) lost; 1 before returning"
+    },
+    {
+      "variant": "dispatch",
+      "seed": "heldout-06",
+      "kind": "crew_lost",
+      "detail": "1 crew(s) lost; 1 before returning"
+    },
+    {
+      "variant": "dispatch",
+      "seed": "heldout-08",
+      "kind": "stranded",
+      "detail": "105 stranded seconds"
+    },
+    {
+      "variant": "dispatch",
+      "seed": "heldout-10",
+      "kind": "crew_lost",
+      "detail": "1 crew(s) lost; 1 before returning"
+    },
+    {
+      "variant": "dispatch",
+      "seed": "heldout-13",
+      "kind": "stranded",
+      "detail": "51 stranded seconds"
+    },
+    {
+      "variant": "dispatch",
+      "seed": "heldout-14",
+      "kind": "crew_lost",
+      "detail": "1 crew(s) lost; 1 before returning"
+    },
+    {
+      "variant": "dispatch",
+      "seed": "heldout-15",
+      "kind": "crew_lost",
+      "detail": "3 crew(s) lost; 1 before returning"
+    },
+    {
+      "variant": "dispatch",
+      "seed": "heldout-18",
+      "kind": "crew_lost",
+      "detail": "1 crew(s) lost; 1 before returning"
+    },
+    {
+      "variant": "dispatch",
+      "seed": "heldout-19",
+      "kind": "crew_lost",
+      "detail": "2 crew(s) lost; 0 before returning"
+    },
+    {
+      "variant": "dispatch",
+      "seed": "heldout-19",
+      "kind": "stranded",
+      "detail": "422 stranded seconds"
+    },
+    {
+      "variant": "forecast_no_scout",
+      "seed": "heldout-07",
+      "kind": "no_normal_return",
+      "detail": "1 best-effort retreat(s)"
+    },
+    {
+      "variant": "ember_line",
+      "seed": "heldout-01",
+      "kind": "no_normal_return",
+      "detail": "1 best-effort retreat(s)"
+    },
+    {
+      "variant": "ember_line",
+      "seed": "heldout-15",
+      "kind": "no_normal_return",
+      "detail": "1 best-effort retreat(s)"
+    },
+    {
+      "variant": "ember_line",
+      "seed": "heldout-17",
+      "kind": "no_normal_return",
+      "detail": "1 best-effort retreat(s)"
+    }
+  ],
+  "caveats": [
+    "Synthetic authored scenario, not the real road extract; constants are documented defaults, not calibrated physics.",
+    "All variants share one hidden fire trajectory per seed up to their own end; protection does not alter spread.",
+    "Runs may end at different times, so final health is an endpoint measure, not an equal-exposure experiment.",
+    "Return counts show interrupted and superseded missions beside completed returns; none are dropped.",
+    "A shared scripted coordinator policy relays evidence; it is not a model of human coordination.",
+    "Ensemble pass fractions are design counts, not validated survival probabilities."
+  ]
+}

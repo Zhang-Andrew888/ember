@@ -65,7 +65,72 @@ real Oakland extract.
 - A planning bug found and fixed on the way: a late-evidence `evalDirty` storm made agents re-plan on every step
   (9x slowdown); only burning/burned evidence triggers it now.
 
-## Known gaps
+## Slice 5 (no provider) and Slice 7 (replay, policy, failure injection)
 
-- Slice 5 conversation, Slice 7 comparison harness, failure injection and the scripted coordinator policy: see below
-  for what landed.
+- `packages/communication`: intent envelope schema, public-name matching, `ScriptedInterpreter` (deterministic stand-in
+  for the model), `CommandGateway` (persistent addressed recipient resolved in input order, clarification, evidence
+  resolved only from received reports, agent reports never become observations, unsupported claims change nothing,
+  idempotent command ids, 5 s "still interpreting" / 10 s failure, incident-end rejection), `AudioScheduler`
+  (urgent-over-routine, recording suspends playback, unready urgent audio blocks routine, relevance check, coalescing,
+  flush, one end announcement), `PushToTalk`, replies in plain or radio phrasing built from committed decisions.
+  Covered: communication cases 1-15 from docs/VALIDATION.md except real microphone/provider behaviour.
+- `apps/server`: `IncidentRunner` (monotonic clock), `IncidentSession` (incident + controllers + reservations),
+  `ConversationBridge`, `ScriptedCoordinatorPolicy` (v2), evaluation harness (`runVariant`, `runEvaluation`), offline
+  CLIs (`evaluate-cli.ts`, `sensitivity-cli.ts`), failure injection (sensor blackout, relay delay, relay drop).
+- `packages/replay`: run records, bundles, `BundleReplayReader`, `revealFire`, run metrics.
+- Not done: the real Grok adapter and WebSocket transport (need provider access / Slice 0); the two-minute
+  presentation and screenshots (web lane); agent-loss injection.
+
+## Evaluation results (actual numbers, 4-core Linux container, Node 22.22.0, scenario hash 9c5ecd71...)
+
+Files: `apps/server/evaluation-results/` (`heldout-20-seeds.json`, `dev-5-seeds.json`, `showcase-seed.json`,
+`prior-sensitivity-exploratory.json`). Policy: `scripted-relay` v2. Seeds: `heldout-01..20`, with every fourth seed
+forcing an earlier-than-prior wind shift (280 s) and every fourth-plus-one a wider spread rate (1.55).
+
+| 20 held-out seeds | Dispatch baseline | Forecast, no scout | Ember Line |
+|---|---|---|---|
+| Mean protection work delivered | 802.5 | 639.4 | 633.3 |
+| Mean sites protected and standing (of 3) | 1.45 | 1.00 | 1.00 |
+| Mean sites destroyed | 1.2 | 1.3 | 1.3 |
+| Crews lost (total over 20 runs) | 10 | 0 | 0 |
+| Missions started / returns / interrupted by end / superseded / lost before return | 173 / 93 / 30 / 104 / 6 | 74 / 74 / 0 / 68 / 0 | 75 / 75 / 0 / 66 / 0 |
+| Stranded seconds (total) | 758 | 0 | 0 |
+| Runs ended by | resolved 14, expired 5, all crews lost 1 | expired 10, resolved 10 | expired 10, resolved 10 |
+
+Reading these honestly:
+
+- The no-forecast baseline delivers more work and saves more sites, but it loses crews (10 over 20 runs, 6 before
+  returning) and spends time stranded; forecast planning lost none. That is a safety/productivity trade, not a win for
+  either side. Final health here is an endpoint measure and runs end at different times.
+- **The scout shows no measurable benefit on this scenario** (633 vs 639 work; same sites). Three reasons visible in
+  traces: all three crews independently pick the same best site at t=0 (spec: no shared knowledge), finishing it at
+  about 509 s and then finding no admissible mission once the fire nears; the scout's information-value ranking mostly
+  picks points near the corridor, far from the fire front; and the scripted policy only relays, it never allocates.
+  No claim of a navigation benefit from scouting can be made from this data.
+- Prior width is not the limiting factor: widening, narrowing or matching the prior to the true sampling ranges gave
+  600-648 work (`prior-sensitivity-exploratory.json`, 5 dev seeds, exploratory).
+- Performance (all variants, held-out): authoritative step mean 0.12-0.15 ms, p95 1 ms, max 18 ms (target p95 < 20 ms
+  met); controller work p95 22-31 ms per simulated second; replanning (ticks that produced a plan) p50 7-12 ms and
+  p95 222-224 ms for forecast variants (target p95 < 500 ms met). Contradiction rebuilds can take 1-4 s in this
+  single-threaded harness; the design runs them asynchronously, so a real server must run forecasts off the step loop.
+- Representative failures (15 in the held-out report): dispatch lost crews on heldout-02, 06, 10, 14, 15 (three lost
+  on 15), and spent 180 s stranded on heldout-01; see `failures` in the JSON.
+
+## Calibration and scenario notes
+
+- The first synthetic graph funnelled every crew through one corridor, so crews 2 and 3 never worked. A second road
+  (Refuge South to Community Lodge) was added to the authored graph; tests that assumed only two ways home were updated.
+  This is an authored-scenario change, not a result-tuning change, and it is recorded in the commit message.
+- Planning is conservative by design (start-of-step ignition, 30 s buffer, wide prior); `idle: no_feasible_mission`
+  is reported with a reason, never hidden.
+- Not implemented from the docs: the scout using relayed crew missions or deadlines for relevance; objective kinds
+  "avoid corridor" (contract gap, issue #3); real-map extraction.
+
+## Review of own diff
+
+Bugs found and fixed after the fact: relay `receivedAt` used the pre-step time; replans fired every step on any new
+cell evidence (9x slowdown); emergency/return planning used the approach class's reservation view; certification
+ignored an agent held past its planned departure; the metrics counted a mission replaced by a return order as never
+returned; unreachable `SimulationAPI` claims. Dead code removed. Gaps remaining: the speed-up work to forecasts relies
+on the incremental-fit assumption that evidence is append-only per source (out-of-order evidence falls back to a full
+rebuild, tested); the `ScriptedInterpreter` is a keyword parser, not a language model.
