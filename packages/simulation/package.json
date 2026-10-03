@@ -8,6 +8,10 @@
     ".": {
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
+    },
+    "./model": {
+      "import": "./dist/model/index.js",
+      "types": "./dist/model/index.d.ts"
     }
   },
   "scripts": {
@@ -15,6 +19,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@ember/domain": "workspace:*"
+    "@ember/domain": "workspace:*",
+    "@ember/knowledge": "workspace:*",
+    "zod": "3.24.2"
   }
 }
