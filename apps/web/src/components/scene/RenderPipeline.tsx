@@ -11,8 +11,19 @@ import { initialAutoTier, percentile75, recordFrame, type AutoTierState } from "
 import { frameMsStore, qualityStore, type SceneParams } from "./quality/qualityStore.js";
 import type { QualityConfig } from "./quality/tiers.js";
 
-/** Every Nth frame is timed with a GPU finish() so asynchronous GPU cost is counted. */
+/** Every Nth frame is timed with a forced GPU sync so asynchronous GPU cost is counted. */
 const SYNC_EVERY = 4;
+
+/**
+ * Blocks until the GPU has finished everything submitted so far. gl.finish() is NOT reliable for this:
+ * measured under ANGLE/SwiftShader it returned immediately (readout 4.5 ms while real frames took
+ * ~1000 ms), which would stop the auto tier from ever stepping down on a weak machine. Reading one
+ * pixel back cannot return before the pixels exist.
+ */
+const syncPixel = new Uint8Array(4);
+export function waitForGpu(context: WebGLRenderingContext | WebGL2RenderingContext): void {
+  context.readPixels(0, 0, 1, 1, context.RGBA, context.UNSIGNED_BYTE, syncPixel);
+}
 
 /**
  * Owns rendering (a priority-1 useFrame disables R3F's own render):
@@ -92,7 +103,7 @@ export function RenderPipeline({
     if (composer) composer.render();
     else gl.render(scene, camera);
     if (timed) {
-      gl.getContext().finish();
+      waitForGpu(gl.getContext());
       const cost = performance.now() - start;
       if (autoEnabled) {
         autoRef.current = recordFrame(autoRef.current, cost, performance.now());

@@ -1703,3 +1703,13 @@ on plain-http pages. Details in commit 13.
 
 Environment notes: corepack's cached pnpm 12.8.1 is broken in this VM; pnpm 10.28 was used through a wrapper outside the repo.
 Playwright is not a repo dependency (the perf script resolves it locally or from the global npm root).
+
+### Debugging pass: the auto quality tier never stepped down (found by checking the unverified timer)
+Reproduced: with `?perfContinuous` on high, the in-app readout said 4.5 ms while real frames took ~1037 ms. Root cause:
+`gl.getContext().finish()` returns immediately under ANGLE/SwiftShader, so RenderPipeline timed only the CPU submit and the
+auto tier (which trusts that number) would never have stepped down on a weak machine.
+Fixes: (1) timing now forces a sync with a 1-pixel `readPixels` (`waitForGpu`); readout became ~3000 ms vs ~1100 ms real, i.e. the
+right order of magnitude and over budget. (2) a fast path in `autoTier`: 4 consecutive frames over 72 ms step down at once,
+because a 1 fps machine would otherwise take minutes to fill the 24-sample window (3 new tests, 2 old ones updated for the new
+intent). Verified end to end in auto mode on this VM: high -> medium at 13 s -> low at 23 s (before: stayed on high).
+Also checked: PR #30 CI all green (Lint, Typecheck, Test).
