@@ -6,8 +6,8 @@ import { formatIncidentClock } from "../../format/time.js";
 
 /**
  * Pure builders for the route-emphasis and forecast layers. They consume
- * only CoordinatorView (agentPlans, coordinatorForecast - contract issues
- * #1/#2, now in packages/domain) so nothing here can leak unknown fire.
+ * only CoordinatorView (`agentPlans`, `coordinatorForecast` from packages/domain)
+ * so nothing here can leak unknown fire.
  */
 
 export type RoutePhase = "approach" | "work" | "return";
