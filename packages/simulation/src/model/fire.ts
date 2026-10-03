@@ -1,9 +1,13 @@
 import { SIM_DEFAULTS } from "./constants.js";
+import { unitHash } from "./rng.js";
 import {
   FUEL_MODELS,
   FUEL_SHRUB,
+  crownInitiationKwM,
   ellipseEccentricity,
   firelineIntensityKwM,
+  flameLengthM,
+  intensityPerMps,
   ellipseFactor,
   noWindRateFtMin,
   rothermelPhiS,
@@ -30,6 +34,14 @@ export interface FireParams {
   readonly windSpeedMps?: number;
   /** Dead fuel moisture fraction; defaults to SIM_DEFAULTS.fuelMoisture. */
   readonly moisture?: number;
+  /** Seeds ember spotting; when undefined, no spotting occurs. Crown fire needs no seed. */
+  readonly spotSeed?: number | undefined;
+}
+
+/** One ember landing: the burning source cell and the cell it ignited. */
+export interface Spot {
+  readonly from: number;
+  readonly to: number;
 }
 
 export function windDirectionAt(params: FireParams, tMs: number): number {
@@ -147,6 +159,10 @@ export class FireField {
   readonly ignitedAtMs: Float64Array;
   private readonly progress: Float64Array;
   private burning: number[] = [];
+  /** Spot ignitions of the most recent step, in order. */
+  lastSpots: Spot[] = [];
+  /** Cells that spread as crown fire at least once. */
+  readonly crowned: Uint8Array;
   private readonly terrain: Terrain;
 
   constructor(terrain: Terrain, nonburnable: ReadonlySet<number>) {
@@ -155,6 +171,7 @@ export class FireField {
     this.state = new Uint8Array(n).fill(CELL_UNBURNED);
     this.ignitedAtMs = new Float64Array(n).fill(Infinity);
     this.progress = new Float64Array(n * 8);
+    this.crowned = new Uint8Array(n);
     for (const cell of nonburnable) this.state[cell] = CELL_NONBURNABLE;
   }
 
@@ -215,6 +232,17 @@ export class FireField {
       }
     }
     const modelOf = this.terrain.fuelModel;
+    // Crown fire: a canopy fuel crowns once its directional intensity passes the Van Wagner threshold.
+    const crownI0 = crownInitiationKwM(SIM_DEFAULTS.canopyBaseHeightM, SIM_DEFAULTS.foliarMoisturePct);
+    const crownRate = new Float64Array(modelCount);
+    const intensityPerRate = new Float64Array(modelCount);
+    const phiWOf = new Float64Array(modelCount);
+    for (let m = 0; m < modelCount; m++) {
+      intensityPerRate[m] = intensityPerMps(FUEL_MODELS[m]!, moisture);
+      crownRate[m] = FUEL_MODELS[m]!.canopy ? crownI0 / intensityPerRate[m]! : Infinity;
+      phiWOf[m] = rothermelPhiW(FUEL_MODELS[m]!, windMps);
+    }
+    this.lastSpots = [];
     const reached: number[] = [];
     const seen = new Set<number>();
     for (const cell of this.burning) {
@@ -230,13 +258,45 @@ export class FireField {
         const slot = cell * 8 + d;
         const m = modelOf[target]!;
         const raw = baseRate * stat.fuelMul[slot]! * r0Rel[m]! * (windTerm[m * 8 + d]! + stat.slopePhi[slot]!);
-        const rate = raw < rateLo ? rateLo : raw > rateHi ? rateHi : raw;
+        let rate = raw < rateLo ? rateLo : raw > rateHi ? rateHi : raw;
+        if (rate >= crownRate[modelOf[cell]!]!) {
+          rate = Math.min(rate * SIM_DEFAULTS.crownRateFactor, SIM_DEFAULTS.crownRateMax);
+          this.crowned[cell] = 1;
+        }
         const next = this.progress[slot]! + rate * dtSec;
         this.progress[slot] = next;
         if (next >= nb.dist && !seen.has(target)) {
           seen.add(target);
           reached.push(target);
         }
+      }
+    }
+    if (params.spotSeed !== undefined) {
+      const stepKey = Math.round(toMs / dtMs);
+      const minI = SIM_DEFAULTS.spotMinIntensityKwM;
+      for (const cell of this.burning) {
+        const m = modelOf[cell]!;
+        const head = baseRate * this.terrain.fuel[cell]! * r0Rel[m]! * (1 + phiWOf[m]!);
+        const headRate = head < rateLo ? rateLo : head > rateHi ? rateHi : head;
+        const intensity = intensityPerRate[m]! * headRate;
+        if (intensity < minI) continue;
+        const boost = FUEL_MODELS[m]!.canopy && intensity >= crownI0 ? SIM_DEFAULTS.spotCrownBoost : 1;
+        const p = SIM_DEFAULTS.spotProbPerStep * Math.min(5, intensity / minI) * boost;
+        if (unitHash(params.spotSeed, cell, stepKey, 1) >= p) continue;
+        const flame = flameLengthM(intensity);
+        const dist = SIM_DEFAULTS.spotDistancePerFlameM * flame * (0.5 + unitHash(params.spotSeed, cell, stepKey, 2));
+        const angle = wind + (unitHash(params.spotSeed, cell, stepKey, 3) - 0.5) * 2 * SIM_DEFAULTS.spotAngleSpreadRad;
+        const gx = cell % SIZE;
+        const gy = (cell - gx) / SIZE;
+        const lx = Math.floor(gx + 0.5 + (Math.cos(angle) * dist) / CELL);
+        const ly = Math.floor(gy + 0.5 + (Math.sin(angle) * dist) / CELL);
+        if (lx < 0 || ly < 0 || lx >= SIZE || ly >= SIZE) continue;
+        if (Math.hypot(lx - gx, ly - gy) < SIM_DEFAULTS.spotMinCells) continue;
+        const target = ly * SIZE + lx;
+        if (this.state[target] !== CELL_UNBURNED || seen.has(target)) continue;
+        seen.add(target);
+        reached.push(target);
+        this.lastSpots.push({ from: cell, to: target });
       }
     }
     for (const target of reached) {
@@ -264,6 +324,8 @@ export class FireField {
     copy.state.set(this.state);
     copy.ignitedAtMs.set(this.ignitedAtMs);
     copy.progress.set(this.progress);
+    copy.crowned.set(this.crowned);
+    copy.lastSpots = [...this.lastSpots];
     copy.burning = [...this.burning];
     return copy;
   }

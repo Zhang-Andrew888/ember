@@ -109,3 +109,21 @@ for (const n of scenario.map.nodes) {
   rows.push(`${n.id}: ${f(a.ignitedAtMs[c])}/${f(b.ign[c])}`);
 }
 console.log(rows.join("  "));
+
+console.log("\n== spotting and crown fire on the default scenario (seed 1), 900 s");
+for (const mult of [1, 1.6]) {
+  const p = { spreadMultiplier: mult, initialWindRad: 0, windShiftMs: 650_000, postShiftWindRad: 1.2, spotSeed: 1 };
+  const f = new FireField(terrain, nonburnable);
+  f.ignite(scenario.map.initialFireCells, 0);
+  let spots = 0;
+  let worstMs = 0;
+  const t0 = performance.now();
+  for (let t = 1000; t <= 900_000; t += 1000) {
+    const s0 = performance.now();
+    f.step(t, 1000, p);
+    worstMs = Math.max(worstMs, performance.now() - s0);
+    spots += f.lastSpots.length;
+  }
+  const crowned = f.crowned.filter((c) => c === 1).length;
+  console.log(`mult ${mult}: spots ${spots}, cells that crowned ${crowned}, ignited ${countNew(f)}, avg step ${((performance.now() - t0) / 900).toFixed(3)} ms, worst step ${worstMs.toFixed(2)} ms`);
+}

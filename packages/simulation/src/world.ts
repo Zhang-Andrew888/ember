@@ -22,6 +22,8 @@ export interface PrivateWorldParameters {
   readonly initialWindRad: number;
   readonly windShiftMs: number;
   readonly postShiftWindRad: number;
+  /** Seeds ember spotting from the independent "spot" stream; undefined disables spotting. */
+  readonly spotSeed?: number | undefined;
 }
 
 /** Test and calibration overrides for the seeded private parameters. */
@@ -30,6 +32,8 @@ export interface PrivateOverrides {
   readonly initialWindRad?: number | undefined;
   readonly windShiftMs?: number | undefined;
   readonly postShiftWindRad?: number | undefined;
+  /** A number fixes the spotting seed; null turns spotting off. */
+  readonly spotSeed?: number | null | undefined;
 }
 
 /** Seeded private parameters from the world stream. These never leave the simulator. */
@@ -45,6 +49,7 @@ export function derivePrivateParameters(seed: string, overrides: PrivateOverride
     initialWindRad: overrides.initialWindRad ?? (jitter * Math.PI) / 180,
     windShiftMs: overrides.windShiftMs ?? windShiftMs,
     postShiftWindRad: overrides.postShiftWindRad ?? (postShift * Math.PI) / 180,
+    spotSeed: overrides.spotSeed === null ? undefined : (overrides.spotSeed ?? Math.floor(streamRng(seed, "spot").next() * 4294967296)),
   };
 }
 

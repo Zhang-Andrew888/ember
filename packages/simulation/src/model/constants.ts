@@ -35,6 +35,24 @@ export const SIM_DEFAULTS = {
   referenceHeadRateMps: 1.1,
   /** Factor from the effective midflame wind to the 20-ft wind that sets the fire ellipse's elongation. */
   ellipseWindFactor: 2,
+  /** Canopy base height (m) and foliar moisture (% dry weight) for the Van Wagner crown-initiation threshold. */
+  canopyBaseHeightM: 8,
+  foliarMoisturePct: 100,
+  /** Crown fire multiplies the surface spread rate by this factor, up to crownRateMax (m/s). */
+  crownRateFactor: 1.8,
+  crownRateMax: 3.0,
+  /** Spotting: embers loft from burning cells whose head intensity (kW/m) reaches this. */
+  spotMinIntensityKwM: 3000,
+  /** Per-step probability of a spot from one such cell at the minimum intensity; scales with intensity up to 5x. */
+  spotProbPerStep: 0.0006,
+  /** Crown-fire cells loft embers this many times as often. */
+  spotCrownBoost: 3,
+  /** Mean landing distance in meters per meter of flame length. */
+  spotDistancePerFlameM: 20,
+  /** Half-width (rad) of the angular scatter around the wind direction. */
+  spotAngleSpreadRad: 0.35,
+  /** Embers must land at least this many cells away; closer ignitions are ordinary spread. */
+  spotMinCells: 2,
   slopeCoefficient: 1.5,
   slopeClamp: 0.5,
   fuelRange: [0.6, 1.4],

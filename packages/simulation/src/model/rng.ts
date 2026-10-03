@@ -39,6 +39,21 @@ export class Rng {
 }
 
 /**
+ * Stateless uniform [0, 1) draw from a seed and three integer keys. Unlike a stream, the value depends
+ * only on its inputs, so fire steps stay reproducible however many times they are cloned or replayed.
+ */
+export function unitHash(seed: number, a: number, b: number, salt: number): number {
+  let h = (seed ^ Math.imul(a + 0x7f4a7c15, 0x9e3779b1)) >>> 0;
+  h = Math.imul(h ^ (h >>> 15), 0x85ebca6b);
+  h = (h ^ Math.imul(b + 0x165667b1, 0xc2b2ae35)) >>> 0;
+  h = Math.imul(h ^ (h >>> 13), 0x27d4eb2f);
+  h = (h ^ Math.imul(salt + 0x1b873593, 0x9e3779b1)) >>> 0;
+  h = Math.imul(h ^ (h >>> 16), 0x85ebca6b);
+  h ^= h >>> 13;
+  return (h >>> 0) / 4294967296;
+}
+
+/**
  * Independent random stream for one purpose ("world", "forecast", "cosmetic", ...).
  * Streams derived from the same root seed never share state.
  */
