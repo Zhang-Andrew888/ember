@@ -24,6 +24,7 @@ function legend(overrides: Partial<SceneLegendProps> = {}): string {
       onResetCamera: noop,
       fireCells: [],
       onInspectCell: noop,
+      onInspectMapTile: noop,
       ...overrides,
     }),
   );

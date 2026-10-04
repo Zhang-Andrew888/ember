@@ -1,4 +1,5 @@
 import { useEffect, useMemo } from "react";
+import type { ThreeEvent } from "@react-three/fiber";
 import { BufferGeometry, CanvasTexture, Float32BufferAttribute, MeshLambertMaterial, MeshStandardMaterial, SRGBColorSpace, Uint32BufferAttribute } from "three";
 import { useQuality } from "./quality/QualityContext.js";
 import { sceneTerrain, waterCells, waterLevel } from "./terrain/sceneTerrain.js";
@@ -11,7 +12,13 @@ import { applyFireLight } from "./fire/fireLight.js";
  * (corner grid, flat-shaded, vertex-coloured by vegetation density and
  * quiet elevation bands) plus water in the basins. No textures or assets.
  */
-export function Terrain() {
+export function Terrain({
+  tilePickEnabled,
+  onSelectTile,
+}: {
+  readonly tilePickEnabled: boolean;
+  readonly onSelectTile: (gridCellIndex: number) => void;
+}) {
   const geometry = useMemo(() => {
     const field = sceneTerrain;
     const n = field.gridSize;
@@ -62,12 +69,20 @@ export function Terrain() {
   }, [cheap]);
   useEffect(() => () => groundMaterial.dispose(), [groundMaterial]);
 
+  const handlePointerDown = (event: ThreeEvent<PointerEvent>) => {
+    if (!tilePickEnabled) return;
+    const index = sceneTerrain.cellIndexAt(event.point.x, event.point.z);
+    if (index === null) return;
+    event.stopPropagation();
+    onSelectTile(index);
+  };
+
   return (
     <>
-      <mesh geometry={geometry} receiveShadow>
+      <mesh geometry={geometry} receiveShadow onPointerDown={handlePointerDown}>
         <primitive object={groundMaterial} attach="material" />
       </mesh>
-      <Water />
+      <Water tilePickEnabled={tilePickEnabled} onSelectTile={onSelectTile} />
       <Apron />
     </>
   );
@@ -128,7 +143,13 @@ function Apron() {
 }
 
 /** One merged quad per wet grid cell, just below the cell's surrounding shore. */
-function Water() {
+function Water({
+  tilePickEnabled,
+  onSelectTile,
+}: {
+  readonly tilePickEnabled: boolean;
+  readonly onSelectTile: (gridCellIndex: number) => void;
+}) {
   const geometry = useMemo(() => {
     const size = sceneTerrain.cellSize;
     const positions = new Float32Array(waterCells.length * 12);
@@ -150,9 +171,17 @@ function Water() {
     return geo;
   }, []);
   useEffect(() => () => geometry.dispose(), [geometry]);
+  const handlePointerDown = (event: ThreeEvent<PointerEvent>) => {
+    if (!tilePickEnabled) return;
+    const index = sceneTerrain.cellIndexAt(event.point.x, event.point.z);
+    if (index === null) return;
+    event.stopPropagation();
+    onSelectTile(index);
+  };
+
   if (waterCells.length === 0) return null;
   return (
-    <mesh geometry={geometry} renderOrder={1}>
+    <mesh geometry={geometry} renderOrder={1} onPointerDown={handlePointerDown}>
       <meshStandardMaterial color="#2f7088" roughness={0.25} metalness={0.1} transparent opacity={0.85} />
     </mesh>
   );

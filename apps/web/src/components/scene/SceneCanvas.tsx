@@ -35,6 +35,7 @@ export interface SceneCanvasProps {
   readonly onUserPan: () => void;
   readonly onInspectAgent: (agentId: string) => void;
   readonly onInspectCell: (cell: FireCellMarker) => void;
+  readonly onSelectMapTile: (gridCellIndex: number) => void;
   readonly mapAssignMode: boolean;
   readonly mapPreviewFrom: { readonly x: number; readonly z: number } | null;
   readonly mapPreviewTo: { readonly x: number; readonly z: number } | null;
@@ -69,6 +70,7 @@ export const SceneCanvas = forwardRef<CameraControlsHandle, SceneCanvasProps>(fu
     onUserPan,
     onInspectAgent,
     onInspectCell,
+    onSelectMapTile,
     mapAssignMode,
     mapPreviewFrom,
     mapPreviewTo,
@@ -133,7 +135,7 @@ export const SceneCanvas = forwardRef<CameraControlsHandle, SceneCanvasProps>(fu
       {onFirstFrame ? <FirstFrame onFirstFrame={onFirstFrame} /> : null}
       <RenderPipeline config={quality} params={params} autoEnabled={qualityState.mode === "auto"} />
       <QualityProvider value={quality}>
-      <Terrain />
+      <Terrain tilePickEnabled={!mapAssignMode} onSelectTile={onSelectMapTile} />
       <SceneClock animated={!reducedMotion} />
       <Trees fireCells={visibleCells} reducedMotion={reducedMotion} />
       <Fire cells={visibleCells} reducedMotion={reducedMotion} />

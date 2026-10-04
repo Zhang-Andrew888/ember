@@ -9,9 +9,9 @@ import { SceneCompass } from "./SceneCompass.js";
 import type { CameraControlsHandle } from "./CameraControls.js";
 import { sceneTerrain } from "./terrain/sceneTerrain.js";
 import { agentMapLabelMeta, agentMapLabelText, siteMapLabelMeta, siteMapLabelText } from "./mapLabels.js";
-import { inspectFireCell } from "./fireInspection.js";
 import { humanizeReason, labelledBands, polylineMidpoint } from "./sceneLayers.js";
 import { listRefugeNodes, type FireCellMarker, type SceneEntities } from "./sceneEntities.js";
+import { inspectMapTile, type MapInspectionTarget } from "./tileInspection.js";
 import { scenarioMap } from "../../map/activeScenario.js";
 /**
  * Dev-only scene tuning panel. `import.meta.env.DEV` is a build-time
@@ -59,7 +59,13 @@ export function SceneView({
   const [showRoutes, setShowRoutes] = useState(true);
   const [showForecast, setShowForecast] = useState(true);
   const [follow, setFollow] = useState(true);
-  const [inspectedCell, setInspectedCell] = useState<FireCellMarker | null>(null);
+  const [inspectionTarget, setInspectionTarget] = useState<MapInspectionTarget | null>(null);
+  const handleInspectCell = useCallback((cell: FireCellMarker) => {
+    setInspectionTarget({ kind: "fire-cell", cell });
+  }, []);
+  const handleSelectMapTile = useCallback((gridCellIndex: number) => {
+    setInspectionTarget({ kind: "terrain", gridCellIndex });
+  }, []);
   const controlsRef = useRef<CameraControlsHandle>(null);
   const legendRef = useRef<HTMLDivElement>(null);
   const compassRef = useRef<HTMLDivElement>(null);
@@ -178,7 +184,8 @@ export function SceneView({
         followTarget={followTarget}
         onUserPan={handleUserPan}
         onInspectAgent={handleInspectAgent}
-        onInspectCell={setInspectedCell}
+        onInspectCell={handleInspectCell}
+        onSelectMapTile={handleSelectMapTile}
         mapAssignMode={mapAssignMode}
         mapPreviewFrom={mapPreviewFrom}
         mapPreviewTo={mapPreviewTo}
@@ -221,42 +228,42 @@ export function SceneView({
         follow={follow}
         onToggleFollow={() => setFollow((value) => !value)}
         fireCells={entities.fireCells}
-        onInspectCell={setInspectedCell}
+        onInspectCell={handleInspectCell}
+        onInspectMapTile={handleSelectMapTile}
       />
       {DebugPanel ? (
         <Suspense fallback={null}>
           <DebugPanel />
         </Suspense>
       ) : null}
-      {inspectedCell ? (
-        <CellInspectionPanel
+      {inspectionTarget ? (
+        <MapTileInspectionPanel
           panelRef={cellPanelRef}
-          cell={inspectedCell}
+          target={inspectionTarget}
+          entities={entities}
           simTimeMs={simTimeMs}
-          onClose={() => setInspectedCell(null)}
+          onClose={() => setInspectionTarget(null)}
         />
       ) : null}
     </div>
   );
 }
 
-/**
- * "Observed burned/active cells, with timestamps in inspection" (docs/FRONTEND.md scene layer 3),
- * extended for #114: a clicked fire cell says WHERE its state comes from (live current fire,
- * observed belief, or replay-only full fire) and which incident time that source describes.
- */
-function CellInspectionPanel({
-  cell,
+/** Coordinator-authorized tile inspection (#125); fire beds and bare terrain share this panel. */
+function MapTileInspectionPanel({
+  target,
+  entities,
   simTimeMs,
   onClose,
   panelRef,
 }: {
-  readonly cell: FireCellMarker;
+  readonly target: MapInspectionTarget;
+  readonly entities: SceneEntities;
   readonly simTimeMs: number | null;
   readonly onClose: () => void;
   readonly panelRef: RefObject<HTMLDivElement | null>;
 }) {
-  const inspection = inspectFireCell(cell, simTimeMs);
+  const inspection = inspectMapTile(target, entities, simTimeMs);
   return (
     <div ref={panelRef} className="cell-inspection-panel" role="status">
       <button type="button" className="cell-inspection-panel__close" onClick={onClose} aria-label="Close">
@@ -264,7 +271,11 @@ function CellInspectionPanel({
       </button>
       <dl>
         <dt>Cell</dt>
-        <dd>Grid cell {cell.gridCellIndex}</dd>
+        <dd>
+          Grid cell {inspection.gridCellIndex} (row {inspection.row}, column {inspection.column})
+        </dd>
+        <dt>Location</dt>
+        <dd>{inspection.location}</dd>
         <dt>Source</dt>
         <dd>{inspection.source}</dd>
         <dt>State</dt>
