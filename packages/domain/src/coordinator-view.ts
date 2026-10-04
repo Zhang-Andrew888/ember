@@ -83,6 +83,36 @@ export const CoordinatorCellView = z.object({
 });
 export type CoordinatorCellView = z.infer<typeof CoordinatorCellView>;
 
+const CurrentFireCells = z
+  .array(z.number().int().nonnegative().max(4095))
+  .refine((cells) => cells.every((cell, i) => i === 0 || cell > (cells[i - 1] ?? -1)), {
+    message: "cells must be strictly ascending (sorted and unique)",
+  });
+
+/**
+ * Current fire state for the authorized live coordinator only (#112).
+ *
+ * Authorization: built solely by projectCoordinator() and sent only on the coordinator's own
+ * CoordinatorView stream while the incident is active. Crew AgentProjection, knowledge stores,
+ * forecast inputs and navigation never receive it.
+ *
+ * Contents: cells burning or burned out at simTimeMs. Unburned and nonburnable cells are implied
+ * by absence. It never carries private world parameters (spread multiplier, wind shift, seeds),
+ * fuel or height layers, burn timers, ignition times, or any future state.
+ * `observedCells` keeps its belief and staleness meaning and is unaffected.
+ */
+export const CoordinatorCurrentFireView = z
+  .object({
+    /** Tick this snapshot describes; equals CoordinatorView.simTimeMs. */
+    simTimeMs: SimTimeMs,
+    burningCells: CurrentFireCells,
+    burnedCells: CurrentFireCells,
+  })
+  .refine((fire) => !fire.burningCells.some((cell) => fire.burnedCells.includes(cell)), {
+    message: "a cell cannot be both burning and burned",
+  });
+export type CoordinatorCurrentFireView = z.infer<typeof CoordinatorCurrentFireView>;
+
 /** Single entry in the coordinator's transcript (agent-to-coordinator reports). */
 export const CoordinatorReportEntry = z.object({
   sequence: SequenceNumber,
@@ -107,6 +137,8 @@ export const CoordinatorView = z.object({
   agents: z.array(CoordinatorAgentView),
   sites: z.array(CoordinatorSiteView),
   observedCells: z.array(CoordinatorCellView),
+  /** Authorized live current fire (#112); absent when the sender does not provide it. */
+  currentFire: CoordinatorCurrentFireView.optional(),
   /** Active reportable plans per agent (empty when idle). */
   agentPlans: z.array(CoordinatorAgentPlanView),
   /** Coordinator forecast envelope for the map; null before the first build. */
