@@ -153,7 +153,7 @@ describe("information boundary", () => {
       expect(text).not.toContain(forbidden);
     }
     const view: CoordinatorView = inc.projectCoordinator();
-    // Fire the coordinator has not observed is absent: only the briefed patch is known burning.
+    // observedCells holds observations only: just the briefed patch is known burning there.
     const burning = view.observedCells.filter((c) => c.burnState === "burning");
     expect(burning.length).toBeGreaterThanOrEqual(4);
     expect(burning.length).toBeLessThan(40);
@@ -276,5 +276,98 @@ describe("coordinator view sequence", () => {
     inc.advanceTo(12_000);
     expect(inc.eventCount).toBe(events);
     expect(inc.projectCoordinator().sequence).toBeGreaterThan(sequence);
+  });
+});
+
+describe("coordinator current fire (#113)", () => {
+  /** Ignitions in all four corners of the map, far from every road, site and crew. */
+  function cornerFires(): number[] {
+    return [cellIndexOf(30, 30)!, cellIndexOf(1540, 30)!, cellIndexOf(30, 1540)!, cellIndexOf(1540, 1540)!];
+  }
+
+  function fromTruth(inc: Incident): { burning: number[]; burned: number[] } {
+    const burning: number[] = [];
+    const burned: number[] = [];
+    inc.truth().cellState.forEach((state, cell) => {
+      if (state === 2) burning.push(cell);
+      else if (state === 3) burned.push(cell);
+    });
+    return { burning, burned };
+  }
+
+  it("publishes burning and burned cells in every direction at the same tick, including unobserved fire", () => {
+    const inc = new Incident({ scenario: small(cornerFires()), seed: "cf1" });
+    inc.advanceTo(300_000);
+    const view = inc.projectCoordinator();
+    const truth = fromTruth(inc);
+    expect(view.currentFire).toEqual({ simTimeMs: view.simTimeMs, burningCells: truth.burning, burnedCells: truth.burned });
+    // All four corners are represented and none of them was ever in a crew's observation radius.
+    const known = new Set([...truth.burning, ...truth.burned]);
+    for (const corner of cornerFires()) expect(known.has(corner)).toBe(true);
+    expect(view.observedCells.filter((c) => c.burnState === "burning").length).toBeLessThan(truth.burning.length);
+  });
+
+  it("tracks the authoritative field on every step and agrees with the view tick", () => {
+    const inc = new Incident({ scenario: small(cornerFires()), seed: "cf2" });
+    for (let t = 1_000; t <= 60_000; t += 1_000) {
+      inc.advanceTo(t);
+      const view = inc.projectCoordinator();
+      const truth = fromTruth(inc);
+      expect(view.currentFire?.simTimeMs).toBe(view.simTimeMs);
+      expect(view.currentFire?.burningCells).toEqual(truth.burning);
+      expect(view.currentFire?.burnedCells).toEqual(truth.burned);
+    }
+  });
+
+  it("never includes future state: a snapshot is a subset of everything later", () => {
+    const inc = new Incident({ scenario: small(cornerFires()), seed: "cf3", overrides: noWindShift });
+    inc.advanceTo(100_000);
+    const early = inc.projectCoordinator().currentFire!;
+    inc.advanceTo(400_000);
+    const late = inc.projectCoordinator().currentFire!;
+    const lateKnown = new Set([...late.burningCells, ...late.burnedCells]);
+    for (const cell of [...early.burningCells, ...early.burnedCells]) expect(lateKnown.has(cell)).toBe(true);
+    expect(lateKnown.size).toBeGreaterThan(early.burningCells.length + early.burnedCells.length);
+    // The early snapshot did not already contain cells that only ignited afterwards.
+    const earlyKnown = new Set([...early.burningCells, ...early.burnedCells]);
+    expect([...lateKnown].some((cell) => !earlyKnown.has(cell))).toBe(true);
+  });
+
+  it("serializes no private parameters, timers or extra keys with currentFire", () => {
+    const inc = new Incident({
+      scenario: small(cornerFires()),
+      seed: "secret-seed-cf4",
+      overrides: { spreadMultiplier: 1.2345678, windShiftMs: 311_111 },
+    });
+    inc.advanceTo(200_000);
+    const view = inc.projectCoordinator();
+    expect(Object.keys(view.currentFire!).sort()).toEqual(["burnedCells", "burningCells", "simTimeMs"]);
+    const text = JSON.stringify(view);
+    for (const forbidden of ["secret-seed-cf4", "spreadMultiplier", "windShift", "privateWorld", "ignitedAt", "1.2345678", "311111"]) {
+      expect(text).not.toContain(forbidden);
+    }
+  });
+
+  it("keeps crew projections free of current fire and independent of unobserved fire", () => {
+    // Same briefed patch; hidden spread differs, so the unobserved fire (and the coordinator feed) differs.
+    const make = (mult: number): Incident =>
+      new Incident({ scenario: buildSyntheticScenario(), seed: "cf5", overrides: { spreadMultiplier: mult, windShiftMs: 300_000 + mult * 1000 } });
+    const a = make(0.7);
+    const b = make(1.5);
+    a.advanceTo(60_000);
+    b.advanceTo(60_000);
+    expect(a.projectCoordinator().currentFire?.burningCells).not.toEqual(b.projectCoordinator().currentFire?.burningCells);
+    expect(a.projectAgent(crew1).inputHash).toBe(b.projectAgent(crew1).inputHash);
+    const text = JSON.stringify(a.projectAgent(crew1));
+    for (const forbidden of ["currentFire", "burningCells", "burnedCells"]) expect(text).not.toContain(forbidden);
+  });
+
+  it("leaves coordinator observedCells as observations only", () => {
+    const inc = new Incident({ scenario: small(cornerFires()), seed: "cf6" });
+    inc.advanceTo(200_000);
+    const view = inc.projectCoordinator();
+    const observed = new Set(view.observedCells.map((c) => c.gridCellIndex));
+    const current = new Set([...view.currentFire!.burningCells, ...view.currentFire!.burnedCells]);
+    expect(observed.size).toBeLessThan(current.size);
   });
 });

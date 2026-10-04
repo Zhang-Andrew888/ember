@@ -18,7 +18,7 @@ import {
   type SiteId,
 } from "@ember/domain";
 import { KnowledgeStore, STALE_AFTER_MS, type AgentKnowledgeSnapshot } from "@ember/knowledge";
-import { SIM_DEFAULTS, cellsWithin, hashValue } from "./model/index.js";
+import { CELL_BURNED, CELL_BURNING, SIM_DEFAULTS, cellsWithin, hashValue } from "./model/index.js";
 import { SimInput, type AppliedInput, type InputReceipt } from "./inputs.js";
 import { SimScenario } from "./scenario.js";
 import { validateScenario } from "./validate.js";
@@ -438,6 +438,7 @@ export class Incident {
         stale: now - b.observedAt > STALE_AFTER_MS,
         observerAgentId: b.sourceAgentId,
       })),
+      currentFire: this.currentFire(),
       agentPlans,
       coordinatorForecast: options.coordinatorForecast ?? null,
       recentReports: this.reports.slice(-20),
@@ -445,6 +446,22 @@ export class Incident {
       incidentEnd: this.endRecord,
     };
     return CoordinatorView.parse(view);
+  }
+
+  /**
+   * Cells burning or burned out at the current tick, for the authorized coordinator only (#112).
+   * Read straight from the authoritative field but exposes cell indices alone: no ignition times,
+   * timers, spread parameters or future state. Never feeds projectAgent, knowledge or forecasts.
+   */
+  private currentFire(): NonNullable<CoordinatorView["currentFire"]> {
+    const burningCells: number[] = [];
+    const burnedCells: number[] = [];
+    const state = this.world.fire.state;
+    for (let cell = 0; cell < state.length; cell++) {
+      if (state[cell] === CELL_BURNING) burningCells.push(cell);
+      else if (state[cell] === CELL_BURNED) burnedCells.push(cell);
+    }
+    return { simTimeMs: SimTimeMs.parse(this.world.timeMs), burningCells, burnedCells };
   }
 
   /** What one agent may know: its own state and its own knowledge store, nothing else. */
