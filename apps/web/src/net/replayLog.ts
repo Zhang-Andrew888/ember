@@ -1,6 +1,7 @@
 import type { CoordinatorView } from "@ember/domain";
 import { fixtureCoordinatorView } from "../../../../tests/fixtures/coordinator-view.fixture.js";
 import { adaptToScenarioIds } from "./mockBase.js";
+import { omitScoutFromView } from "../format/omitScout.js";
 import { authoredSnapshots } from "./mockIncidentSocket.js";
 import { runEndedScenarios } from "./scenarios.js";
 
@@ -56,4 +57,5 @@ const rawReplayLog: CoordinatorView[] = [
   { ...runEndedScenarios.time_expired, sequence: 10 as CoordinatorView["sequence"] },
 ];
 
-export const replayLog: CoordinatorView[] = rawReplayLog.map(adaptToScenarioIds);
+/** The illustrative replay is part of the demo, so it presents crews only (#118). */
+export const replayLog: CoordinatorView[] = rawReplayLog.map((view) => adaptToScenarioIds(omitScoutFromView(view)));

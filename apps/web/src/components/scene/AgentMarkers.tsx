@@ -10,7 +10,6 @@ import {
   createChevronGeometry,
   createCrewGeometry,
   createCrossGeometry,
-  createScoutGeometry,
   createWarnGeometry,
   createWorkGlyphGeometry,
 } from "./models/crewModels.js";
@@ -22,7 +21,6 @@ const MODEL_SCALE = 1.9;
 
 /** Distinct hue per crew slot, but identity is the tally pegs + label, never hue alone. */
 const CREW_COLORS = ["#4FA7E0", "#E0A04A", "#8BBF6B", "#C97BC2", "#D9D26A"];
-const SCOUT_COLOR = "#E8DD6B";
 const MUTED = "#6c7476";
 const MUTED_STALE = "#c3cdcf";
 
@@ -101,8 +99,7 @@ function GlyphMeshes({ glyph }: { readonly glyph: ReturnType<typeof agentCue>["g
 }
 
 /**
- * Crew trucks (with tally pegs = crew number), a binocular scout, and a
- * state glyph for each agent state (see models/markerCues.ts). Markers are
+ * Crew trucks (with tally pegs = crew number) and a state glyph for each agent state (see models/markerCues.ts). Markers are
  * unaffected by fog so they stay readable under every atmosphere setting.
  */
 export function AgentMarkers({
@@ -114,8 +111,9 @@ export function AgentMarkers({
   readonly selectedAgentId: string | null;
   readonly onInspectAgent: (agentId: string) => void;
 }) {
-  const scout = useGeometry(createScoutGeometry, []);
-  const crewOrdinals = agents.filter((a) => a.role === "protection_crew").map((a) => a.id);
+  // Every agent is drawn as a crew truck. An agent of another role (old recording, pre-#117 sim) is
+  // numbered after the crews so its tally pegs never duplicate a real crew's.
+  const ordinals = [...agents.filter((a) => a.role === "protection_crew"), ...agents.filter((a) => a.role !== "protection_crew")].map((a) => a.id);
   return (
     <group>
       {agents.map((agent, index) => (
@@ -123,9 +121,8 @@ export function AgentMarkers({
           key={agent.id}
           agent={agent}
           slot={index}
-          crewOrdinal={Math.max(0, crewOrdinals.indexOf(agent.id))}
+          crewOrdinal={Math.max(0, ordinals.indexOf(agent.id))}
           selected={agent.id === selectedAgentId}
-          scoutGeometry={scout}
           onInspectAgent={onInspectAgent}
         />
       ))}
@@ -138,14 +135,12 @@ function AgentModel({
   slot,
   crewOrdinal,
   selected,
-  scoutGeometry,
   onInspectAgent,
 }: {
   readonly agent: AgentMarker;
   readonly slot: number;
   readonly crewOrdinal: number;
   readonly selected: boolean;
-  readonly scoutGeometry: BufferGeometry;
   readonly onInspectAgent: (agentId: string) => void;
 }) {
   const cue = agentCue(agent.state);
@@ -153,7 +148,7 @@ function AgentModel({
   const crewGeometry = useGeometry(() => createCrewGeometry(number), [number]);
   const fresh = freshness(agent.ageMs);
   // Colour fades toward grey with age as well as opacity: an old position never looks current.
-  const color = cue.muted || fresh.stale ? (cue.muted ? MUTED : MUTED_STALE) : agent.role === "scout" ? SCOUT_COLOR : CREW_COLORS[slot % CREW_COLORS.length]!;
+  const color = cue.muted || fresh.stale ? (cue.muted ? MUTED : MUTED_STALE) : CREW_COLORS[slot % CREW_COLORS.length]!;
   const material = useStaleMaterial(
     () => new MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.7, fog: false }),
     color,
@@ -169,7 +164,7 @@ function AgentModel({
   return (
     <group position={[agent.position.x, y, agent.position.z]} rotation={[0, headingRotationY(agent), 0]} scale={MODEL_SCALE}>
       <mesh
-        geometry={agent.role === "scout" ? scoutGeometry : crewGeometry}
+        geometry={crewGeometry}
         onClick={handleClick}
         rotation={[cue.lying ? 1.25 : 0, 0, 0]}
         position={[0, cue.lying ? 4 : 0, 0]}
