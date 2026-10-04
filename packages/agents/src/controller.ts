@@ -18,6 +18,7 @@ import {
   ALWAYS_FREE,
   DEFAULT_NAV_CONFIG,
   certifyPlan,
+  planDirectionalMove,
   containmentTargets,
   planMissions,
   planRetreat,
@@ -177,6 +178,7 @@ export class CrewController implements AgentController {
 
     // Reconcile with the simulator: a missing commitment means done, cancelled or rejected.
     if (proj.commitment === null && this.active !== null && now > this.active.committedAtMs) {
+      if (this.objective?.kind === "move_direction") this.objective = null;
       const work = this.active.plan.work;
       if (work?.kind === "suppress_fire") this.evidence.retireContainmentCell(work.gridCellIndex, now);
       this.active = null;
@@ -458,8 +460,13 @@ export class CrewController implements AgentController {
    * must not later walk a leg it was told to abandon. A mid-edge emergency stop is allowed only here.
    */
   private halt(proj: AgentProjection, out: TickOutput): void {
-    const refuge = this.map.refuges[0]?.nodeId
-      ?? (proj.position.kind === "node" ? proj.position.nodeId : proj.position.kind === "edge" ? proj.position.edgeId : "offroad-halt");
+    const refuge =
+      this.map.refuges[0]?.nodeId ??
+      (proj.position.kind === "node"
+        ? proj.position.nodeId
+        : proj.position.kind === "edge"
+          ? proj.position.edgeId
+          : NodeId.parse("offroad-halt"));
     const plan = MissionPlan.parse({
       id: `halt-${this.agentId}-${proj.simTimeMs}`,
       recipientId: this.agentId,
@@ -583,6 +590,18 @@ export class CrewController implements AgentController {
       this.report(out, explain(this.callsign, { type: "objective_rejected", reasonCode: reason, actualAction: "" }, `(${reason})`), true);
     };
     switch (obj.kind) {
+      case "move_direction": {
+        if (obj.movement === undefined) return reject("missing_direction");
+        const result = planDirectionalMove(ctx, obj.movement);
+        if (result.best === null) return reject(result.limitingReason ?? "no_safe_directional_route");
+        const hadPlan = this.active !== null;
+        const chosen = this.commitFirst(proj, result, out);
+        if (chosen === null) return reject("reservation_unavailable");
+        this.objective = obj;
+        this.holding = false;
+        this.decide(out, proj, hadPlan ? "mission_update" : "mission_start", "objective_accepted", `moving ${obj.movement.direction} to a safe road node, then returning to refuge`);
+        return;
+      }
       case "protect_site": {
         if (obj.targetId === null) return reject("missing_target");
         const sites = this.evidence.siteKnowledge();
@@ -778,11 +797,13 @@ export class CrewController implements AgentController {
       LOST: null,
     };
     const last = a === null ? null : a.plan.timedLegs[a.plan.timedLegs.length - 1];
-    const targetName = a?.targetId == null ? null : this.siteName(a.targetId);
+    const targetName = a?.targetId == null ? null : a.targetId.startsWith("waypoint:") ? "road waypoint" : this.siteName(a.targetId);
     return {
       callsign: this.callsign,
       currentAction: verbs[this.computeState(proj)] === null ? null : `${verbs[this.computeState(proj)]}${targetName !== null && this.computeState(proj) !== "HOLDING" ? ` (${targetName})` : ""}`,
-      objective: this.objective === null ? null : `${this.objective.kind.replaceAll("_", " ")}${this.objective.targetId === null ? "" : ` ${this.siteName(this.objective.targetId)}`}`,
+      objective: this.objective === null ? null : this.objective.kind === "move_direction" && this.objective.movement !== undefined
+        ? `move ${this.objective.movement.direction} up to ${this.objective.movement.maxDistanceMeters} m`
+        : `${this.objective.kind.replaceAll("_", " ")}${this.objective.targetId === null ? "" : ` ${this.siteName(this.objective.targetId)}`}`,
       returnEstimateSec: last === undefined || last === null ? null : Math.max(0, (last.arriveMs - proj.simTimeMs) / 1000),
       lastRejection: this.lastRejectionText,
       knownConditions: this.evidence.closed.size === 0 ? null : `${this.evidence.closed.size} cells observed burning or burned`,

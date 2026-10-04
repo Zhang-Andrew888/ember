@@ -22,7 +22,7 @@ export function buildIntentSystemPrompt(req: InterpretationRequest): string {
     '{',
     '  "explicitRecipient": string (optional callsign),',
     '  "kind": "objective" | "relay" | "status" | "clarification_answer",',
-    '  "objective": { "kind": "protect"|"observe"|"return"|"hold"|"avoid"|"resume", "targetName": string (optional) } (optional),',
+    '  "objective": { "kind": "protect"|"observe"|"return"|"hold"|"avoid"|"resume"|"move", "targetName": string (optional), "direction": "north"|"northeast"|"east"|"southeast"|"south"|"southwest"|"west"|"northwest" (for move), "maxDistanceMeters": number (optional, at most 1200) } (optional),',
     '  "evidenceQueries": [{ "sourceName", "locationName", "timeSelector": "latest"|"referenced", "referencedReportId" }],',
     '  "unsupportedClaims": string[],',
     '  "clarification": string (optional question when ambiguous)',

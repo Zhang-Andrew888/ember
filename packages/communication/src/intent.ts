@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { CompassDirection } from "@ember/domain";
 
 /**
  * What the language interpreter may propose. The server, not the model, creates authoritative
@@ -11,8 +12,10 @@ export const IntentEnvelope = z.object({
   kind: z.enum(["objective", "relay", "status", "clarification_answer"]),
   objective: z
     .object({
-      kind: z.enum(["protect", "contain", "observe", "return", "hold", "avoid", "resume"]),
+      kind: z.enum(["protect", "contain", "observe", "return", "hold", "avoid", "resume", "move"]),
       targetName: z.string().optional(),
+      direction: CompassDirection.optional(),
+      maxDistanceMeters: z.number().positive().max(1200).optional(),
     })
     .optional(),
   evidenceQueries: z.array(

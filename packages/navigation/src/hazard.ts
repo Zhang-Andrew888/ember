@@ -91,6 +91,24 @@ export class HazardModel {
   edgeId(edge: RoadEdge): EdgeId {
     return edge.id;
   }
+
+  /** Latest departure time for a straight off-road segment at off-road speed. */
+  offRoadLatestDepartMs(fromX: number, fromY: number, toX: number, toY: number, speedMps: number): number {
+    const dist = Math.hypot(toX - fromX, toY - fromY);
+    const steps = Math.max(1, Math.ceil(dist / (SIM_DEFAULTS.cellMeters / 2)));
+    let bound = Infinity;
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const x = fromX + (toX - fromX) * t;
+      const y = fromY + (toY - fromY) * t;
+      const cell = cellIndexOf(x, y);
+      if (cell === null) return -Infinity;
+      const travel = (dist * t) / speedMps * 1000;
+      const limit = this.cellIgnMs(cell) - this.config.bufferMs - travel;
+      if (limit < bound) bound = limit;
+    }
+    return bound;
+  }
 }
 
 function minIgnition(members: readonly ForecastMember[]): Float64Array {

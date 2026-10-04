@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AgentId, EdgeId, NodeId, SiteId, type AgentPosition } from "@ember/domain";
+import { AgentId, EdgeId, NodeId, MissionPlan, MissionPlanId, SequenceNumber, SimTimeMs, SiteId, type AgentPosition } from "@ember/domain";
 import { buildSyntheticScenario } from "@ember/simulation";
 import { Rng, RoadIndex, SIM_DEFAULTS } from "@ember/simulation/model";
 import {
@@ -10,6 +10,7 @@ import {
   cellsOfEdge,
   certifyPlan,
   makeEnsemble,
+  offRoadTravelMs,
   planMissions,
   planRetreat,
   planReturn,
@@ -281,6 +282,45 @@ describe("certifying committed plans", () => {
     const result = certifyPlan({ ...input, ensemble: makeEnsemble(map, [{ id: "a" }], { reliability: "unreliable" }) });
     expect(result.failure?.kind).toBe("forecast_unreliable");
   });
+
+  it("certifies an off-road leg and a following road return", () => {
+    const ensemble = makeEnsemble(map, [{ id: "a" }]);
+    const dist = 360.555;
+    const travelMs = offRoadTravelMs(dist, DEFAULT_NAV_CONFIG);
+    const offPlan = MissionPlan.parse({
+      id: MissionPlanId.parse("off-cert"),
+      recipientId: agent,
+      knowledgeRevision: SequenceNumber.parse(0),
+      timedLegs: [],
+      offroadLegs: [
+        {
+          kind: "offroad",
+          start: { x: 700, y: 600 },
+          end: { x: 1000, y: 800 },
+          departMs: SimTimeMs.parse(0),
+          arriveMs: SimTimeMs.parse(travelMs),
+        },
+      ],
+      workInterval: { startMs: SimTimeMs.parse(travelMs), endMs: SimTimeMs.parse(travelMs) },
+      refugeId: NodeId.parse("n-rs"),
+      reservationRevision: 0,
+      limitingReason: null,
+    });
+    const atSouth: AgentPosition = { kind: "node", nodeId: NodeId.parse("n-s") };
+    const ok = certifyPlan({
+      road,
+      ensemble,
+      closedCells: new Set(),
+      plan: offPlan,
+      position: atSouth,
+      legIndex: 0,
+      nowMs: 0,
+    });
+    expect(ok.ok).toBe(true);
+    const ret = planReturn(ctxWith({ ensemble, position: { kind: "node", nodeId: NodeId.parse("n-h") }, nowMs: travelMs }));
+    expect(ret).not.toBeNull();
+    expect(ret!.plan.timedLegs.length).toBeGreaterThan(0);
+  });
 });
 
 describe("withdrawal, reversal and retreat", () => {
@@ -310,7 +350,8 @@ describe("withdrawal, reversal and retreat", () => {
     const behind = cellOnEdge(road, "e-s-h", 0.1);
     const ensemble = makeEnsemble(map, [{ id: "a", ignition: new Map([[behind, 80_000]]) }], { nowMs: 60_000 });
     const ret = planReturn(ctxWith({ ensemble, position: midCorridor, nowMs: 60_000 }));
-    expect(ret!.plan.timedLegs[0]?.direction).toBe("forward");
+    const leg0 = ret!.plan.timedLegs[0]!;
+    expect(leg0.direction).toBe("forward");
   });
 
   it("falls back to a best-effort retreat that minimizes exposure when no normal return passes", () => {
@@ -326,7 +367,8 @@ describe("withdrawal, reversal and retreat", () => {
     expect(retreat).not.toBeNull();
     expect(retreat!.bestEffort).toBe(true);
     expect(retreat!.plan.limitingReason).toBe("best_effort_retreat");
-    expect(retreat!.plan.timedLegs[0]?.edgeId).toBe("e-n-h");
+    const r0 = retreat!.plan.timedLegs[0];
+    expect(r0!.edgeId).toBe("e-n-h");
   });
 
   it("never retreats through directly observed burning cells and reports stranded when none is passable", () => {
@@ -340,7 +382,8 @@ describe("withdrawal, reversal and retreat", () => {
     const atHub: AgentPosition = { kind: "node", nodeId: NodeId.parse("n-h") };
     const ensemble = makeEnsemble(map, [{ id: "p", ignition: ignite(road, ["e-s-h", "e-h-sc"], 20_000) }], { reliability: "unreliable" });
     const retreat = planRetreat(ctxWith({ ensemble, position: atHub, nowMs: 10_000 }));
-    expect(retreat?.plan.timedLegs[0]?.edgeId).toBe("e-n-h");
+    const r0 = retreat?.plan.timedLegs[0];
+    expect(r0!.edgeId).toBe("e-n-h");
     expect(retreat?.bestEffort).toBe(true);
     expect(SiteId.parse("x")).toBe("x");
   });

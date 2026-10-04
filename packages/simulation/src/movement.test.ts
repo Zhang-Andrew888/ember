@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { AgentId, MissionPlan, MissionPlanId, NodeId, SequenceNumber, SimTimeMs } from "@ember/domain";
 import { Incident, authoredCommit, buildSyntheticScenario, dueSimTimeMs, realPlayExpired, wallMsForSimTime } from "./index.js";
-import { RoadIndex, cellIndexOf } from "./model/index.js";
+import { RoadIndex, SIM_DEFAULTS, cellIndexOf } from "./model/index.js";
+
+function offRoadTravelMs(distanceM: number): number {
+  const speed = SIM_DEFAULTS.agentSpeedMps * SIM_DEFAULTS.offRoadSpeedFactor;
+  return Math.ceil((distanceM / speed) * 1000 / 5000) * 5000;
+}
 
 const calm = { spreadMultiplier: 0.01, windShiftMs: 10_000_000, initialWindRad: 0 };
 
@@ -52,17 +57,20 @@ describe("clock mapping", () => {
 });
 
 describe("movement rules", () => {
-  it("rejects off-road legs until the simulator implements them", () => {
+  it("accepts off-road legs when start and end connect to the road graph", () => {
     const inc = new Incident({ scenario: twoAtCorridor(), seed: "m", overrides: calm });
+    const start = { x: 700, y: 600 };
+    const end = { x: 1000, y: 800 };
+    const travelMs = offRoadTravelMs(Math.hypot(end.x - start.x, end.y - start.y));
     const plan = MissionPlan.parse({
       id: "offroad", recipientId: "crew-1", knowledgeRevision: inc.agentRevision(AgentId.parse("crew-1")),
       timedLegs: [],
-      offroadLegs: [{ kind: "offroad", start: { x: 400, y: 800 }, end: { x: 500, y: 900 }, departMs: 0, arriveMs: 70_000 }],
-      workInterval: { startMs: 70_000, endMs: 70_000 }, refugeId: "n-rw", reservationRevision: 0, limitingReason: null,
+      offroadLegs: [{ kind: "offroad", start, end, departMs: 0, arriveMs: travelMs }],
+      workInterval: { startMs: travelMs, endMs: travelMs }, refugeId: "n-rw", reservationRevision: 0, limitingReason: null,
     });
     inc.submit({ kind: "commit_plan", agentId: AgentId.parse("crew-1"), plan, workSiteId: null, mode: "normal" });
     inc.advanceTo(1000);
-    expect(inc.notices).toContainEqual(expect.objectContaining({ kind: "plan_rejected", reason: "offroad_movement_not_supported" }));
+    expect(inc.notices.some((n) => n.kind === "plan_rejected")).toBe(false);
   });
 
   it("waits at a node until the leg's planned departure time", () => {
