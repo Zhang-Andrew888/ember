@@ -112,6 +112,7 @@ describe("demo copy guard (#118)", () => {
     expect(mentioning).toEqual(
       [
         "briefing/briefingInfo.ts", // imports the filter
+        "briefing/publicScenario.fixture.ts", // test-only server scenario with a scout, so the live filter is exercised
         "components/AgentRail.tsx", // neutral label for a non-crew role in an old recording
         "format/omitScout.ts",
         "map/scenarioSchema.ts", // public map data (scoutPoints), not UI

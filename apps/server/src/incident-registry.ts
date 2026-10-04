@@ -53,10 +53,15 @@ export class IncidentRegistry {
    */
   constructor(private readonly defaultSeed?: string) {}
 
+  /** The scenario a `create` without an explicit one runs; also what `GET /scenario` briefs before any incident exists. */
+  defaultScenario(): SimScenario {
+    return buildSyntheticScenario({ gameChanges: true });
+  }
+
   create(body: CreateIncidentBody = {}, clock: MonotonicClock): IncidentRecord {
     const id = randomBytes(12).toString("hex");
     const token = randomBytes(24).toString("hex");
-    const scenario = body.scenario ?? buildSyntheticScenario({ gameChanges: true });
+    const scenario = body.scenario ?? this.defaultScenario();
     const seed = this.defaultSeed ?? randomBytes(16).toString("hex");
     const session = new IncidentSession({ scenario, seed, ...body.session });
     const speechStore = new SpeechAudioStore();

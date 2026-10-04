@@ -21,6 +21,7 @@ export default defineConfig({
     proxy: {
       "/incidents": { target: proxyTarget, ws: true },
       "/health": proxyTarget,
+      "/scenario": proxyTarget,
     },
   },
 });

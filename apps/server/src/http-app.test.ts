@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { connect } from "node:net";
 import { WebSocket } from "ws";
+import { PublicScenarioBriefing, ScenarioBriefingResponse } from "@ember/domain";
 import { startHttpApp } from "./http-app.js";
 import { parseServerWire } from "./protocol.js";
 import { encodeClient } from "./protocol.js";
@@ -234,6 +235,29 @@ describe("http-app transport", () => {
         llmCrewPlanning: false,
         coordinatorIntent: { mode: "grok", active: true, missingEnv: [] },
       });
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("GET /scenario briefs the public map before Start, and POST /incidents returns the same scenario", async () => {
+    const app = await startHttpApp({});
+    try {
+      const response = await fetch(`http://127.0.0.1:${app.port}/scenario`);
+      expect(response.status).toBe(200);
+      const parsed = ScenarioBriefingResponse.safeParse(await response.json());
+      expect(parsed.success).toBe(true);
+      if (!parsed.success) return;
+      expect(parsed.data.protocolVersion).toBe(1);
+      expect(parsed.data.scenario.sites.length).toBeGreaterThan(0);
+      expect(parsed.data.scenario.initialFireCells.length).toBeGreaterThan(0);
+      expect(JSON.stringify(parsed.data)).not.toContain("requiredWork");
+
+      const create = await fetch(`http://127.0.0.1:${app.port}/incidents`, { method: "POST" });
+      const body = (await create.json()) as { scenario?: unknown };
+      const created = PublicScenarioBriefing.safeParse(body.scenario);
+      expect(created.success).toBe(true);
+      if (created.success) expect(created.data).toEqual(parsed.data.scenario);
     } finally {
       await app.close();
     }

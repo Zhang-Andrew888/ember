@@ -8,6 +8,7 @@ import { TopBar } from "./TopBar.js";
 import { UrgentStrip } from "./UrgentStrip.js";
 import { ConnectionBanner } from "./ConnectionBanner.js";
 import { DemoBanner } from "./DemoBanner.js";
+import { MapCommandPanel, type MapCommandPanelProps } from "./MapCommandPanel.js";
 
 describe("components markup", () => {
   it("Briefing exposes start control and site list", () => {
@@ -97,5 +98,34 @@ describe("components markup", () => {
 
   it("DemoBanner describes demo mode", () => {
     expect(renderToStaticMarkup(createElement(DemoBanner, null))).toContain("Demo mode");
+  });
+  describe("MapCommandPanel", () => {
+    const props: MapCommandPanelProps = {
+      assignMode: false,
+      onToggleAssignMode: () => {},
+      selectedCallsign: "Crew 1",
+      selectedAgentId: "agent-1",
+      draft: null,
+      pickHint: null,
+      delivery: null,
+      disabled: false,
+      onSend: () => {},
+      onCancelDraft: () => {},
+      open: true,
+      onOpen: () => {},
+      onClose: () => {},
+    };
+
+    it("offers a close button while open", () => {
+      const html = renderToStaticMarkup(createElement(MapCommandPanel, props));
+      expect(html).toContain("map-command-panel__close");
+      expect(html).toContain("Pick destination on map");
+    });
+
+    it("collapses to a reopen control when closed", () => {
+      const html = renderToStaticMarkup(createElement(MapCommandPanel, { ...props, open: false }));
+      expect(html).toContain("map-command-panel__reopen");
+      expect(html).not.toContain("Pick destination on map");
+    });
   });
 });
