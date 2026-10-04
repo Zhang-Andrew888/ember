@@ -12,7 +12,7 @@ describe("planStart", () => {
   });
 
   it("a pre-configured WebSocket URL wins: no incident is created, even if a REST base is also set", () => {
-    const ws = "ws://127.0.0.1:3000/incidents/abc/events?token=t";
+    const ws = "ws://127.0.0.1:3000/incidents/abc/events";
     expect(planStart({ wsUrl: ws, restBase: undefined })).toEqual({ kind: "preconfigured" });
     expect(planStart({ wsUrl: ws, restBase: "http://127.0.0.1:3000" })).toEqual({ kind: "preconfigured" });
   });

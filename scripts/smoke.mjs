@@ -78,7 +78,7 @@ async function main() {
   const badToken = await fetchJson(`/incidents/${c.incidentId}/start`, { method: "POST", headers: { "x-incident-token": "nope" } });
   check("start with wrong token is 401", badToken.status === 401, `status=${badToken.status}`);
   const badWs = await new Promise((resolve) => {
-    const ws = new WebSocket(`${SERVER_URL.replace(/^http/, "ws")}/incidents/${c.incidentId}/events?token=nope`);
+    const ws = new WebSocket(`${SERVER_URL.replace(/^http/, "ws")}/incidents/${c.incidentId}/events`, ["ember.v1", `ember.token.${"0".repeat(48)}`]);
     ws.onopen = () => resolve("open");
     ws.onerror = () => resolve("error");
     ws.onclose = () => resolve("closed");
@@ -97,7 +97,7 @@ async function main() {
   let nonMonotonicSequence = null;
   let invalidEnvelope = null;
   let lastSequence = -1;
-  const ws = new WebSocket(`${SERVER_URL.replace(/^http/, "ws")}${c.websocket.events}`);
+  const ws = new WebSocket(`${SERVER_URL.replace(/^http/, "ws")}${c.websocket.events}`, ["ember.v1", `ember.token.${c.token}`]);
   ws.onmessage = (event) => {
     const raw = String(event.data);
     if (leak === null && PRIVATE_FIELD_PATTERN.test(raw)) leak = raw.slice(0, 200);
@@ -175,7 +175,7 @@ async function main() {
   ws.close();
 
   // 9. Second client gets a fresh view immediately and the incident is not reset.
-  const ws2 = new WebSocket(`${SERVER_URL.replace(/^http/, "ws")}${c.websocket.events}`);
+  const ws2 = new WebSocket(`${SERVER_URL.replace(/^http/, "ws")}${c.websocket.events}`, ["ember.v1", `ember.token.${c.token}`]);
   const second = await new Promise((resolve) => {
     ws2.onmessage = (event) => resolve(JSON.parse(String(event.data)).message);
     ws2.onerror = () => resolve(null);
@@ -194,7 +194,7 @@ async function main() {
     check("web dev server proxies POST /incidents", proxiedCreate.status === 200 && typeof proxiedCreate.body?.incidentId === "string", `status=${proxiedCreate.status}`);
     if (proxiedCreate.body?.websocket?.events) {
       const proxiedWs = await new Promise((resolve) => {
-        const s = new WebSocket(`${WEB_URL.replace(/^http/, "ws")}${proxiedCreate.body.websocket.events}`);
+        const s = new WebSocket(`${WEB_URL.replace(/^http/, "ws")}${proxiedCreate.body.websocket.events}`, ["ember.v1", `ember.token.${proxiedCreate.body.token}`]);
         s.onmessage = (event) => {
           resolve(JSON.parse(String(event.data)).message?.type);
           s.close();

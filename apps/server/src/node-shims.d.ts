@@ -91,20 +91,29 @@ interface ImportMeta {
   url: string;
 }
 declare module "ws" {
+  import type { IncomingMessage } from "node:http";
   export class WebSocket {
-    constructor(url: string);
+    constructor(url: string, protocols?: string[]);
+    readonly protocol: string;
     readyState: number;
     send(data: string): void;
     close(code?: number, reason?: string): void;
     /** Destroy the socket immediately. `close()` alone waits for a handshake. */
     terminate(): void;
+    on(event: "upgrade", cb: (response: IncomingMessage) => void): void;
     on(event: "message", cb: (data: { toString(): string }) => void): void;
     on(event: "close", cb: (code: number) => void): void;
     on(event: "open", cb: () => void): void;
     on(event: "error", cb: (e: unknown) => void): void;
   }
   export class WebSocketServer {
-    constructor(options: { port?: number; host?: string; maxPayload?: number; noServer?: boolean });
+    constructor(options: {
+      port?: number;
+      host?: string;
+      maxPayload?: number;
+      noServer?: boolean;
+      handleProtocols?: (protocols: Set<string>, request: IncomingMessage) => string | false;
+    });
     on(event: "connection", cb: (socket: WebSocket) => void): void;
     on(event: "listening", cb: () => void): void;
     handleUpgrade(

@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { DoubleSide, MeshStandardMaterial, type BufferGeometry } from "three";
 import { useStaleMaterial } from "./useStaleMaterial.js";
 import { freshness } from "./staleness.js";
@@ -13,9 +13,8 @@ const SITE_LIFT = 1.2;
 /** See MODEL_SCALE in AgentMarkers: sites are also enlarged to read at the fitted zoom. */
 const SITE_SCALE = 1.7;
 
-function useGeometry(factory: () => BufferGeometry, deps: readonly unknown[]): BufferGeometry {
-  // deps are supplied by the caller (the rules-of-hooks plugin is not part of this repo's lint config)
-  const geometry = useMemo(factory, deps);
+function useGeometry(factory: () => BufferGeometry): BufferGeometry {
+  const geometry = useMemo(() => factory(), [factory]);
   useEffect(() => () => geometry.dispose(), [geometry]);
   return geometry;
 }
@@ -47,17 +46,17 @@ export function SiteMarkers({ sites }: { readonly sites: SiteMarker[] }) {
 function SiteModel({ site, index }: { readonly site: SiteMarker; readonly index: number }) {
   const kind = siteModelKind(site.name, index);
   const cue = siteCue(site.protectionStatus);
-  const building = useGeometry(() => createSiteGeometry(kind), [kind]);
-  const rubble = useGeometry(createRubbleGeometry, []);
-  const fence = useGeometry(() => createFenceRingGeometry(), []);
-  const notch = useGeometry(createDamageNotchGeometry, []);
+  const building = useGeometry(useCallback(() => createSiteGeometry(kind), [kind]));
+  const rubble = useGeometry(createRubbleGeometry);
+  const fence = useGeometry(createFenceRingGeometry);
+  const notch = useGeometry(createDamageNotchGeometry);
   const filled = damageNotches(site.damage);
   const y = sceneTerrain.groundY(site.position.x, site.position.z) + SITE_LIFT;
   const tint = PROTECTION_TINT[site.protectionStatus];
   const fresh = freshness(site.ageMs, site.stale);
   // Unobserved sites are already outline-only ghosts; stale observed sites fade and hatch.
   const material = useStaleMaterial(
-    () => new MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.85, fog: false }),
+    useCallback(() => new MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.85, fog: false }), []),
     tint,
     fresh,
     fresh.stale && !cue.ghost,

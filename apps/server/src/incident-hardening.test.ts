@@ -1,3 +1,4 @@
+import { incidentWebSocketProtocols } from "@ember/domain";
 import { describe, expect, it } from "vitest";
 import { WebSocket } from "ws";
 import { startHttpApp } from "./http-app.js";
@@ -92,14 +93,14 @@ describe("failure containment (#51)", () => {
     const app = await startHttpApp({});
     try {
       const create = await fetch(`http://127.0.0.1:${app.port}/incidents`, { method: "POST" });
-      const body = (await create.json()) as { incidentId: string; websocket: { events: string } };
+      const body = (await create.json()) as { incidentId: string; token: string; websocket: { events: string } };
       const record = app.registry.get(body.incidentId)!;
       record.hub.handle = () => {
         throw new Error("boom");
       };
 
       const ws = await new Promise<WebSocket>((resolve, reject) => {
-        const socket = new WebSocket(`ws://127.0.0.1:${app.port}${body.websocket.events}`);
+        const socket = new WebSocket(`ws://127.0.0.1:${app.port}${body.websocket.events}`, incidentWebSocketProtocols(body.token));
         socket.on("open", () => resolve(socket));
         socket.on("error", reject);
       });

@@ -11,7 +11,7 @@ import type { Freshness } from "./staleness.js";
  * clock is running, so a mutation made during render would not repaint until
  * something unrelated asked for a frame (a stale marker would keep looking
  * current).
- * `factory` is called once per component instance.
+ * `factory` should be stable (module function or useCallback); changes replace the material.
  */
 export function useStaleMaterial(
   factory: () => MeshStandardMaterial,
@@ -25,7 +25,7 @@ export function useStaleMaterial(
     const created = factory();
     applyStaleHatch(created, uniform);
     return created;
-  }, [uniform]);
+  }, [factory, uniform]);
 
   useLayoutEffect(() => {
     material.color.set(color);

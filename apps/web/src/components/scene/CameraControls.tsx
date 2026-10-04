@@ -74,8 +74,7 @@ export const CameraControls = forwardRef<CameraControlsHandle, CameraControlsPro
     instance.maxDistance = 1400;
     instance.screenSpacePanning = false;
     return instance;
-    // camera/gl are stable for the Canvas lifetime; this must only run once.
-  }, []);
+  }, [camera, gl.domElement]);
 
   // Fit the whole scene into the canvas once, then remember that pose as
   // the reset target (OrbitControls.reset restores the saved state).

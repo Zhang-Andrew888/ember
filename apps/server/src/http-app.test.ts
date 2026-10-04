@@ -1,3 +1,4 @@
+import { incidentWebSocketProtocols } from "@ember/domain";
 import { describe, expect, it, vi } from "vitest";
 import { connect } from "node:net";
 import { WebSocket } from "ws";
@@ -96,12 +97,16 @@ describe("http-app transport", () => {
       websocket: { events: string };
     };
     expect(body.protocolVersion).toBe(1);
+    expect(body.websocket.events).toBe(`/incidents/${body.incidentId}/events`);
+    expect(JSON.stringify(body.websocket)).not.toContain(body.token);
 
     const ws = await new Promise<WebSocket>((resolve, reject) => {
-      const socket = new WebSocket(`ws://127.0.0.1:${app.port}${body.websocket.events}`);
+      const socket = new WebSocket(`ws://127.0.0.1:${app.port}${body.websocket.events}`, incidentWebSocketProtocols(body.token));
       socket.on("open", () => resolve(socket));
       socket.on("error", reject);
     });
+
+    expect(ws.protocol).toBe("ember.v1");
 
     const first = await new Promise<unknown>((resolve) => {
       ws.on("message", (d) => resolve(JSON.parse(d.toString())));
@@ -122,6 +127,59 @@ describe("http-app transport", () => {
     await app.close();
   });
 
+  it("rejects query-only, missing, wrong, and malformed protocol credentials without starting the incident", async () => {
+    const app = await startHttpApp({ clock: { nowMs: () => 0 } });
+    try {
+      const create = await fetch(`http://127.0.0.1:${app.port}/incidents`, { method: "POST" });
+      const body = (await create.json()) as { incidentId: string; token: string; websocket: { events: string } };
+      const offers = incidentWebSocketProtocols(body.token).join(", ");
+      for (const [path, headers] of [
+        [`${body.websocket.events}?token=${body.token}`, ""],
+        [body.websocket.events, ""],
+        [body.websocket.events, `Sec-WebSocket-Protocol: ember.v1, ember.token.${"0".repeat(48)}\r\n`],
+        [body.websocket.events, `Sec-WebSocket-Protocol: ${offers}, ember.v1\r\n`],
+        [body.websocket.events, `Sec-WebSocket-Protocol: ember.v2, ember.token.${body.token}\r\n`],
+        [body.websocket.events, `Sec-WebSocket-Protocol: ember.v1, ember.token.short\r\n`],
+        // An invalid offer must not fall back to a valid custom header.
+        [body.websocket.events, `Sec-WebSocket-Protocol: bad\r\nx-incident-token: ${body.token}\r\n`],
+      ] as const) {
+        const rejected = await requestUpgrade(app.port, path, headers);
+        expect(rejected.startsWith("HTTP/1.1 401")).toBe(true);
+        expect(rejected).not.toContain(body.token);
+        expect(app.registry.get(body.incidentId)?.started).toBe(false);
+      }
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("authenticates events, reconnects and voice with only the public protocol echoed", async () => {
+    const app = await startHttpApp({ clock: { nowMs: () => 0 } });
+    try {
+      const create = await fetch(`http://127.0.0.1:${app.port}/incidents`, { method: "POST" });
+      const body = (await create.json()) as { token: string; websocket: { events: string; voice: string } };
+      for (const path of [body.websocket.events, body.websocket.events, body.websocket.voice]) {
+        const ws = new WebSocket(`ws://127.0.0.1:${app.port}${path}`, incidentWebSocketProtocols(body.token).reverse());
+        const responseHeaders = new Promise<Record<string, unknown>>((resolve) => {
+          ws.on("upgrade", (response) => resolve(response.headers));
+        });
+        await new Promise<void>((resolve, reject) => {
+          ws.on("open", resolve);
+          ws.on("error", reject);
+        });
+        expect(ws.protocol).toBe("ember.v1");
+        expect(JSON.stringify(await responseHeaders)).not.toContain(body.token);
+        const closed = new Promise<void>((resolve) => ws.on("close", () => resolve()));
+        ws.close();
+        await closed;
+      }
+      const peer = await holdUpgrade(app.port, body.websocket.events, `x-incident-token: ${body.token}\r\n`);
+      peer.destroy();
+    } finally {
+      await app.close();
+    }
+  });
+
   it("rejects a malformed percent-encoded upgrade and still serves the next request", async () => {
     const app = await startHttpApp({});
     try {
@@ -138,9 +196,9 @@ describe("http-app transport", () => {
   it("finishes shutdown while a WebSocket client stays connected", async () => {
     const app = await startHttpApp({});
     const create = await fetch(`http://127.0.0.1:${app.port}/incidents`, { method: "POST" });
-    const body = (await create.json()) as { websocket: { events: string } };
+    const body = (await create.json()) as { token: string; websocket: { events: string } };
     const ws = await new Promise<WebSocket>((resolve, reject) => {
-      const socket = new WebSocket(`ws://127.0.0.1:${app.port}${body.websocket.events}`);
+      const socket = new WebSocket(`ws://127.0.0.1:${app.port}${body.websocket.events}`, incidentWebSocketProtocols(body.token));
       socket.on("open", () => resolve(socket));
       socket.on("error", reject);
     });
@@ -162,8 +220,8 @@ describe("http-app transport", () => {
   it("finishes shutdown when the peer never completes the close handshake", async () => {
     const app = await startHttpApp({});
     const create = await fetch(`http://127.0.0.1:${app.port}/incidents`, { method: "POST" });
-    const body = (await create.json()) as { websocket: { events: string } };
-    const peer = await holdUpgrade(app.port, body.websocket.events);
+    const body = (await create.json()) as { token: string; websocket: { events: string } };
+    const peer = await holdUpgrade(app.port, body.websocket.events, `Sec-WebSocket-Protocol: ${incidentWebSocketProtocols(body.token).join(", ")}\r\n`);
     try {
       const started = performance.now();
       await app.close();
@@ -204,12 +262,12 @@ describe("http-app transport", () => {
     const app = await startHttpApp({});
     try {
       const create = await fetch(`http://127.0.0.1:${app.port}/incidents`, { method: "POST" });
-      const body = (await create.json()) as { websocket: { events: string } };
+      const body = (await create.json()) as { token: string; websocket: { events: string } };
       const foreign = await requestUpgrade(app.port, body.websocket.events, "Origin: https://evil.example.com\r\n");
       expect(foreign.startsWith("HTTP/1.1 403")).toBe(true);
       const opaque = await requestUpgrade(app.port, body.websocket.events, "Origin: null\r\n");
       expect(opaque.startsWith("HTTP/1.1 403")).toBe(true);
-      const local = await holdUpgrade(app.port, body.websocket.events, "Origin: http://localhost:5173\r\n");
+      const local = await holdUpgrade(app.port, body.websocket.events, `Origin: http://localhost:5173\r\nSec-WebSocket-Protocol: ${incidentWebSocketProtocols(body.token).join(", ")}\r\n`);
       local.destroy();
     } finally {
       await app.close();

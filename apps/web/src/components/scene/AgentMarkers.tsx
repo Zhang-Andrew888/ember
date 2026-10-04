@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import type { ThreeEvent } from "@react-three/fiber";
 import { DoubleSide, MeshStandardMaterial, type BufferGeometry } from "three";
 import { useStaleMaterial } from "./useStaleMaterial.js";
@@ -30,18 +30,17 @@ function headingRotationY(agent: AgentMarker): number {
 }
 
 /** Memoised geometry that is disposed when the component unmounts. */
-function useGeometry(factory: () => BufferGeometry, deps: readonly unknown[]): BufferGeometry {
-  // deps are supplied by the caller (the rules-of-hooks plugin is not part of this repo's lint config)
-  const geometry = useMemo(factory, deps);
+function useGeometry(factory: () => BufferGeometry): BufferGeometry {
+  const geometry = useMemo(() => factory(), [factory]);
   useEffect(() => () => geometry.dispose(), [geometry]);
   return geometry;
 }
 
 function GlyphMeshes({ glyph }: { readonly glyph: ReturnType<typeof agentCue>["glyph"] }) {
-  const chevron = useGeometry(createChevronGeometry, []);
-  const warn = useGeometry(createWarnGeometry, []);
-  const cross = useGeometry(createCrossGeometry, []);
-  const work = useGeometry(createWorkGlyphGeometry, []);
+  const chevron = useGeometry(createChevronGeometry);
+  const warn = useGeometry(createWarnGeometry);
+  const cross = useGeometry(createCrossGeometry);
+  const work = useGeometry(createWorkGlyphGeometry);
   const flat = { fog: false } as const;
   switch (glyph) {
     case "none":
@@ -145,12 +144,12 @@ function AgentModel({
 }) {
   const cue = agentCue(agent.state);
   const number = crewNumber(agent.callsign, crewOrdinal);
-  const crewGeometry = useGeometry(() => createCrewGeometry(number), [number]);
+  const crewGeometry = useGeometry(useCallback(() => createCrewGeometry(number), [number]));
   const fresh = freshness(agent.ageMs);
   // Colour fades toward grey with age as well as opacity: an old position never looks current.
   const color = cue.muted || fresh.stale ? (cue.muted ? MUTED : MUTED_STALE) : CREW_COLORS[slot % CREW_COLORS.length]!;
   const material = useStaleMaterial(
-    () => new MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.7, fog: false }),
+    useCallback(() => new MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.7, fog: false }), []),
     color,
     fresh,
     fresh.stale,

@@ -16,6 +16,18 @@ const proxyTarget = devServerProxyTarget();
 
 export default defineConfig({
   plugins: [react(), scenarioFilesPlugin()],
+  build: {
+    manifest: true,
+    rollupOptions: {
+      output: {
+        // Keep the renderer out of the briefing and cache framework code across app updates.
+        manualChunks: {
+          three: ["three"],
+          react: ["react", "react-dom/client"],
+        },
+      },
+    },
+  },
   server: {
     port: 5173,
     proxy: {

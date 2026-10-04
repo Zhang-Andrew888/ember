@@ -14,7 +14,7 @@ export type { IncidentReplayRecording };
 export interface CreatedIncident {
   readonly incidentId: string;
   readonly token: string;
-  /** Path or absolute URL for the events WebSocket (includes token query). */
+  /** Path or absolute URL for the events WebSocket (credentials are sent separately). */
   readonly websocketEventsPath: string;
 }
 

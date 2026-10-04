@@ -54,13 +54,13 @@ export function RenderPipeline({
 
   const composer = useMemo(() => {
     if (!useComposer) return null;
-    const target = new WebGLRenderTarget(width, height, { type: HalfFloatType, samples: config.antialias ? 4 : 0 });
+    const target = new WebGLRenderTarget(1, 1, { type: HalfFloatType, samples: config.antialias ? 4 : 0 });
     const c = new EffectComposer(gl, target);
     c.addPass(new RenderPass(scene, camera));
     bloomRef.current = null;
     vignetteRef.current = null;
     if (config.bloom) {
-      const bloom = new UnrealBloomPass(new Vector2(width, height), 0.55, 0.45, 1.0);
+      const bloom = new UnrealBloomPass(new Vector2(1, 1), 0.55, 0.45, 1.0);
       bloomRef.current = bloom;
       c.addPass(bloom);
     }
@@ -71,7 +71,7 @@ export function RenderPipeline({
       c.addPass(vignette);
     }
     return c;
-    // Size changes are applied by the effect below, not by rebuilding.
+    // The effect below sets size before the first frame and after each resize.
   }, [gl, scene, camera, useComposer, config.bloom, config.vignette, config.antialias]);
 
   useEffect(() => {

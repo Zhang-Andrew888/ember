@@ -73,7 +73,7 @@ describe("net/incidentRestClient - createIncident", () => {
         json: async () => ({
           incidentId: "abc",
           token: "tok",
-          websocket: { events: "/incidents/abc/events?token=tok" },
+          websocket: { events: "/incidents/abc/events" },
         }),
       }),
     );
@@ -82,7 +82,7 @@ describe("net/incidentRestClient - createIncident", () => {
     expect(created).toEqual({
       incidentId: "abc",
       token: "tok",
-      websocketEventsPath: "/incidents/abc/events?token=tok",
+      websocketEventsPath: "/incidents/abc/events",
     });
   });
 
@@ -137,8 +137,8 @@ describe("net/incidentRestClient - fetchIncidentReplay", () => {
 
 describe("net/incidentRestClient - resolveWebSocketUrl", () => {
   it("maps http base to ws on the same host", () => {
-    expect(resolveWebSocketUrl("http://127.0.0.1:3000", "/incidents/x/events?token=t")).toBe(
-      "ws://127.0.0.1:3000/incidents/x/events?token=t",
+    expect(resolveWebSocketUrl("http://127.0.0.1:3000", "/incidents/x/events")).toBe(
+      "ws://127.0.0.1:3000/incidents/x/events",
     );
   });
 

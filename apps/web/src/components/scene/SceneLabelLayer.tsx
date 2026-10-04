@@ -5,6 +5,8 @@ import type { RefObject } from "react";
 import { projectToScreen } from "./projectToScreen.js";
 import { resolveLabelCollisions, type ReservedBox, type SizedLabelPoint } from "./stackLabels.js";
 
+const NO_RESERVED_REFS: ReadonlyArray<RefObject<HTMLElement | null>> = [];
+
 const LABEL_HEIGHT_PX = 20;
 /** Rough glyph width estimate so two co-located labels don't overlap; not pixel-exact. */
 const CHAR_WIDTH_PX = 6.5;
@@ -41,7 +43,7 @@ export function SceneLabelLayer({
   camera,
   canvasElement,
   labels,
-  reservedElementRefs = [],
+  reservedElementRefs = NO_RESERVED_REFS,
 }: SceneLabelLayerProps) {
   const elementsRef = useRef(new Map<string, HTMLDivElement>());
   const worldPoint = useRef(new Vector3());
@@ -87,7 +89,7 @@ export function SceneLabelLayer({
 
     frameId = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frameId);
-  }, [camera, canvasElement, labels]);
+  }, [camera, canvasElement, labels, reservedElementRefs]);
 
   return (
     <div className="scene-label-layer">

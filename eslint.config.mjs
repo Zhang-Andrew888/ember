@@ -1,4 +1,6 @@
 import tseslint from "@typescript-eslint/eslint-plugin";
+// TypeScript lint does not check React hook order or effect dependencies.
+import reactHooks from "eslint-plugin-react-hooks";
 import tsParser from "@typescript-eslint/parser";
 
 const tsFiles = ["**/*.ts", "**/*.tsx"];
@@ -46,8 +48,12 @@ export default [
       parser: tsParser,
       parserOptions: { project: true },
     },
-    plugins: { "@typescript-eslint": tseslint },
-    rules: sharedRules,
+    plugins: { "@typescript-eslint": tseslint, "react-hooks": reactHooks },
+    rules: {
+      ...sharedRules,
+      "react-hooks/rules-of-hooks": "error",
+      "react-hooks/exhaustive-deps": "error",
+    },
   },
 
   // apps/web — vite config (Node.js, separate tsconfig)

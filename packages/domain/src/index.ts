@@ -5,3 +5,4 @@ export * from "./records.js";
 export * from "./coordinator-view.js";
 export * from "./simulation-api.js";
 export * from "./wire-protocol.js";
+export * from "./websocket-auth.js";

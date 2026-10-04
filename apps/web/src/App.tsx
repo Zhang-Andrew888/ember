@@ -1,10 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   createCoordinatorViewClient,
   type CoordinatorViewClient,
 } from "./net/CoordinatorViewClient.js";
-import { createMockIncidentSocket, type MockIncidentSocket } from "./net/mockIncidentSocket.js";
-import { resolveScenario } from "./net/scenarioSelection.js";
+import type { MockIncidentSocket } from "./net/mockIncidentSocket.js";
 import {
   createIncident,
   fetchIncidentReplay,
@@ -30,12 +29,11 @@ import { latestUrgentReport } from "./format/reports.js";
 import { isDemoMode } from "./demo/demoMode.js";
 import { Briefing } from "./components/Briefing.js";
 import { TopBar } from "./components/TopBar.js";
-import { SceneView } from "./components/scene/SceneView.js";
 import { ConversationPanel } from "./components/ConversationPanel.js";
 import { UrgentStrip } from "./components/UrgentStrip.js";
 import { AgentRail } from "./components/AgentRail.js";
 import { EndOverlay } from "./components/EndOverlay.js";
-import { ReplayView, type ReplaySource } from "./components/ReplayView.js";
+import type { ReplaySource } from "./components/ReplayView.js";
 import { ConnectionBanner } from "./components/ConnectionBanner.js";
 import { DemoBanner } from "./components/DemoBanner.js";
 import { MockPlaybackEndedOverlay } from "./components/MockPlaybackEndedOverlay.js";
@@ -46,6 +44,10 @@ import { MapCommandPanel } from "./components/MapCommandPanel.js";
 import { applyReceipts, registerSentCommand, type MapCommandDelivery } from "./command/mapCommandDelivery.js";
 import { buildMoveDirectionDraft, type MapMovementDraft } from "./map/moveDirectionCommand.js";
 import { agentWorldPoint, sceneToWorld, worldToScenePoint } from "./map/worldPoint.js";
+
+// Download the 3D renderer and replay UI only when the user enters those views.
+const SceneView = lazy(() => import("./components/scene/SceneView.js").then((module) => ({ default: module.SceneView })));
+const ReplayView = lazy(() => import("./components/ReplayView.js").then((module) => ({ default: module.ReplayView })));
 
 const INCIDENT_ID = import.meta.env.VITE_INCIDENT_ID ?? "demo";
 const INCIDENT_TOKEN = import.meta.env.VITE_INCIDENT_TOKEN as string | undefined;
@@ -79,6 +81,7 @@ export function App() {
   const [replayLoading, setReplayLoading] = useState(false);
   const [replayError, setReplayError] = useState<string | null>(null);
   const [mockPlaybackEnded, setMockPlaybackEnded] = useState(false);
+  const mockSocketFactoryRef = useRef<(() => MockIncidentSocket) | null>(null);
   const mockSocketRef = useRef<MockIncidentSocket | null>(null);
   const protocolSocketRef = useRef<ProtocolWebSocket | null>(null);
   const liveSessionRef = useRef<{ incidentId: string; token: string } | null>(null);
@@ -161,11 +164,9 @@ export function App() {
 
   const openSocket = useCallback(() => {
     if (IS_MOCK_MODE) {
-      const scenarioOptions = resolveScenario(window.location.search);
-      const socket = createMockIncidentSocket({
-        ...(scenarioOptions ?? {}),
-        onPlaybackEnded: () => setMockPlaybackEnded(true),
-      });
+      const factory = mockSocketFactoryRef.current;
+      if (factory === null) throw new Error("Mock playback is not loaded");
+      const socket = factory();
       mockSocketRef.current = socket;
       return socket;
     }
@@ -173,7 +174,7 @@ export function App() {
     if (url === undefined) {
       throw new Error("Live WebSocket URL is not configured");
     }
-    const socket = createProtocolWebSocket(url);
+    const socket = createProtocolWebSocket(url, liveSessionRef.current?.token ?? INCIDENT_TOKEN);
     protocolSocketRef.current = socket;
     return socket;
   }, []);
@@ -182,6 +183,23 @@ export function App() {
     setStarting(true);
     setStartError(null);
     setMockPlaybackEnded(false);
+    if (IS_MOCK_MODE) {
+      try {
+        const [{ createMockIncidentSocket }, { resolveScenario }] = await Promise.all([
+          import("./net/mockIncidentSocket.js"),
+          import("./net/scenarioSelection.js"),
+        ]);
+        const scenarioOptions = resolveScenario(window.location.search);
+        mockSocketFactoryRef.current = () => createMockIncidentSocket({
+          ...(scenarioOptions ?? {}),
+          onPlaybackEnded: () => setMockPlaybackEnded(true),
+        });
+      } catch {
+        setStarting(false);
+        setStartError(START_FAILED_MESSAGE);
+        return;
+      }
+    }
     // A pre-configured WebSocket URL skips incident creation (see net/startPlan.ts).
     if (START_PLAN.kind === "create-incident") {
       const created = await createIncident(REST_BASE_URL ?? "");
@@ -193,8 +211,13 @@ export function App() {
       liveSessionRef.current = { incidentId: created.incidentId, token: created.token };
       liveWsUrlRef.current = resolveWebSocketUrl(REST_BASE_URL ?? "", created.websocketEventsPath);
     }
-    const nextClient = createCoordinatorViewClient(openSocket);
-    setClient(nextClient);
+    try {
+      setClient(createCoordinatorViewClient(openSocket));
+    } catch {
+      setStarting(false);
+      setStartError(START_FAILED_MESSAGE);
+      return;
+    }
     if (IS_MOCK_MODE) {
       mockSocketRef.current?.start();
     } else {
@@ -437,11 +460,13 @@ export function App() {
 
   if (phase === "replay") {
     return (
-      <ReplayView
-        onExit={handleExitReplay}
-        source={replaySource}
-        {...(replayRecording === null ? {} : { recording: replayRecording })}
-      />
+      <Suspense fallback={<div role="status">Loading replay…</div>}>
+        <ReplayView
+          onExit={handleExitReplay}
+          source={replaySource}
+          {...(replayRecording === null ? {} : { recording: replayRecording })}
+        />
+      </Suspense>
     );
   }
 
@@ -462,18 +487,20 @@ export function App() {
           speechSnapshot={speechSnapshot}
         />
         <div className="app-layout__main">
-          <SceneView
-            entities={entities}
-            selectedAgentId={selectedAgentId}
-            onInspectAgent={setSelectedAgentId}
-            reducedMotion={reducedMotion}
-            simTimeMs={view ? (view.simTimeMs as number) : null}
-            mapAssignMode={mapAssignMode}
-            mapPreviewFrom={mapPreviewFrom}
-            mapPreviewTo={mapPreviewTo}
-            onMapDestinationPick={handleMapDestinationPick}
-            mapCommandPanel={mapCommandPanel}
-          />
+          <Suspense fallback={<div className="scene-view"><div className="scene-view__loading" role="status">Preparing the map…</div></div>}>
+            <SceneView
+              entities={entities}
+              selectedAgentId={selectedAgentId}
+              onInspectAgent={setSelectedAgentId}
+              reducedMotion={reducedMotion}
+              simTimeMs={view ? (view.simTimeMs as number) : null}
+              mapAssignMode={mapAssignMode}
+              mapPreviewFrom={mapPreviewFrom}
+              mapPreviewTo={mapPreviewTo}
+              onMapDestinationPick={handleMapDestinationPick}
+              mapCommandPanel={mapCommandPanel}
+            />
+          </Suspense>
           <ConversationPanel
             transcript={transcript}
             activeRecipientCallsign={activeRecipientCallsign}

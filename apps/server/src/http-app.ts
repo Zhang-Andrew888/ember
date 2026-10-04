@@ -2,7 +2,7 @@ import Fastify from "fastify";
 import { WebSocketServer } from "ws";
 import type { WebSocket } from "ws";
 import type { IncomingMessage } from "node:http";
-import { WIRE_PROTOCOL_VERSION } from "@ember/domain";
+import { WIRE_PROTOCOL_VERSION, INCIDENT_WS_PROTOCOL, incidentTokenFromProtocols } from "@ember/domain";
 import { IncidentRegistry } from "./incident-registry.js";
 import { stopReplayWorker } from "./replay-offloop.js";
 import { grokVoiceEnabled } from "./xai/env.js";
@@ -56,13 +56,6 @@ function parseIncidentPath(url: string | undefined): { kind: "events" | "voice";
   return { incidentId: decodeURIComponent(m[1]!), kind: m[2] as "events" | "voice" };
 }
 
-function tokenFromQuery(url: string | undefined): string | undefined {
-  if (url === undefined) return undefined;
-  const q = url.split("?")[1];
-  if (q === undefined) return undefined;
-  return new URLSearchParams(q).get("token") ?? undefined;
-}
-
 /** A header that Node may deliver as a list; only the first value matters for these checks. */
 function firstHeader(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
@@ -80,7 +73,11 @@ export async function startHttpApp(options: { port?: number; clock?: MonotonicCl
   const clock: MonotonicClock = options.clock ?? { nowMs: () => performance.now() };
   const registry = new IncidentRegistry(options.seed);
   const fastify = Fastify({ logger: false });
-  const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_MESSAGE_BYTES });
+  const wss = new WebSocketServer({
+    noServer: true,
+    maxPayload: MAX_MESSAGE_BYTES,
+    handleProtocols: (protocols) => protocols.has(INCIDENT_WS_PROTOCOL) ? INCIDENT_WS_PROTOCOL : false,
+  });
   const extraHosts = allowedHostsFromEnv(process.env.EMBER_ALLOWED_HOSTS);
   const sockets = new Map<WebSocket, { clientId: ClientId; record: NonNullable<ReturnType<IncidentRegistry["get"]>> }>();
   let closing = false;
@@ -106,8 +103,8 @@ export async function startHttpApp(options: { port?: number; clock?: MonotonicCl
       protocolVersion: WIRE_PROTOCOL_VERSION,
       briefing: view,
       websocket: {
-        events: `/incidents/${record.id}/events?token=${record.token}`,
-        voice: `/incidents/${record.id}/voice?token=${record.token}`,
+        events: `/incidents/${record.id}/events`,
+        voice: `/incidents/${record.id}/voice`,
       },
     };
   });
@@ -221,7 +218,13 @@ export async function startHttpApp(options: { port?: number; clock?: MonotonicCl
       rawSocket.destroy();
       return;
     }
-    const token = tokenFromQuery(request.url) ?? request.headers["x-incident-token"]?.toString();
+    // A browser sends exactly the public protocol plus one credential offer.
+    // Header-only auth remains available to non-browser clients without protocol offers.
+    const offers = request.headers["sec-websocket-protocol"];
+    const headerToken = request.headers["x-incident-token"];
+    const token = offers === undefined
+      ? (typeof headerToken === "string" ? headerToken : undefined)
+      : incidentTokenFromProtocols(offers);
     const record = registry.authorize(route.incidentId, token);
     if (record === undefined) {
       rawSocket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
