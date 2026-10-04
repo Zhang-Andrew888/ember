@@ -15,7 +15,7 @@ import { RouteLayer } from "./RouteLayer.js";
 import { ForecastLayer } from "./ForecastLayer.js";
 import { AgentMarkers } from "./AgentMarkers.js";
 import { CameraControls, type CameraControlsHandle } from "./CameraControls.js";
-import { listRefugeNodes } from "./sceneEntities.js";
+import { listRefugeNodes, litFireCells } from "./sceneEntities.js";
 import { scenarioMap } from "../../map/activeScenario.js";
 import type { FireCellMarker, SceneEntities } from "./sceneEntities.js";
 
@@ -26,6 +26,7 @@ const INITIAL_CAMERA_POSITION: [number, number, number] = [0, 520, 440];
 export interface SceneCanvasProps {
   readonly entities: SceneEntities;
   readonly showFireCells: boolean;
+  readonly showCurrentFire: boolean;
   readonly showRoutes: boolean;
   readonly showForecast: boolean;
   readonly selectedAgentId: string | null;
@@ -52,15 +53,23 @@ function FirstFrame({ onFirstFrame }: { readonly onFirstFrame: () => void }) {
 }
 
 export const SceneCanvas = forwardRef<CameraControlsHandle, SceneCanvasProps>(function SceneCanvas(
-  { entities, showFireCells, showRoutes, showForecast, selectedAgentId, followTarget, onUserPan, onInspectAgent, onInspectCell, onReady, onFirstFrame, reducedMotion },
+  { entities, showFireCells, showCurrentFire, showRoutes, showForecast, selectedAgentId, followTarget, onUserPan, onInspectAgent, onInspectCell, onReady, onFirstFrame, reducedMotion },
   controlsRef,
 ) {
   const qualityState = useQualityState();
   const tier = currentTier(qualityState);
   const params = qualityState.params;
   const quality = useMemo(() => effectiveQuality(tier, reducedMotion), [tier, reducedMotion]);
-  // The fire toggle governs every observed-fire effect (flames, ground light, char), not just the tiles.
-  const visibleCells = useMemo(() => (showFireCells ? entities.fireCells : []), [showFireCells, entities.fireCells]);
+  // The fire toggles govern every fire effect (flames, ground light, char), not just the tiles. The
+  // actual fire is the current-fire layer when the feed has one; observations are then only outlined.
+  const visibleCells = useMemo(
+    () => litFireCells(entities, { currentFire: showCurrentFire, observed: showFireCells }),
+    [entities, showCurrentFire, showFireCells],
+  );
+  const currentCells = useMemo(
+    () => (showCurrentFire && entities.currentFire ? entities.currentFire.cells : []),
+    [showCurrentFire, entities.currentFire],
+  );
   const refuges = listRefugeNodes(scenarioMap);
   const routeLines = useMemo(
     () => entities.routes.map((line) => ({ ...line, selected: line.agentId === selectedAgentId })),
@@ -109,8 +118,13 @@ export const SceneCanvas = forwardRef<CameraControlsHandle, SceneCanvasProps>(fu
       {showForecast && entities.forecast ? <ForecastLayer layer={entities.forecast} /> : null}
       <RefugeMarkers refuges={refuges} />
       <SiteMarkers sites={entities.sites} />
-      {showFireCells ? (
-        <FireCells cells={entities.fireCells} onInspectCell={onInspectCell} />
+      {showFireCells || showCurrentFire ? (
+        <FireCells
+          current={currentCells}
+          currentFirePresent={entities.currentFire !== null}
+          cells={showFireCells ? entities.fireCells : []}
+          onInspectCell={onInspectCell}
+        />
       ) : null}
       {showRoutes ? <RouteLayer lines={routeLines} /> : null}
       <AgentMarkers

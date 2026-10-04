@@ -1,5 +1,6 @@
 import type { CoordinatorView, EndReason } from "@ember/domain";
 import { fixtureCoordinatorView } from "../../../../tests/fixtures/coordinator-view.fixture.js";
+import { fixtureCoordinatorViewWithCurrentFire } from "../../../../tests/fixtures/coordinator-view-current-fire.fixture.js";
 
 /**
  * Dev/test-only scenario content (backlog item 1: "every product-critical
@@ -206,3 +207,27 @@ export const staleLaterScenario: CoordinatorView = {
   simTimeMs: 160_000 as CoordinatorView["simTimeMs"],
   wallElapsedMs: 32_000 as CoordinatorView["wallElapsedMs"],
 };
+
+/**
+ * Dev preset `?scenario=current-fire`: views that carry the optional `currentFire` field, so the full
+ * live fire layer can be seen without the live server feed (sim #113). The fire grows between the two
+ * snapshots; `observedCells` stay the fixture's six crew sightings.
+ */
+/** More burning cells (row 36..37, columns 9..16: grid indices ascending and after the fixture's) for the later snapshot. */
+const currentFireGrowth: number[] = [36, 37].flatMap((row) => Array.from({ length: 8 }, (_, i) => row * 64 + 9 + i));
+
+export const currentFireScenarios: CoordinatorView[] = [
+  fixtureCoordinatorViewWithCurrentFire,
+  {
+    ...fixtureCoordinatorViewWithCurrentFire,
+    sequence: 451 as CoordinatorView["sequence"],
+    simTimeMs: 120_000 as CoordinatorView["simTimeMs"],
+    wallElapsedMs: 24_000 as CoordinatorView["wallElapsedMs"],
+    currentFire: {
+      simTimeMs: 120_000 as CoordinatorView["simTimeMs"],
+      // Growth rows sit above the fixture fire, so putting them first keeps the cells strictly ascending.
+      burningCells: [...currentFireGrowth, ...(fixtureCoordinatorViewWithCurrentFire.currentFire?.burningCells ?? [])],
+      burnedCells: fixtureCoordinatorViewWithCurrentFire.currentFire?.burnedCells ?? [],
+    },
+  },
+];

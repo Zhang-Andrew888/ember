@@ -16,4 +16,6 @@ export const colors = {
   terrainSage: "#6E8168",
   terrainOchre: "#9C8252",
   road: "#39454A",
+  /** Observed belief (crew sightings, possibly old): drawn as an outlined frame, never a solid fire tile. */
+  observedBelief: "#CFE3E0",
 } as const;

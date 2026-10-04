@@ -9,7 +9,7 @@ import { SceneCompass } from "./SceneCompass.js";
 import type { CameraControlsHandle } from "./CameraControls.js";
 import { sceneTerrain } from "./terrain/sceneTerrain.js";
 import { agentMapLabelMeta, agentMapLabelText, siteMapLabelMeta, siteMapLabelText } from "./mapLabels.js";
-import { formatObservationInspection } from "./staleness.js";
+import { inspectFireCell } from "./fireInspection.js";
 import { humanizeReason, labelledBands, polylineMidpoint } from "./sceneLayers.js";
 import { listRefugeNodes, type FireCellMarker, type SceneEntities } from "./sceneEntities.js";
 import { scenarioMap } from "../../map/activeScenario.js";
@@ -45,6 +45,7 @@ export function SceneView({
   const [renderContext, setRenderContext] = useState<RenderContext | null>(null);
   const [firstFrameDrawn, setFirstFrameDrawn] = useState(false);
   const [showFireCells, setShowFireCells] = useState(true);
+  const [showCurrentFire, setShowCurrentFire] = useState(true);
   const [showRoutes, setShowRoutes] = useState(true);
   const [showForecast, setShowForecast] = useState(true);
   const [follow, setFollow] = useState(true);
@@ -160,6 +161,7 @@ export function SceneView({
         ref={controlsRef}
         entities={entities}
         showFireCells={showFireCells}
+        showCurrentFire={showCurrentFire}
         showRoutes={showRoutes}
         showForecast={showForecast}
         selectedAgentId={selectedAgentId}
@@ -187,6 +189,9 @@ export function SceneView({
         ref={legendRef}
         showFireCells={showFireCells}
         onToggleFireCells={() => setShowFireCells((value) => !value)}
+        showCurrentFire={showCurrentFire}
+        onToggleCurrentFire={() => setShowCurrentFire((value) => !value)}
+        currentFire={entities.currentFire}
         showRoutes={showRoutes}
         onToggleRoutes={() => setShowRoutes((value) => !value)}
         showForecast={showForecast}
@@ -221,9 +226,9 @@ export function SceneView({
 }
 
 /**
- * "Observed burned/active cells, with timestamps in inspection"
- * (docs/FRONTEND.md scene layer 3) - clicking a fire cell shows when it was
- * last observed, not just its current color.
+ * "Observed burned/active cells, with timestamps in inspection" (docs/FRONTEND.md scene layer 3),
+ * extended for #114: a clicked fire cell says WHERE its state comes from (live current fire,
+ * observed belief, or replay-only full fire) and which incident time that source describes.
  */
 function CellInspectionPanel({
   cell,
@@ -236,32 +241,23 @@ function CellInspectionPanel({
   readonly onClose: () => void;
   readonly panelRef: RefObject<HTMLDivElement | null>;
 }) {
-  const inspection =
-    simTimeMs === null || cell.unseen
-      ? null
-      : formatObservationInspection(cell.lastObservedAt, simTimeMs, cell.stale);
+  const inspection = inspectFireCell(cell, simTimeMs);
   return (
     <div ref={panelRef} className="cell-inspection-panel" role="status">
       <button type="button" className="cell-inspection-panel__close" onClick={onClose} aria-label="Close">
         ×
       </button>
       <dl>
-        <dt>Edge</dt>
-        <dd>
-          Grid cell {cell.gridCellIndex}
-        </dd>
+        <dt>Cell</dt>
+        <dd>Grid cell {cell.gridCellIndex}</dd>
+        <dt>Source</dt>
+        <dd>{inspection.source}</dd>
         <dt>State</dt>
-        <dd>{cell.burnState}</dd>
-        {cell.unseen ? (
+        <dd>{inspection.state}</dd>
+        {inspection.time === null ? null : (
           <>
-            <dt>Observation</dt>
-            <dd>This state was not observed by the coordinator (full simulated fire, replay only)</dd>
-          </>
-        ) : null}
-        {inspection === null ? null : (
-          <>
-            <dt>Last observed</dt>
-            <dd>{inspection}</dd>
+            <dt>{inspection.timeHeading}</dt>
+            <dd>{inspection.time}</dd>
           </>
         )}
       </dl>
