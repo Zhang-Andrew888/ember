@@ -16,7 +16,6 @@ const sampleReq: InterpretationRequest = {
   directory: {
     agents: [{ id: "crew-1", callsign: "Crew 1", role: "protection_crew" }],
     sites: [],
-    scoutPoints: [],
     locations: [],
     corridors: [],
   },

@@ -31,7 +31,7 @@ async function until(cond: () => boolean, ms = 5000): Promise<void> {
 
 describe("websocket server", () => {
   it("sends a coordinator view on connect, validates input, acknowledges commands and never leaks the seed", async () => {
-    const server = await startServer({ scenario: buildSyntheticScenario(), seed: "WS-SECRET-SEED-5521", uncontrolled: ["crew-1", "crew-2", "crew-3", "scout"] });
+    const server = await startServer({ scenario: buildSyntheticScenario(), seed: "WS-SECRET-SEED-5521", uncontrolled: ["crew-1", "crew-2", "crew-3"] });
     const { socket, received } = await connect(server.port);
     await until(() => received.length > 0);
     const first = parseServerWire(JSON.stringify(received[0]));
@@ -58,7 +58,7 @@ describe("websocket server", () => {
   });
 
   it("closes a connection that sends an oversized message and keeps serving others", async () => {
-    const server = await startServer({ scenario: buildSyntheticScenario(), seed: "WS-LIMIT", uncontrolled: ["crew-1", "crew-2", "crew-3", "scout"] });
+    const server = await startServer({ scenario: buildSyntheticScenario(), seed: "WS-LIMIT", uncontrolled: ["crew-1", "crew-2", "crew-3"] });
     const big = await connect(server.port);
     const closed = new Promise<void>((resolve) => big.socket.on("close", () => resolve()));
     big.socket.send("x".repeat(256 * 1024));
