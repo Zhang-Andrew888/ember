@@ -152,8 +152,25 @@ export const ObjectiveKind = z.enum([
   "hold",
   /** Planner must not use the targeted road edge (corridor segment). */
   "avoid_corridor",
+  /** Travel in a world compass direction, stopping at a safe road node. */
+  "move_direction",
 ]);
 export type ObjectiveKind = z.infer<typeof ObjectiveKind>;
+
+/** World north is increasing map y (increasing scene z); east is increasing x. */
+export const CompassDirection = z.preprocess(
+  (value) => typeof value === "string" ? value.trim().toLowerCase().replace(/[\s-]+/g, "") : value,
+  z.enum(["north", "northeast", "east", "southeast", "south", "southwest", "west", "northwest"]),
+);
+export type CompassDirection = z.infer<typeof CompassDirection>;
+
+/** An order is bounded by 1,200 m; omission means at most 600 m, ending at a safe road node. */
+export const MovementDirective = z.object({
+  direction: CompassDirection,
+  maxDistanceMeters: z.number().positive().max(1200).default(600),
+  stopRule: z.literal("safe_road_node").default("safe_road_node"),
+});
+export type MovementDirective = z.infer<typeof MovementDirective>;
 
 export const ObjectiveConstraints = z.object({
   workInterval: z
@@ -177,7 +194,15 @@ export const Objective = z.object({
    */
   targetId: z.string().nullable(),
   constraints: ObjectiveConstraints,
+  movement: MovementDirective.optional(),
   issueSequence: SequenceNumber,
+}).superRefine((objective, context) => {
+  if (objective.kind === "move_direction" && objective.movement === undefined) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["movement"], message: "A movement objective needs an unambiguous compass direction." });
+  }
+  if (objective.kind === "move_direction" && objective.targetId !== null) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["targetId"], message: "A directional movement objective uses its movement directive, not a target ID." });
+  }
 });
 export type Objective = z.infer<typeof Objective>;
 
