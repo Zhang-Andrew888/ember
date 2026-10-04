@@ -1,47 +1,78 @@
-/**
- * Static briefing content shown before the incident starts. In the real
- * transport contract this comes from `POST /incidents` (docs/ARCHITECTURE.md),
- * which doesn't exist yet (apps/server is still a stub). Authored to match
- * the mock/fixture scenario in net/mockIncidentSocket.ts exactly, so the
- * briefing never promises an agent or site the live demo doesn't have.
- */
+import type { ScenarioMap } from "../map/scenarioMap.js";
+import { recordedMockStartSnapshot } from "../net/recordedMockPlayback.js";
+import { resolveScenario } from "../net/scenarioSelection.js";
+
 export interface BriefingSite {
   readonly name: string;
   readonly value: number;
 }
 
-export const briefingSites: BriefingSite[] = [
-  { name: "Ridge Cabins", value: 1 },
-  { name: "Waterworks", value: 1.5 },
-  { name: "Community Lodge", value: 2 },
-];
-
-export const briefingCallsigns: string[] = ["Crew 1", "Crew 2", "Scout"];
+export interface PublicPreview {
+  readonly roads: readonly { readonly id: string; readonly points: readonly { readonly x: number; readonly z: number }[] }[];
+  readonly sites: readonly { readonly name: string; readonly x: number; readonly z: number }[];
+  readonly refuges: readonly { readonly name: string; readonly x: number; readonly z: number }[];
+  readonly initialFireCells: readonly number[];
+  readonly gridSize: number;
+  readonly worldMeters: number;
+}
 
 export interface BriefingContent {
   readonly sites: readonly BriefingSite[];
   readonly callsigns: readonly string[];
+  readonly refugeNames: readonly string[];
+  readonly preview: PublicPreview | null;
 }
 
-/** The authored list, which matches the mock demo exactly. */
-export const mockBriefing: BriefingContent = { sites: briefingSites, callsigns: briefingCallsigns };
+let recordedStart: ReturnType<typeof recordedMockStartSnapshot> | null = null;
 
-/**
- * What the briefing promises. The mock demo keeps its authored list; a live run uses the scenario's
- * public roster (docs/FRONTEND.md: three sites, four callsigns) so the briefing matches the game
- * that starts. A scenario with no roster falls back to the authored list per field.
- */
-export function briefingContent(
-  scenario: { readonly briefing: BriefingContent },
-  mock: boolean,
-): BriefingContent {
-  if (mock) return mockBriefing;
-  const { sites, callsigns } = scenario.briefing;
+function mockStart() {
+  recordedStart ??= recordedMockStartSnapshot();
+  return recordedStart;
+}
+
+function publicPreview(map: ScenarioMap, fireCells: readonly number[]): PublicPreview {
+  const named = (kind: "site" | "refuge") => [...map.nodes.values()]
+    .filter((node) => node.kind === kind && node.label !== undefined)
+    .map((node) => ({ name: node.label!, x: node.x, z: node.z }));
   return {
-    sites: sites.length > 0 ? sites : briefingSites,
-    callsigns: callsigns.length > 0 ? callsigns : briefingCallsigns,
+    roads: [...map.edges.values()].map((edge) => ({ id: edge.id, points: edge.points })),
+    sites: named("site"),
+    refuges: named("refuge"),
+    initialFireCells: fireCells,
+    gridSize: map.terrain?.gridSize ?? 64,
+    worldMeters: map.worldMeters,
   };
 }
 
-export const briefingIncidentLabel =
-  "Fictional incident - Ember Line training scenario. No real wildfire, location, or agency is depicted.";
+/** The preview is shown only when its public map and initial observation match the selected start source. */
+export function briefingContent(map: ScenarioMap, mock: boolean, search = ""): BriefingContent {
+  const refugeNames = [...map.nodes.values()]
+    .filter((node) => node.kind === "refuge" && node.label !== undefined)
+    .map((node) => node.label!);
+
+  if (mock) {
+    const selection = resolveScenario(search);
+    const first = selection?.snapshots?.[0] ?? mockStart();
+    const sites = first.sites.map((site) => ({ name: site.name, value: site.value as number }));
+    const callsigns = first.agents.map((agent) => agent.callsign);
+    const mapMatchesSites = sites.length === map.briefing.sites.length && sites.every((site) =>
+      map.briefing.sites.some((mapped) => mapped.name === site.name && mapped.value === site.value));
+    const initialBurning = first.observedCells
+      .filter((cell) => cell.burnState === "burning" && (cell.lastObservedAt as number) === 0)
+      .map((cell) => cell.gridCellIndex as number)
+      .sort((a, b) => a - b);
+    const expected = [...map.initialFireCells].sort((a, b) => a - b);
+    const mapMatchesObservation = initialBurning.length === expected.length &&
+      initialBurning.every((cell, index) => cell === expected[index]);
+    return {
+      sites,
+      callsigns,
+      refugeNames,
+      preview: mapMatchesSites && mapMatchesObservation ? publicPreview(map, initialBurning) : null,
+    };
+  }
+
+  // The live start contract does not return its public map before Start.
+  // Avoid presenting local geometry as a verified live starting picture.
+  return { sites: map.briefing.sites, callsigns: map.briefing.callsigns, refugeNames, preview: null };
+}

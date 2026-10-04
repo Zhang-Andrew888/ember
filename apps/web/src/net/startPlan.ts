@@ -19,4 +19,4 @@ export function planStart(env: { readonly wsUrl: string | undefined; readonly re
 }
 
 export const START_FAILED_MESSAGE =
-  "Could not create the incident. Check that the server is running and reachable, then try again.";
+  "Check that the server is running and reachable, then try again.";

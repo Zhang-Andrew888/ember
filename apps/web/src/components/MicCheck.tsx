@@ -6,35 +6,31 @@ export interface MicCheckProps {
 }
 
 const LABEL: Record<MicPermissionState, string> = {
-  unknown: "Not checked yet",
-  granted: "Microphone available",
-  denied: "Microphone blocked, use text input",
-  unsupported: "Microphone not available in this browser, use text input",
+  unknown: "",
+  granted: "Microphone ready",
+  denied: "Microphone blocked. You can use text.",
+  unsupported: "Microphone unavailable here. You can use text.",
 };
 
-/**
- * Microphone status for the briefing. The browser's permission prompt only appears when the presenter
- * presses "Check microphone", never as a side effect of loading the page (issue #51).
- */
+/** Permission probing remains user initiated; a failed probe still leaves text and Start available. */
 export function MicCheck({ onProbe }: MicCheckProps) {
-  const [state, setState] = useState<MicPermissionState>("unknown");
+  const [status, setStatus] = useState("");
   const [checking, setChecking] = useState(false);
 
   const check = () => {
     setChecking(true);
     void onProbe()
-      .then(setState)
+      .then((state) => setStatus(LABEL[state]))
+      .catch(() => setStatus("Couldn’t check the microphone. Try again or use text."))
       .finally(() => setChecking(false));
   };
 
   return (
     <div className="briefing__mic">
-      <p className="briefing__mic-status" role="status">
-        {LABEL[state]}. Push-to-talk uses demo speech capture until Grok Voice is connected; text input always works.
-      </p>
       <button type="button" onClick={check} disabled={checking}>
         {checking ? "Checking…" : "Check microphone"}
       </button>
+      <p className="briefing__mic-status" role="status">{status}</p>
     </div>
   );
 }

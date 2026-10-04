@@ -78,6 +78,10 @@ export function App() {
   const grokPlaybackRef = useRef(new PreparedSpeechPlayback());
   const reducedMotion = useReducedMotion();
   const [serverHealth, setServerHealth] = useState<ServerHealthResponse | null>(null);
+  const briefing = useMemo(
+    () => briefingContent(scenarioMap, IS_MOCK_MODE, typeof window === "undefined" ? "" : window.location.search),
+    [],
+  );
 
   useEffect(() => {
     if (!HAS_LIVE_REST) return;
@@ -174,31 +178,36 @@ export function App() {
     setStarting(true);
     setStartError(null);
     setMockPlaybackEnded(false);
-    // A pre-configured WebSocket URL skips incident creation (see net/startPlan.ts).
-    if (START_PLAN.kind === "create-incident") {
-      const created = await createIncident(REST_BASE_URL ?? "");
-      if (created === null) {
-        setStarting(false);
-        setStartError(START_FAILED_MESSAGE);
-        return;
+    try {
+      // A pre-configured WebSocket URL skips incident creation (see net/startPlan.ts).
+      if (START_PLAN.kind === "create-incident") {
+        const created = await createIncident(REST_BASE_URL ?? "");
+        if (created === null) {
+          setStartError(START_FAILED_MESSAGE);
+          return;
+        }
+        liveSessionRef.current = { incidentId: created.incidentId, token: created.token };
+        liveWsUrlRef.current = resolveWebSocketUrl(REST_BASE_URL ?? "", created.websocketEventsPath);
       }
-      liveSessionRef.current = { incidentId: created.incidentId, token: created.token };
-      liveWsUrlRef.current = resolveWebSocketUrl(REST_BASE_URL ?? "", created.websocketEventsPath);
-    }
-    const nextClient = createCoordinatorViewClient(openSocket);
-    setClient(nextClient);
-    if (IS_MOCK_MODE) {
-      mockSocketRef.current?.start();
-    } else {
-      const incidentId = liveSessionRef.current?.incidentId ?? INCIDENT_ID;
-      const token = liveSessionRef.current?.token ?? INCIDENT_TOKEN;
-      const restBase = HAS_LIVE_REST ? (REST_BASE_URL ?? "") : REST_BASE_URL;
-      if (restBase !== undefined) {
-        await startIncident(restBase, incidentId, token);
+      const nextClient = createCoordinatorViewClient(openSocket);
+      if (!IS_MOCK_MODE) {
+        const incidentId = liveSessionRef.current?.incidentId ?? INCIDENT_ID;
+        const token = liveSessionRef.current?.token ?? INCIDENT_TOKEN;
+        const restBase = HAS_LIVE_REST ? (REST_BASE_URL ?? "") : REST_BASE_URL;
+        if (restBase !== undefined && !(await startIncident(restBase, incidentId, token))) {
+          nextClient.close();
+          setStartError("Check that the server is running and reachable, then try again.");
+          return;
+        }
       }
+      setClient(nextClient);
+      if (IS_MOCK_MODE) mockSocketRef.current?.start();
+      setPhase("live");
+    } catch {
+      setStartError("Check the connection and try again.");
+    } finally {
+      setStarting(false);
     }
-    setStarting(false);
-    setPhase("live");
   }, [openSocket]);
 
   const handleStartAgain = useCallback(() => {
@@ -319,7 +328,7 @@ export function App() {
       <Briefing
         onStart={handleStart}
         starting={starting}
-        content={briefingContent(scenarioMap, IS_MOCK_MODE)}
+        content={briefing}
         demoMode={demoMode}
         transportMode={TRANSPORT_MODE}
         error={startError}
