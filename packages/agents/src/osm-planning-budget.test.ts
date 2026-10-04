@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { AgentId } from "@ember/domain";
 import type { MissionSearchResult, PlanningContext } from "@ember/navigation";
 import { Incident, osmMontclairScenario } from "@ember/simulation";
-import { CrewController, ScoutController, type ControllerOptions } from "./index.js";
+import { CrewController, type ControllerOptions } from "./index.js";
 
 vi.setConfig({ testTimeout: 300_000 });
 
@@ -30,15 +30,6 @@ class TimedCrew extends CrewController {
   }
 }
 
-class TimedScout extends ScoutController {
-  override candidateSearch(ctx: PlanningContext, allowed: ReadonlySet<string> | null): MissionSearchResult {
-    const t0 = performance.now();
-    const result = super.candidateSearch(ctx, allowed);
-    planning.push(performance.now() - t0);
-    return result;
-  }
-}
-
 const percentile = (values: number[], q: number): number => {
   const sorted = [...values].sort((a, b) => a - b);
   return sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * q))]!;
@@ -49,8 +40,8 @@ describe("OSM Montclair planning budget (issue #72)", () => {
     const scenario = osmMontclairScenario();
     const inc = new Incident({ scenario, seed: "osm-budget", overrides: { spreadMultiplier: 1, windShiftMs: 450_000, initialWindRad: 0 } });
     const controllers = scenario.agents.map((a) => {
-      const options: ControllerOptions = { agentId: AgentId.parse(a.id), callsign: a.id, role: a.id === "scout" ? "scout" : "protection_crew", map: scenario.map };
-      return a.id === "scout" ? new TimedScout(options) : new TimedCrew(options);
+      const options: ControllerOptions = { agentId: AgentId.parse(a.id), callsign: a.id, role: "protection_crew", map: scenario.map };
+      return new TimedCrew(options);
     });
 
     const planningTicks: number[] = [];

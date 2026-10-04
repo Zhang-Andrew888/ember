@@ -29,8 +29,8 @@ export function callsignTokens(text: string): string[] {
 }
 
 /**
- * Callsigns for the authored agent ids: "crew-N" becomes "Crew N", "scout" becomes "Scout"
- * (docs/SIMULATION.md), anything else is title-cased from its id.
+ * Callsigns for the authored agent ids: "crew-N" becomes "Crew N" (docs/SIMULATION.md),
+ * anything else is title-cased from its id.
  */
 export function defaultCallsign(agentId: string): string {
   const crew = /^crew[-_ ]?(\d+)$/i.exec(agentId);
@@ -75,6 +75,9 @@ export class CallsignDirectory {
   clarification(resolution: CallsignResolution): string | null {
     if (resolution.kind === "match") return null;
     if (resolution.kind === "ambiguous") return `Which do you mean: ${resolution.candidates.map((c) => c.callsign).join(" or ")}?`;
-    return `I don't have a crew or scout called "${resolution.heard}". Known callsigns: ${this.callsigns.join(", ")}.`;
+    if (/\bscouts?\b/i.test(resolution.heard)) {
+      return `There is no scout in this incident. Known callsigns: ${this.callsigns.join(", ")}.`;
+    }
+    return `I don't have a crew called "${resolution.heard}". Known callsigns: ${this.callsigns.join(", ")}.`;
   }
 }

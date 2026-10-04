@@ -32,20 +32,20 @@ describe("evaluation harness", () => {
     expect(new Set(fires).size).toBe(1);
   });
 
-  it("gives the dispatch baseline no forecast and the full planners a forecast, with the scout parked unless Ember Line", () => {
+  it("gives the dispatch baseline no forecast and the full planners a forecast, with crews only in every variant", () => {
     const dispatch = runVariant({ variant: "dispatch", seed: "dev-3", untilMs: 60_000 });
-    const noScout = runVariant({ variant: "forecast_no_scout", seed: "dev-3", untilMs: 60_000 });
     const ember = runVariant({ variant: "ember_line", seed: "dev-3", untilMs: 60_000 });
-    const scoutDecisions = (r: typeof ember) => r.bundle.decisions.filter((d) => d.agentId === "scout").length;
-    expect(scoutDecisions(dispatch)).toBe(0);
-    expect(scoutDecisions(noScout)).toBe(0);
-    expect(scoutDecisions(ember)).toBeGreaterThan(0);
+    expect(VARIANTS).toEqual(["dispatch", "ember_line"]);
+    for (const r of [dispatch, ember]) {
+      expect(r.bundle.decisions.length).toBeGreaterThan(0);
+      expect(r.bundle.decisions.every((d) => String(d.agentId).startsWith("crew-"))).toBe(true);
+    }
     // The baseline admits missions with no forecast, so it commits at once.
     expect(dispatch.bundle.decisions.some((d) => d.type === "mission_start")).toBe(true);
   });
 
   it("replays a recorded bundle to the same final snapshot and view", async () => {
-    const r = runVariant({ variant: "forecast_no_scout", seed: "dev-4", untilMs: SHORT });
+    const r = runVariant({ variant: "ember_line", seed: "dev-4", untilMs: SHORT });
     const round = parseBundle(serializeBundle(r.bundle));
     const verify = replayRecord(round.record);
     expect(verify.hashMatches).toBe(true);

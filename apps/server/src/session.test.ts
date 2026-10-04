@@ -56,12 +56,12 @@ describe("full team on shared roads", () => {
     }
   });
 
-  it("gives the scout's observations to the coordinator only until they are relayed", () => {
+  it("gives another crew's observations to the coordinator only until they are relayed", () => {
     const make = (): SimScenario => {
-      const base = buildSyntheticScenario({ agents: ["crew-1", "scout"], sites: ["site-a"] });
+      const base = buildSyntheticScenario({ agents: ["crew-1", "crew-2"], sites: ["site-a"] });
       return {
         ...base,
-        agents: base.agents.map((a) => (a.id === "scout" ? { ...a, startNodeId: NodeId.parse("n-j1") } : a)),
+        agents: base.agents.map((a) => (a.id === "crew-2" ? { ...a, startNodeId: NodeId.parse("n-j1") } : a)),
         map: { ...base.map, initialFireCells: patch(450, 850) },
       };
     };
@@ -70,7 +70,7 @@ describe("full team on shared roads", () => {
         scenario: make(),
         seed: "relay",
         overrides: { spreadMultiplier: 1.3, windShiftMs: 1e9, initialWindRad: 0 },
-        uncontrolled: ["scout"],
+        uncontrolled: ["crew-2"],
       });
       const crew = AgentId.parse("crew-1");
       const hashes: string[] = [];
@@ -81,7 +81,7 @@ describe("full team on shared roads", () => {
         if (relayAt !== null && !relayed && s.incident.simTimeMs >= relayAt) {
           const obs = s.incident.coordinator
             .observations()
-            .filter((o) => o.sourceAgentId === "scout" && o.observedFields.some((f) => f.kind === "cell" && f.burnState === "burning"))
+            .filter((o) => o.sourceAgentId === "crew-2" && o.observedFields.some((f) => f.kind === "cell" && f.burnState === "burning"))
             .at(-1);
           if (obs !== undefined) {
             s.relay(obs.id, "crew-1");
@@ -95,8 +95,8 @@ describe("full team on shared roads", () => {
     const without = run(null);
     const withRelay = run(100_000);
     // The coordinator learned things the crew did not, in both runs.
-    const scoutSeen = without.session.incident.coordinator.observations().filter((o) => o.sourceAgentId === "scout").length;
-    expect(scoutSeen).toBeGreaterThan(1);
+    const observerSeen = without.session.incident.coordinator.observations().filter((o) => o.sourceAgentId === "crew-2").length;
+    expect(observerSeen).toBeGreaterThan(1);
     // Identical crew knowledge and plans until the relay lands.
     expect(withRelay.hashes.slice(0, 100)).toEqual(without.hashes.slice(0, 100));
     expect(withRelay.orders.filter((o) => Number(o.split(":")[0]) <= 100_000)).toEqual(without.orders.filter((o) => Number(o.split(":")[0]) <= 100_000));
@@ -107,17 +107,16 @@ describe("full team on shared roads", () => {
     }
   });
 
-  it("does not keep the incident running because the scout survives", () => {
-    const base = buildSyntheticScenario({ agents: ["crew-1", "scout"], sites: ["site-a"] });
-    const session = new IncidentSession({
-      scenario: { ...base, map: { ...base.map } },
-      seed: "scout-alone",
-      overrides: calm,
-      uncontrolled: ["crew-1", "scout"],
-    });
-    // Nothing is controlled, so nothing happens: sanity check that the session steps and ends on time.
+  it("builds crew controllers only and leaves a legacy scout from an old replay without one (#117)", () => {
+    const base = buildSyntheticScenario();
+    expect([...new IncidentSession({ scenario: base, seed: "crews-only", overrides: calm }).controllers.keys()]).toEqual(["crew-1", "crew-2", "crew-3"]);
+    const legacy: SimScenario = {
+      ...base,
+      agents: [...base.agents, { id: AgentId.parse("scout"), role: "scout", callsign: "Scout", startNodeId: NodeId.parse("n-rs") }],
+    };
+    const session = new IncidentSession({ scenario: legacy, seed: "legacy-scout", overrides: calm });
+    expect(session.controllers.has(AgentId.parse("scout"))).toBe(false);
     session.runUntil(60_000);
-    expect(session.incident.ended).toBe(false);
     expect(session.incident.simTimeMs).toBe(60_000);
   });
 

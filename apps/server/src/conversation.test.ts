@@ -51,22 +51,22 @@ describe("conversation over a session (no provider)", () => {
     expect(session.incident.projectCoordinator().activeRecipientId).toBe("crew-2");
   });
 
-  it("relays only the named scout report to the addressed crew", () => {
-    const base = buildSyntheticScenario({ agents: ["crew-1", "crew-2", "scout"], sites: ["site-a"] });
+  it("relays only the named crew's report to the addressed crew", () => {
+    const base = buildSyntheticScenario({ agents: ["crew-1", "crew-2", "crew-3"], sites: ["site-a"] });
     const scenario: SimScenario = {
       ...base,
-      agents: base.agents.map((a) => (a.id === "scout" ? { ...a, startNodeId: NodeId.parse("n-j1") } : a)),
+      agents: base.agents.map((a) => (a.id === "crew-3" ? { ...a, startNodeId: NodeId.parse("n-j1") } : a)),
       map: { ...base.map, initialFireCells: patch(450, 850) },
     };
     const session = new IncidentSession({
       scenario,
       seed: "conv-2",
       overrides: { spreadMultiplier: 1.3, windShiftMs: 1e9, initialWindRad: 0 },
-      uncontrolled: ["scout"],
+      uncontrolled: ["crew-3"],
     });
     const bridge = new ConversationBridge(session);
     session.runUntil(100_000, () => bridge.collect());
-    const out = bridge.say("Crew 2, use Scout's latest report", 0)[0]!;
+    const out = bridge.say("Crew 2, use Crew 3's latest report", 0)[0]!;
     expect(out.actions.some((a) => a.kind === "relay")).toBe(true);
     session.runUntil(102_000, () => bridge.collect());
     const store2 = session.incident.agentStores.get(AgentId.parse("crew-2"))!;

@@ -6,7 +6,7 @@ describe("checkScenarioText", () => {
   it("accepts the synthetic scenario with every gate ok", () => {
     const r = checkScenarioText(JSON.stringify(buildSyntheticScenario()));
     expect(r.ok).toBe(true);
-    expect(r.lines.filter((l) => l.startsWith("ok  ")).length).toBe(5);
+    expect(r.lines.filter((l) => l.startsWith("ok  ")).length).toBe(4);
   });
 
   it("reports invalid JSON and schema failures", () => {

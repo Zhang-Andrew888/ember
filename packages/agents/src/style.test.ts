@@ -14,8 +14,8 @@ describe("communication style", () => {
   });
 
   it("radio puts the callsign first when the text lacks it, and never doubles it", () => {
-    expect(applyStyle("Scout", "taking the west loop", "radio")).toBe("Scout, taking the west loop");
-    expect(applyStyle("Scout", "Scout, holding.", "radio")).toBe("Scout, holding.");
+    expect(applyStyle("Crew 2", "taking the west loop", "radio")).toBe("Crew 2, taking the west loop");
+    expect(applyStyle("Crew 2", "Crew 2, holding.", "radio")).toBe("Crew 2, holding.");
   });
 
   it("never drops the reason or a statement of uncertainty", () => {

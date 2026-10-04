@@ -1,4 +1,4 @@
-import { RoadIndex, SIM_DEFAULTS, cellCenter, cellIndexOf, cellsWithin, refugeCells } from "./model/index.js";
+import { RoadIndex, SIM_DEFAULTS, cellCenter, cellIndexOf, refugeCells } from "./model/index.js";
 import type { SimScenario } from "./scenario.js";
 
 function coordinateError(label: string, x: number, y: number): string | null {
@@ -36,7 +36,6 @@ export function validateScenario(scenario: SimScenario): string[] {
   }
   for (const s of m.sites) if (!nodeIds.has(s.nodeId)) errors.push(`site ${s.id} is on unknown node ${s.nodeId}`);
   for (const r of m.refuges) if (!nodeIds.has(r.nodeId)) errors.push(`refuge ${r.id} is on unknown node ${r.nodeId}`);
-  for (const p of m.scoutPoints) if (!nodeIds.has(p)) errors.push(`scouting point ${p} is not a node`);
   for (const a of scenario.agents) if (!nodeIds.has(a.startNodeId)) errors.push(`agent ${a.id} starts at unknown node ${a.startNodeId}`);
   if (m.refuges.length === 0) errors.push("no refuge");
   if (m.initialFireCells.length === 0) errors.push("no initial fire");
@@ -150,23 +149,5 @@ export function scenarioGates(scenario: SimScenario): GateResult[] {
   const constrained = [...road.edges.values()].filter((e) => e.singleCapacity);
   const waits = constrained.filter((e) => (road.adjacency.get(e.from)?.length ?? 0) >= 2 && (road.adjacency.get(e.to)?.length ?? 0) >= 2);
   gates.push({ gate: "constrained segment", ok: waits.length > 0, detail: `${constrained.length} single-capacity, ${waits.length} with waiting nodes at both ends` });
-
-  // At least two scouting points reveal different parts of the road network.
-  const coverage = scenario.map.scoutPoints.map((p) => {
-    const pt = road.nodePoint(p);
-    const disc = new Set(cellsWithin(pt.x, pt.y, SIM_DEFAULTS.observationRadiusM));
-    const cells = new Set<number>();
-    for (const e of road.edges.values()) for (const c of e.cells) if (disc.has(c.cell)) cells.add(c.cell);
-    return cells;
-  });
-  let distinct = false;
-  for (let i = 0; i < coverage.length; i++) {
-    for (let j = i + 1; j < coverage.length; j++) {
-      const a = coverage[i]!;
-      const b = coverage[j]!;
-      if (a.size > 0 && b.size > 0 && [...a].every((c) => !b.has(c))) distinct = true;
-    }
-  }
-  gates.push({ gate: "scouting points", ok: distinct, detail: `${coverage.length} points; two with disjoint road coverage: ${distinct}` });
   return gates;
 }

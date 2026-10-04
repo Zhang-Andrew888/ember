@@ -6,6 +6,7 @@ import {
   SimTimeMs,
   type AgentId,
   type AgentPosition,
+  type AgentRole,
   type DecisionType,
   EdgeId,
   type MissionPlan as MissionPlanT,
@@ -62,7 +63,7 @@ interface ActivePlan {
 export interface ControllerOptions {
   readonly agentId: AgentId;
   readonly callsign: string;
-  readonly role: "protection_crew" | "scout";
+  readonly role: AgentRole;
   readonly map: PublicMap;
   readonly config?: Partial<ControllerConfig>;
   /** How this agent words its reports; plain by default. */
@@ -78,7 +79,7 @@ export interface ControllerOptions {
 export class CrewController implements AgentController {
   readonly agentId: AgentId;
   readonly callsign: string;
-  protected readonly role: "protection_crew" | "scout";
+  protected readonly role: AgentRole;
   readonly style: CommStyle;
   protected readonly map: PublicMap;
   protected readonly road: RoadIndex;
@@ -668,14 +669,13 @@ export class CrewController implements AgentController {
     return `heading to ${this.siteName(id)}`;
   }
 
-  /** Player-facing name for a map node: refuge, site, or scout point; the raw id is never shown. */
+  /** Player-facing name for a map node: refuge or site; the raw id is never shown. */
   protected nodeName(nodeId: string): string {
     const refuge = this.map.refuges.find((r) => r.nodeId === nodeId);
     if (refuge !== undefined) return refuge.name;
     const site = this.map.sites.find((x) => x.nodeId === nodeId);
     if (site !== undefined) return site.name;
-    const point = this.map.scoutPoints.findIndex((p) => p === nodeId);
-    return point >= 0 ? `survey point ${point + 1}` : "a waypoint";
+    return "a waypoint";
   }
 
   protected siteName(id: string): string {
@@ -686,13 +686,13 @@ export class CrewController implements AgentController {
     const a = this.active;
     if (a !== null && a.mode !== "normal") return "emergency";
     if (a !== null && a.kind === "return") return "return";
-    return this.role === "scout" ? "scout" : "approach";
+    return "approach";
   }
 
   private classFor(mode: "normal" | "withdrawing" | "retreating", kind: PlanKind): PriorityClass {
     if (mode !== "normal") return "emergency";
     if (kind === "return") return "return";
-    return this.role === "scout" ? "scout" : "approach";
+    return "approach";
   }
 
   /**

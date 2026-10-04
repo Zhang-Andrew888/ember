@@ -57,8 +57,20 @@ describe("synthetic scenario", () => {
     }
   });
 
-  it("provides three scouting points that are graph nodes", () => {
-    expect(scenario.map.scoutPoints).toHaveLength(3);
-    for (const p of scenario.map.scoutPoints) expect(road.nodes.has(p)).toBe(true);
+  it("contains protection crews only: no scout agent and no scouting points (#117)", () => {
+    expect(scenario.agents.map((a) => a.id)).toEqual(["crew-1", "crew-2", "crew-3"]);
+    expect(scenario.agents.every((a) => a.role === "protection_crew")).toBe(true);
+    expect("scoutPoints" in scenario.map).toBe(false);
+  });
+
+  it("still parses an old scenario that carries a scout, for replay compatibility (#117)", () => {
+    const legacy = {
+      ...scenario,
+      agents: [...scenario.agents, { id: "scout", role: "scout", callsign: "Scout", startNodeId: "n-rs" }],
+      map: { ...scenario.map, scoutPoints: ["n-n", "n-s", "n-h"] },
+    };
+    const parsed = SimScenario.parse(legacy);
+    expect(parsed.agents.some((a) => a.role === "scout")).toBe(true);
+    expect("scoutPoints" in parsed.map).toBe(false);
   });
 });

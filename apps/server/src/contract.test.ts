@@ -13,7 +13,7 @@ describe("contract / private state leaks", () => {
     const session = new IncidentSession({
       scenario: buildSyntheticScenario(),
       seed: "LEAK-TEST-SEED-XYZZY",
-      uncontrolled: ["crew-1", "crew-2", "crew-3", "scout"],
+      uncontrolled: ["crew-1", "crew-2", "crew-3"],
     });
     session.runUntil(120_000);
     const view = session.coordinatorView();

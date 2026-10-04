@@ -27,7 +27,7 @@ const priors: Record<string, ForecastConfig["prior"]> = {
 const out: Record<string, unknown> = {};
 for (const [name, prior] of Object.entries(priors)) {
   const runs = DEV_SEEDS.map((seed, i) =>
-    runVariant({ variant: "forecast_no_scout", seed, overrides: overridesForSeed(seed, i), controllerConfig: { forecast: { ...DEFAULT_FORECAST_CONFIG, prior } } }).metrics,
+    runVariant({ variant: "ember_line", seed, overrides: overridesForSeed(seed, i), controllerConfig: { forecast: { ...DEFAULT_FORECAST_CONFIG, prior } } }).metrics,
   );
   const s = summarize(runs);
   out[name] = s;

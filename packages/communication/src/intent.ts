@@ -32,7 +32,6 @@ export type IntentEnvelope = z.infer<typeof IntentEnvelope>;
 export interface Directory {
   readonly agents: readonly { id: string; callsign: string; role: "protection_crew" | "scout" }[];
   readonly sites: readonly { id: string; name: string }[];
-  readonly scoutPoints: readonly { id: string; name: string }[];
   /** Named places used to match report footprints, e.g. "east corridor". */
   readonly locations: readonly { name: string; x: number; y: number; radius: number }[];
   /** Named road segments for avoid-corridor objectives; id is the edge id. */

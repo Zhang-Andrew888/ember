@@ -2,7 +2,6 @@ import { AgentId, SimTimeMs, type CoordinatorView, type DecisionEvent, type Miss
 import { ForecastService, toCoordinatorForecastView } from "@ember/forecast";
 import {
   CrewController,
-  ScoutController,
   type AgentController,
   type ControllerConfig,
   type ReservationHooks,
@@ -14,10 +13,10 @@ import { RoadIndex, type PublicMap } from "@ember/simulation/model";
 export type ControllerFactory = (spec: AgentSpec, map: PublicMap, config: Partial<ControllerConfig> | undefined) => AgentController | null;
 
 export interface SessionOptions extends IncidentOptions {
-  /** Build a controller per agent; return null to leave an agent uncontrolled. Defaults to crews and a scout. */
+  /** Build a controller per agent; return null to leave an agent uncontrolled. Defaults to a crew controller per protection crew. */
   readonly factory?: ControllerFactory;
   readonly controllerConfig?: Partial<ControllerConfig>;
-  /** Agents that get no controller and simply stay put (e.g. a parked scout in a test). */
+  /** Agents that get no controller and simply stay put (e.g. a parked crew in a test). */
   readonly uncontrolled?: readonly string[];
 }
 
@@ -77,10 +76,11 @@ export class IncidentSession {
     const skip = new Set(options.uncontrolled ?? []);
     const factory: ControllerFactory =
       options.factory ??
-      ((a, map, config) => {
-        const ctor = a.role === "scout" ? ScoutController : CrewController;
-        return new ctor({ agentId: a.id, callsign: a.callsign, role: a.role, map, ...(config === undefined ? {} : { config }) });
-      });
+      ((a, map, config) =>
+        // Old replay scenarios may still carry a scout; it has no controller and stays put.
+        a.role === "scout"
+          ? null
+          : new CrewController({ agentId: a.id, callsign: a.callsign, role: a.role, map, ...(config === undefined ? {} : { config }) }));
     for (const a of this.incident.scenario.agents) {
       if (skip.has(a.id)) continue;
       const controller = factory(a, this.incident.scenario.map, options.controllerConfig);

@@ -32,8 +32,6 @@ const END_REASON_SENTENCE: Record<EndReason, string> = {
   time_expired: "The incident window expired.",
 };
 
-const POINT_NAMES: Record<string, string> = { "n-n": "north road", "n-s": "south junction", "n-h": "hub" };
-
 /** Public names for the synthetic scenario; a real extract would ship its own authored names. */
 export function directoryFor(scenario: SimScenario): Directory {
   const nodes = new Map(scenario.map.nodes.map((n) => [n.id as string, n]));
@@ -44,9 +42,7 @@ export function directoryFor(scenario: SimScenario): Directory {
   return {
     agents: scenario.agents.map((x) => ({ id: x.id, callsign: x.callsign, role: x.role })),
     sites: scenario.map.sites.map((s) => ({ id: s.id, name: s.name })),
-    scoutPoints: scenario.map.scoutPoints.map((p) => ({ id: p, name: POINT_NAMES[p] ?? p })),
     locations: [
-      ...scenario.map.scoutPoints.map((p) => ({ name: POINT_NAMES[p] ?? p, ...point(p), radius: 150 })),
       ...(a !== null && b !== null ? [{ name: "east corridor", x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, radius: 250 }] : []),
     ],
     corridors:
