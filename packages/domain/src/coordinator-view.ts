@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { AgentId, EdgeId, MissionPlanId, NodeId, SiteId } from "./ids.js";
 import { SequenceNumber, SimTimeMs, WallTimeMs, WorkUnits } from "./units.js";
-import { AgentPosition } from "./position.js";
+import { AgentPosition, MapPoint } from "./position.js";
 import { AgentRole, AgentState, ContainmentWorkResult, IncidentEnd, MissionWork, OffroadTimedLeg } from "./records.js";
 import { WIRE_PROTOCOL_VERSION } from "./wire-protocol.js";
 
@@ -114,6 +114,28 @@ export const CoordinatorCurrentFireView = z
   });
 export type CoordinatorCurrentFireView = z.infer<typeof CoordinatorCurrentFireView>;
 
+/** A cell partly cleared of fuel: fire spreads into it more slowly, in proportion to what is left. */
+export const CoordinatorClearingCell = z.object({
+  gridCellIndex: z.number().int().nonnegative().max(4095),
+  clearance: z.number().gt(0).lt(1),
+});
+export type CoordinatorClearingCell = z.infer<typeof CoordinatorClearingCell>;
+
+/**
+ * A fire line between two map points. Cleared cells also appear in `firebreakCells`. `id` is the
+ * same for both directions; `start`/`end` are in canonical order (lower end cell first).
+ */
+export const CoordinatorFirelineView = z.object({
+  id: z.string(),
+  start: MapPoint,
+  end: MapPoint,
+  /** Cells from `start` to `end`. */
+  cells: z.array(z.number().int().nonnegative().max(4095)),
+  /** No unburned cell is left: every cell is cleared, or the fire took some. */
+  resolved: z.boolean(),
+});
+export type CoordinatorFirelineView = z.infer<typeof CoordinatorFirelineView>;
+
 /** Single entry in the coordinator's transcript (agent-to-coordinator reports). */
 export const CoordinatorReportEntry = z.object({
   sequence: SequenceNumber,
@@ -140,6 +162,15 @@ export const CoordinatorView = z.object({
   observedCells: z.array(CoordinatorCellView),
   /** Authorized live current fire (#112); absent when the sender does not provide it. */
   currentFire: CoordinatorCurrentFireView.optional(),
+  /**
+   * Firebreak cells: ground cleared of fuel, which never ignites. Public map knowledge (no private
+   * parameters), sorted and unique like the current-fire lists; absent when there are none.
+   */
+  firebreakCells: CurrentFireCells.optional(),
+  /** Cells partly cleared toward a firebreak (0 < clearance < 1), ascending by cell; absent when none. */
+  clearingCells: z.array(CoordinatorClearingCell).optional(),
+  /** Fire lines crews have been sent to build, with their cells from one end to the other. */
+  firelines: z.array(CoordinatorFirelineView).optional(),
   /** Active reportable plans per agent (empty when idle). */
   agentPlans: z.array(CoordinatorAgentPlanView),
   /** Coordinator forecast envelope for the map; null before the first build. */
