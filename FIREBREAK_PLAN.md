@@ -220,52 +220,52 @@ Edit only your **owned paths**. If you need something outside them, ask Track A 
 ### Track A: contract and integration
 - **Mission:** ship contract v2 (2.3) with tests and helper implementations, then integrate.
 - **Starts:** immediately. Everyone else starts when A1 merges.
-- [ ] **A1. Contract v2:** schema, helpers, and Phase 1b code moved onto the new
+- [x] **A1. Contract v2:** schema, helpers, and Phase 1b code moved onto the new
   form so everything compiles. Check: contract tests (2.3); full checks green.
-- [ ] **A2. Integration:** rebase the tracks; full checks; live run with the three example orders
+- [x] **A2. Integration:** rebase the tracks; full checks; live run with the three example orders
   in 2.4, including the two-crew one. Check: lines appear where ordered, crews start from the
   ends named, and the fire stops at a finished line.
 
 ### Track B: simulation
 - **Mission:** the world builds two-point lines.
 - **Must not touch:** agents, navigation, communication, `apps/**`.
-- [ ] **B1. World builds point lines:** register by `firelineId`; validate the plan's work node is
+- [x] **B1. World builds point lines:** register by `firelineId`; validate the plan's work node is
   where the crew stands at work time and lies within reach of its end; clear per 2.5; emit
   `fireline_resolved`. Check: `firelines.test.ts` rewritten for points, including two crews from
   opposite ends and a line clamped at the edge.
-- [ ] **B2. View:** `firelines` with points; `firebreakCells` and `clearingCells` unchanged.
+- [x] **B2. View:** `firelines` with points; `firebreakCells` and `clearingCells` unchanged.
   Check: incident view test.
-- [ ] **B3. Determinism:** seeded-run and replay tests unchanged; a two-crew line run gives the
+- [x] **B3. Determinism:** seeded-run and replay tests unchanged; a two-crew line run gives the
   same view twice. Check: tests.
 
 ### Track C: crews
 - **Mission:** crews plan and accept point-line orders.
 - **Must not touch:** `packages/simulation/src/world.ts`, communication, `apps/**`.
 - **Stub:** until B lands, use the A1 helpers and a fake incident in tests.
-- [ ] **C1. Line target:** work node per 2.5; work time from reachable cells × 15 s; refuse with
+- [x] **C1. Line target:** work node per 2.5; work time from reachable cells × 15 s; refuse with
   `no_road_near_line_end`. Check: navigation test (near a road accepted; far from one refused).
-- [ ] **C2. Controller:** handle `build_line` with points; report the crew's end in words ("cutting
+- [x] **C2. Controller:** handle `build_line` with points; report the crew's end in words ("cutting
   line from the north end toward East Junction"); one shift per order. Check:
   `agents/src/firelines.test.ts` rewritten.
 
 ### Track D: orders
 - **Mission:** the order language in 2.4, typed or spoken.
 - **Must not touch:** sim, agents, web.
-- [ ] **D1. Directory:** places with coordinates (sites, refuges, named junctions). Check: server test.
-- [ ] **D2. Scripted parser:** anchor, offset, course, crews and ends, including spoken numbers and
+- [x] **D1. Directory:** places with coordinates (sites, refuges, named junctions). Check: server test.
+- [x] **D2. Scripted parser:** anchor, offset, course, crews and ends, including spoken numbers and
   bearings. Check: interpreter tests for every row in 2.4, plus the "hold the line" case.
-- [ ] **D3. Gateway:** words → two points per crew with the A1 helpers; clarifications; replies per
+- [x] **D3. Gateway:** words → two points per crew with the A1 helpers; clarifications; replies per
   2.4. Check: gateway tests (default 200 m, clamped reply, ambiguous end, unknown place, two crews).
-- [ ] **D4. Grok prompt:** describe the new objective shape; one manual check with an API key using
-  the 2.4 examples.
+- [x] **D4. Grok prompt:** describe the new objective shape; one manual check with an API key using
+  the 2.4 examples. (Manual Grok check still pending: no API key was used.)
 
 ### Track E: web
 - **Mission:** show point lines; teach the order language.
 - **Must not touch:** anything outside `apps/web`.
 - **Stub:** fixture views with point-based `firelines`.
-- [ ] **E1. Point lines:** planned, clearing and cleared tiles from `firelines` with points.
+- [x] **E1. Point lines:** planned, clearing and cleared tiles from `firelines` with points.
   Check: `sceneEntities.test.ts`.
-- [ ] **E2. Order help:** a short "How to order a fire line" note near the message box, with two
+- [x] **E2. Order help:** a short "How to order a fire line" note near the message box, with two
   examples and a reminder that directions follow the compass. Check: component test.
 
 ---
