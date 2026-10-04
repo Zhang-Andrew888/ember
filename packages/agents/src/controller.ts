@@ -20,6 +20,7 @@ import {
   certifyPlan,
   planDirectionalMove,
   containmentTargets,
+  firelineTarget,
   planMissions,
   planRetreat,
   planReturn,
@@ -178,7 +179,8 @@ export class CrewController implements AgentController {
 
     // Reconcile with the simulator: a missing commitment means done, cancelled or rejected.
     if (proj.commitment === null && this.active !== null && now > this.active.committedAtMs) {
-      if (this.objective?.kind === "move_direction") this.objective = null;
+      // One-shot orders: a directional move or one fire-line shift ends with its mission.
+      if (this.objective?.kind === "move_direction" || this.objective?.kind === "build_line") this.objective = null;
       const work = this.active.plan.work;
       if (work?.kind === "suppress_fire") this.evidence.retireContainmentCell(work.gridCellIndex, now);
       this.active = null;
@@ -532,7 +534,8 @@ export class CrewController implements AgentController {
       this.noteIdle(proj, "forecast_unreliable", out);
       return;
     }
-    const result = this.candidateSearch(ctx, allowed, containCell);
+    const line = this.objective?.kind === "build_line" ? this.lineSearch(ctx, this.objective) : null;
+    const result = line ?? this.candidateSearch(ctx, allowed, containCell);
     const chosen = result.best !== null ? this.commitFirst(proj, result, out) : null;
     if (chosen !== null) {
       this.lastIdleReason = null;
@@ -649,6 +652,28 @@ export class CrewController implements AgentController {
         this.decide(out, proj, hadPlan ? "mission_update" : "mission_start", "objective_accepted", `${this.missionVerb(chosen.target.id)} on coordinator objective`);
         return;
       }
+      case "build_line": {
+        const result = this.lineSearch(ctx, obj);
+        if (result === null) return reject("missing_target");
+        const verdict = decideOrder(this.callsign, {
+          kind: obj.kind,
+          forecastReliable: ctx.ensemble.reliability !== "unreliable",
+          feasible: result.best !== null,
+          limitingReason: result.limitingReason,
+        });
+        if (verdict.action === "refuse") return reject(verdict.reason);
+        const hadPlan = this.active !== null;
+        this.objective = obj;
+        this.holding = false;
+        const chosen = this.commitFirst(proj, result, out);
+        if (chosen === null) {
+          this.objective = null;
+          return reject("reservation_unavailable");
+        }
+        this.decide(out, proj, hadPlan ? "mission_update" : "mission_start", "objective_accepted", `${this.missionVerb(chosen.target.id)} on coordinator objective (work ${Math.round(chosen.workMs / 1000)} s)`);
+        this.report(out, explain(this.callsign, { type: "mission_start", reasonCode: "objective_accepted", actualAction: this.missionVerb(chosen.target.id) }), false);
+        return;
+      }
       case "avoid_corridor": {
         if (obj.targetId === null) return reject("missing_target");
         this.avoidCorridorEdges.add(EdgeId.parse(obj.targetId));
@@ -685,7 +710,29 @@ export class CrewController implements AgentController {
 
   protected missionVerb(id: string): string {
     if (id.startsWith("cell-")) return `containing fire near ${id.slice(5)}`;
+    const line = this.lineEnds(id);
+    if (line !== null) return `cutting a fire line from ${this.nodeName(line.from)} toward ${this.nodeName(line.to)}`;
     return `heading to ${this.siteName(id)}`;
+  }
+
+  /** Missions for one fire-line objective, or null when it names no line. */
+  private lineSearch(ctx: PlanningContext, obj: Objective): MissionSearchResult | null {
+    const line = obj.constraints.line;
+    if (line === undefined || !this.road.nodes.has(line.fromNodeId) || !this.road.nodes.has(line.toNodeId)) return null;
+    const target = firelineTarget(this.road, line.fromNodeId, line.toNodeId, this.capabilities.workRate, this.cfg.nav ?? DEFAULT_NAV_CONFIG);
+    if (target === null) return null;
+    // A line order wants the longest shift the forecast admits, not the best work-per-second ratio.
+    const result = planMissions(ctx, [target]);
+    const candidates = [...result.candidates].sort((a, b) => b.workMs - a.workMs || b.score - a.score);
+    return { ...result, candidates, best: candidates[0] ?? null };
+  }
+
+  /** Ends of a fire-line target id (`line:a~b@from`), from the crew's side. */
+  private lineEnds(id: string): { from: string; to: string } | null {
+    const m = /^line:([^~]+)~([^@]+)@(.+)$/.exec(id);
+    if (m === null) return null;
+    const [, a, b, from] = m;
+    return from === a ? { from: a!, to: b! } : { from: b!, to: a! };
   }
 
   /** Player-facing name for a map node: refuge or site; the raw id is never shown. */
@@ -694,7 +741,7 @@ export class CrewController implements AgentController {
     if (refuge !== undefined) return refuge.name;
     const site = this.map.sites.find((x) => x.nodeId === nodeId);
     if (site !== undefined) return site.name;
-    return "a waypoint";
+    return this.map.nodes.find((n) => n.id === nodeId)?.name ?? "a waypoint";
   }
 
   protected siteName(id: string): string {
@@ -797,18 +844,33 @@ export class CrewController implements AgentController {
       LOST: null,
     };
     const last = a === null ? null : a.plan.timedLegs[a.plan.timedLegs.length - 1];
-    const targetName = a?.targetId == null ? null : a.targetId.startsWith("waypoint:") ? "road waypoint" : this.siteName(a.targetId);
+    const targetName =
+      a?.targetId == null
+        ? null
+        : a.targetId.startsWith("waypoint:")
+          ? "road waypoint"
+          : a.targetId.startsWith("line:")
+            ? "fire line"
+            : this.siteName(a.targetId);
     return {
       callsign: this.callsign,
       currentAction: verbs[this.computeState(proj)] === null ? null : `${verbs[this.computeState(proj)]}${targetName !== null && this.computeState(proj) !== "HOLDING" ? ` (${targetName})` : ""}`,
-      objective: this.objective === null ? null : this.objective.kind === "move_direction" && this.objective.movement !== undefined
-        ? `move ${this.objective.movement.direction} up to ${this.objective.movement.maxDistanceMeters} m`
-        : `${this.objective.kind.replaceAll("_", " ")}${this.objective.targetId === null ? "" : ` ${this.siteName(this.objective.targetId)}`}`,
+      objective: this.objectiveText(),
       returnEstimateSec: last === undefined || last === null ? null : Math.max(0, (last.arriveMs - proj.simTimeMs) / 1000),
       lastRejection: this.lastRejectionText,
       knownConditions: this.evidence.closed.size === 0 ? null : `${this.evidence.closed.size} cells observed burning or burned`,
       lastReport: this.lastReportText,
     };
+  }
+
+  private objectiveText(): string | null {
+    const o = this.objective;
+    if (o === null) return null;
+    if (o.kind === "move_direction" && o.movement !== undefined) return `move ${o.movement.direction} up to ${o.movement.maxDistanceMeters} m`;
+    if (o.kind === "build_line" && o.constraints.line !== undefined) {
+      return `cut a fire line from ${this.nodeName(o.constraints.line.fromNodeId)} toward ${this.nodeName(o.constraints.line.toNodeId)}`;
+    }
+    return `${o.kind.replaceAll("_", " ")}${o.targetId === null ? "" : ` ${this.siteName(o.targetId)}`}`;
   }
 
   private computeState(proj: AgentProjection): ControllerState {

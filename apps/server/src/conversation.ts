@@ -49,6 +49,11 @@ export function directoryFor(scenario: SimScenario): Directory {
       corridor === undefined
         ? []
         : [{ id: corridor.id as string, name: "east corridor" }],
+    places: [
+      ...scenario.map.sites.map((s) => ({ id: s.nodeId as string, name: s.name })),
+      ...scenario.map.refuges.map((r) => ({ id: r.nodeId as string, name: r.name })),
+      ...scenario.map.nodes.flatMap((n) => (n.name === undefined ? [] : [{ id: n.id as string, name: n.name }])),
+    ],
   };
 }
 

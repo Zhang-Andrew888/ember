@@ -97,7 +97,11 @@ export const SceneCanvas = forwardRef<CameraControlsHandle, SceneCanvasProps>(fu
     [showCurrentFire, entities.currentFire],
   );
   const refuges = listRefugeNodes(scenarioMap);
-  const clearedCells = useMemo(() => new Set(entities.firebreaks.map((cell) => cell.gridCellIndex)), [entities.firebreaks]);
+  // Crews fell the trees as they clear, so partly cleared cells lose theirs too.
+  const clearedCells = useMemo(
+    () => new Set([...entities.firebreaks, ...entities.clearing].map((cell) => cell.gridCellIndex)),
+    [entities.firebreaks, entities.clearing],
+  );
   const routeLines = useMemo(
     () => entities.routes.map((line) => ({ ...line, selected: line.agentId === selectedAgentId })),
     [entities.routes, selectedAgentId],
@@ -140,7 +144,7 @@ export const SceneCanvas = forwardRef<CameraControlsHandle, SceneCanvasProps>(fu
       <Terrain tilePickEnabled={!mapAssignMode} onSelectTile={onSelectMapTile} />
       <SceneClock animated={!reducedMotion} />
       <Trees fireCells={visibleCells} clearedCells={clearedCells} reducedMotion={reducedMotion} />
-      <FirebreakCells cells={entities.firebreaks} />
+      <FirebreakCells cells={entities.firebreaks} clearing={entities.clearing} planned={entities.plannedLine} />
       <Fire cells={visibleCells} reducedMotion={reducedMotion} />
       <Roads />
       {showForecast && entities.forecast ? <ForecastLayer layer={entities.forecast} /> : null}

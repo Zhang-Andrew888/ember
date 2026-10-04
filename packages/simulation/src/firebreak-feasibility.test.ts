@@ -121,7 +121,9 @@ describe("hand-placed firebreak feasibility (synthetic scenario)", () => {
     for (const s of SEEDS) expect(run(s, cells, 600_000, 15_000).damage[RIDGE_CABINS]).toBe(0);
   });
 
-  it("line cells must share edges: a diagonal-only line leaks", () => {
+  // Phase 0 wrote bare nonburnable cells; those still leak through corner gaps. Crew-cleared cells
+  // (FireField.clearance) block corner gaps, so built diagonal lines hold: see model/clearance.test.ts.
+  it("bare nonburnable cells must share edges: a diagonal-only line of them leaks", () => {
     const diagonal: number[] = [];
     for (let i = 0; i < 40; i++) diagonal.push((24 + i) * N + 20 + i);
     const stair = fourConnected(diagonal);

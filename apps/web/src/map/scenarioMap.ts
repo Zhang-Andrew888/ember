@@ -14,7 +14,7 @@ export interface SceneNode {
   readonly x: number;
   readonly z: number;
   readonly kind: "refuge" | "site" | "junction";
-  /** Display name for refuge/site nodes; absent for plain junctions. */
+  /** Display name: refuge or site name, or a junction's public place name; absent for unnamed junctions. */
   readonly label?: string;
 }
 
@@ -64,7 +64,7 @@ export function buildScenarioMap(file: ScenarioFile, source: ScenarioSource): Sc
     const refugeName = refugeNodes.get(node.id);
     const siteName = siteNodes.get(node.id);
     const kind = refugeName !== undefined ? "refuge" : siteName !== undefined ? "site" : "junction";
-    const label = refugeName ?? siteName;
+    const label = refugeName ?? siteName ?? node.name;
     const position = worldToScene(node.x, node.y, worldMeters);
     nodes.set(node.id, { id: node.id, x: position.x, z: position.z, kind, ...(label !== undefined ? { label } : {}) });
   }

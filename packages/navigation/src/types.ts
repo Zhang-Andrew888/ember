@@ -52,11 +52,13 @@ export interface SiteKnowledge {
 /** One candidate destination for a mission. */
 export interface MissionTarget {
   readonly id: string;
-  readonly kind: "protect" | "observe" | "contain";
+  readonly kind: "protect" | "observe" | "contain" | "line";
   readonly nodeId: NodeId;
   readonly siteId: SiteId | null;
   /** Set when `kind === "contain"`. */
   readonly gridCellIndex?: number;
+  /** Set when `kind === "line"`: the crew works from `fromNodeId` (the target node) toward `toNodeId`. */
+  readonly line?: { readonly fromNodeId: NodeId; readonly toNodeId: NodeId };
   readonly value: number;
   /** Candidate work/dwell durations in ms, ascending. */
   readonly workOptionsMs: readonly number[];

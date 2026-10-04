@@ -19,6 +19,8 @@ export const MapNode = z
     id: NodeId,
     x: finiteMeters,
     y: finiteMeters,
+    /** Public place name for a junction (sites and refuges carry their own names). Optional. */
+    name: z.string().min(1).optional(),
   })
   .superRefine(rejectOffGrid);
 export type MapNode = z.infer<typeof MapNode>;

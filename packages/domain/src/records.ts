@@ -127,6 +127,8 @@ export type EvidenceReference = z.infer<typeof EvidenceReference>;
  * What timed work at the mission anchor accomplishes.
  * - `protect_structure`: site `completedWork` reduces structure damage (not burn spread).
  * - `suppress_fire`: containment work on one grid cell (burn progression; deterministic slice TBD in sim).
+ * - `build_line`: clear a fire line between two map nodes, working outward from `fromNodeId` toward
+ *   `toNodeId`. A second crew can work the same line from the other end; each starts on its own.
  * Incident terminal `fire_extinguished` (EndReason) is a world outcome, not a crew work class.
  */
 export const MissionWork = z.discriminatedUnion("kind", [
@@ -137,6 +139,11 @@ export const MissionWork = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("suppress_fire"),
     gridCellIndex: z.number().int().nonnegative().max(4095),
+  }),
+  z.object({
+    kind: z.literal("build_line"),
+    fromNodeId: NodeId,
+    toNodeId: NodeId,
   }),
 ]);
 export type MissionWork = z.infer<typeof MissionWork>;
@@ -154,6 +161,8 @@ export const ObjectiveKind = z.enum([
   "avoid_corridor",
   /** Travel in a world compass direction, stopping at a safe road node. */
   "move_direction",
+  /** Clear a fire line between two map nodes, starting at `constraints.line.fromNodeId`. */
+  "build_line",
 ]);
 export type ObjectiveKind = z.infer<typeof ObjectiveKind>;
 
@@ -182,6 +191,8 @@ export const ObjectiveConstraints = z.object({
    * Duration is still expressed via issued plan `workInterval` once committed.
    */
   gridCellIndex: z.number().int().nonnegative().max(4095).optional(),
+  /** For `build_line`: the line's two end nodes; the crew starts at `fromNodeId`. */
+  line: z.object({ fromNodeId: NodeId, toNodeId: NodeId }).optional(),
 });
 export type ObjectiveConstraints = z.infer<typeof ObjectiveConstraints>;
 
@@ -202,6 +213,14 @@ export const Objective = z.object({
   }
   if (objective.kind === "move_direction" && objective.targetId !== null) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ["targetId"], message: "A directional movement objective uses its movement directive, not a target ID." });
+  }
+  if (objective.kind === "build_line") {
+    const line = objective.constraints.line;
+    if (line === undefined) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["constraints", "line"], message: "A fire line objective needs both end nodes." });
+    } else if (line.fromNodeId === line.toNodeId) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["constraints", "line"], message: "A fire line needs two different end nodes." });
+    }
   }
 });
 export type Objective = z.infer<typeof Objective>;

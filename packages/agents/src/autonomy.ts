@@ -32,7 +32,7 @@ export interface OrderDecision {
 }
 
 /** Orders that add exposure. Everything else only restricts or retreats and is always acceptable. */
-const WORK_ORDERS: ReadonlySet<string> = new Set(["protect_site", "contain_fire", "observe"]);
+const WORK_ORDERS: ReadonlySet<string> = new Set(["protect_site", "contain_fire", "observe", "build_line"]);
 const ALWAYS_ACCEPTED: ReadonlySet<string> = new Set(["return_to_refuge", "hold", "avoid_corridor", "resume"]);
 
 const accept: OrderDecision = { action: "accept", reason: "order_accepted", announcement: null };

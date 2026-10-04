@@ -102,6 +102,7 @@ const KIND_OF: Record<string, ObjectiveKind | undefined> = {
   hold: "hold",
   avoid: "avoid_corridor",
   move: "move_direction",
+  line: "build_line",
 };
 
 /**
@@ -248,6 +249,9 @@ export class CommandGateway {
     const notes: string[] = [];
 
     if (env.clarification !== undefined) return this.ask(message, seq, env, env.clarification);
+    if (env.objective?.kind === "line" && (env.objective.assignments?.length ?? 0) > 0) {
+      return this.resolveLine(message, seq, env, null, actions);
+    }
 
     // Recipient: an explicit name overrides; otherwise the active recipient as resolved so far.
     let recipient = this.active;
@@ -296,6 +300,8 @@ export class CommandGateway {
       }
     }
     for (const claim of env.unsupportedClaims) notes.push(`unsupported_claim:${claim}`);
+
+    if (env.objective?.kind === "line") return this.resolveLine(message, seq, env, recipientId, actions);
 
     let objectiveText = "";
     let rejectedObjective: string | null = null;
@@ -414,6 +420,78 @@ export class CommandGateway {
     if (env.unsupportedClaims.length > 0) parts.push("That claim is not backed by a report, so no hazard was changed.");
     const status: CommandStatus = rejectedObjective !== null && actions.every((a) => a.kind === "set_recipient") ? "rejected" : "accepted";
     return this.finish(message, seq, status, recipientId, actions, parts.join(" "), evidence, notes, now);
+  }
+
+  /**
+   * A fire-line order: the two ends must be named places, and each crew gets its own objective
+   * starting at its end. Crews do not wait for each other. `recipientId` is the single addressee
+   * when the message carries no per-crew assignments.
+   */
+  private resolveLine(
+    message: IncomingMessage,
+    seq: number,
+    env: IntentEnvelope,
+    recipientId: AgentIdT | null,
+    actions: GatewayAction[],
+  ): GatewayOutcome {
+    const o = env.objective!;
+    const places = (this.env.directory.places ?? []).map((p) => ({ id: p.id, name: p.name }));
+    const place = (name: string | undefined): { kind: "ok"; id: string; name: string } | { kind: "ask"; question: string } => {
+      if (name === undefined) return { kind: "ask", question: "Between which two places should the fire line run?" };
+      const m = matchName(name, places);
+      if (m.kind === "unique") return { kind: "ok", id: m.id, name: places.find((p) => p.id === m.id)!.name };
+      return { kind: "ask", question: m.kind === "ambiguous" ? `Which place do you mean by ${name}?` : `I don't know a place called ${name}.` };
+    };
+    const from = place(o.fromName);
+    if (from.kind === "ask") return this.ask(message, seq, env, from.question, actions);
+    const to = place(o.toName);
+    if (to.kind === "ask") return this.ask(message, seq, env, to.question, actions);
+    if (from.id === to.id) return this.ask(message, seq, env, "A fire line needs two different places. Where should it end?", actions);
+
+    const crews = this.env.directory.agents.map((a) => ({ id: a.id, name: a.callsign }));
+    const orders: { agentId: string; startId: string }[] = [];
+    if (o.assignments !== undefined && o.assignments.length > 0) {
+      for (const assignment of o.assignments) {
+        const crew = matchName(assignment.recipient, crews);
+        if (crew.kind !== "unique") return this.ask(message, seq, env, this.unknownRecipient(assignment.recipient), actions);
+        const start = place(assignment.startName);
+        if (start.kind === "ask") return this.ask(message, seq, env, start.question, actions);
+        if (start.id !== from.id && start.id !== to.id) {
+          return this.ask(message, seq, env, `${assignment.startName} is not an end of the line from ${from.name} to ${to.name}. Which end should ${assignment.recipient} start from?`, actions);
+        }
+        orders.push({ agentId: crew.id, startId: start.id });
+      }
+    } else if (recipientId !== null) {
+      orders.push({ agentId: recipientId, startId: from.id });
+    } else {
+      return this.ask(message, seq, env, "Which crew should cut the fire line?", actions);
+    }
+
+    const parts: string[] = [];
+    const now = this.env.nowSimMs();
+    for (const order of orders) {
+      const agent = this.env.directory.agents.find((a) => a.id === order.agentId)!;
+      if (agent.role !== "protection_crew") {
+        parts.push(`${agent.callsign} does not cut fire lines.`);
+        continue;
+      }
+      const startName = order.startId === from.id ? from.name : to.name;
+      const endName = order.startId === from.id ? to.name : from.name;
+      const objective = Objective.parse({
+        id: ObjectiveId.parse(`obj-${seq}-${agent.id}`),
+        recipientId: AgentId.parse(agent.id),
+        kind: "build_line",
+        targetId: null,
+        constraints: { line: { fromNodeId: order.startId, toNodeId: order.startId === from.id ? to.id : from.id } },
+        issueSequence: SequenceNumber.parse(seq),
+      });
+      actions.push({ kind: "objective", objective });
+      parts.push(`Sent to ${agent.callsign}: cut a fire line from ${startName} toward ${endName}.`);
+    }
+    const sent = actions.some((a) => a.kind === "objective");
+    if (sent) parts.push(orders.length > 1 ? "Each crew starts on its own; their own feasibility checks decide." : "Its own feasibility check decides.");
+    const receiptRecipient = AgentId.parse(orders[0]!.agentId);
+    return this.finish(message, seq, sent ? "accepted" : "rejected", receiptRecipient, actions, parts.join(" "), [], [], now);
   }
 
   /** Question for a named recipient that is not in the directory; scouts no longer exist in new incidents. */

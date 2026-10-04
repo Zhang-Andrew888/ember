@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { NodeId } from "@ember/domain";
 import { fixtureCoordinatorView as rawFixture } from "../../../../../tests/fixtures/coordinator-view.fixture.js";
 import { adaptToScenarioIds } from "../../net/mockBase.js";
 import { scenarioMap } from "../../map/activeScenario.js";
@@ -167,5 +168,22 @@ describe("components/scene/sceneEntities - firebreaks", () => {
     // One row apart in the grid: same scene x, different z.
     expect(a!.position.x).toBeCloseTo(b!.position.x, 6);
     expect(a!.position.z).not.toBeCloseTo(b!.position.z, 1);
+  });
+});
+
+describe("components/scene/sceneEntities - fire line work", () => {
+  it("splits a fire line into cleared, being-cleared and not-yet-started cells", () => {
+    const entities = buildSceneEntities(
+      {
+        ...fixtureCoordinatorView,
+        firebreakCells: [1576],
+        clearingCells: [{ gridCellIndex: 1640, clearance: 0.5 }],
+        firelines: [{ id: "line:n-h~n-n", fromNodeId: NodeId.parse("n-h"), toNodeId: NodeId.parse("n-n"), cells: [1576, 1640, 1704, 1768], resolved: false }],
+      },
+      scenarioMap,
+    );
+    expect(entities.firebreaks.map((cell) => cell.gridCellIndex)).toEqual([1576]);
+    expect(entities.clearing).toEqual([expect.objectContaining({ gridCellIndex: 1640, clearance: 0.5 })]);
+    expect(entities.plannedLine.map((cell) => cell.gridCellIndex)).toEqual([1704, 1768]);
   });
 });

@@ -18,3 +18,8 @@ export function nonburnableCells(road: RoadIndex): Set<number> {
   for (const cell of road.map.firebreakCells ?? []) out.add(cell);
   return out;
 }
+
+/** Pre-placed firebreak cells from the map. */
+export function mapFirebreakCells(road: RoadIndex): Set<number> {
+  return new Set(road.map.firebreakCells ?? []);
+}

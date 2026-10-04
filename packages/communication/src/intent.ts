@@ -12,10 +12,15 @@ export const IntentEnvelope = z.object({
   kind: z.enum(["objective", "relay", "status", "clarification_answer"]),
   objective: z
     .object({
-      kind: z.enum(["protect", "contain", "observe", "return", "hold", "avoid", "resume", "move"]),
+      kind: z.enum(["protect", "contain", "observe", "return", "hold", "avoid", "resume", "move", "line"]),
       targetName: z.string().optional(),
       direction: CompassDirection.optional(),
       maxDistanceMeters: z.number().positive().max(1200).optional(),
+      /** For `line`: the two named places the fire line runs between. */
+      fromName: z.string().optional(),
+      toName: z.string().optional(),
+      /** For `line`: which crew starts at which end; each crew starts on its own. */
+      assignments: z.array(z.object({ recipient: z.string(), startName: z.string() })).optional(),
     })
     .optional(),
   evidenceQueries: z.array(
@@ -39,6 +44,8 @@ export interface Directory {
   readonly locations: readonly { name: string; x: number; y: number; radius: number }[];
   /** Named road segments for avoid-corridor objectives; id is the edge id. */
   readonly corridors: readonly { id: string; name: string }[];
+  /** Named map nodes (sites, refuges, junctions) a fire line can run between; id is the node id. */
+  readonly places?: readonly { id: string; name: string }[];
 }
 
 export type NameMatch = { kind: "unique"; id: string } | { kind: "ambiguous"; ids: string[] } | { kind: "unknown" };

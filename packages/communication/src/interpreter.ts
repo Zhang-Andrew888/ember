@@ -59,6 +59,8 @@ export class ScriptedInterpreter implements Interpreter {
       }
     }
     const names = [...callsigns];
+    const line = LINE_ORDER.test(lower) ? parseLineOrder(text, req.directory) : null;
+    if (line !== null) return IntentSchema.parse(lineEnvelope(req, names, line));
     const envelope: IntentEnvelope = {
       commandId: req.commandId,
       inputSequence: req.inputSequence,
@@ -123,6 +125,87 @@ export class ScriptedInterpreter implements Interpreter {
     }
     return IntentSchema.parse(envelope);
   }
+}
+
+const LINE_ORDER = /\b(?:cut|build|dig|clear|construct|make|work)\b[^.]*\b(?:fire\s?line|line|fire\s?break|break)\b|\bfire\s?(?:line|break)\b/;
+/** "from X", "at X", "starting at X", "on the X end": a crew's own starting end... */
+const START_BEFORE = /\b(?:from|at|on)\s+(?:the\s+)?$/;
+/** ...unless X opens the line's endpoint pair ("from X to Y", "between X and Y"). */
+const PAIR_AFTER = /^\s+(?:to|and|toward|towards)\b/;
+
+interface LineOrder {
+  /** Places in the order they are mentioned (the first two are the ends). */
+  readonly places: readonly string[];
+  /** Callsign -> place it was told to start from. */
+  readonly starts: ReadonlyMap<string, string>;
+  /** Callsigns in the order they are mentioned. */
+  readonly crews: readonly string[];
+}
+
+/** Places and per-crew starting ends in a fire-line order, by position in the text. */
+function parseLineOrder(text: string, directory: InterpretationRequest["directory"]): LineOrder {
+  const lower = text.toLowerCase();
+  const mentions: { at: number; end: number; name: string }[] = [];
+  // Longest names first so "Refuge West" is not also read as a shorter overlapping name.
+  for (const place of [...(directory.places ?? [])].sort((a, b) => b.name.length - a.name.length)) {
+    const name = place.name.toLowerCase();
+    for (let at = lower.indexOf(name); at >= 0; at = lower.indexOf(name, at + 1)) {
+      if (mentions.some((m) => at < m.end && at + name.length > m.at)) continue;
+      mentions.push({ at, end: at + name.length, name: place.name });
+    }
+  }
+  mentions.sort((a, b) => a.at - b.at);
+  const crews: { at: number; end: number; callsign: string }[] = [];
+  for (const agent of directory.agents) {
+    const callsign = agent.callsign.toLowerCase();
+    for (let at = lower.indexOf(callsign); at >= 0; at = lower.indexOf(callsign, at + 1)) {
+      crews.push({ at, end: at + callsign.length, callsign: agent.callsign });
+    }
+  }
+  crews.sort((a, b) => a.at - b.at);
+  // A start phrase belongs to the nearest crew named before it.
+  const starts = new Map<string, string>();
+  for (const m of mentions) {
+    if (!START_BEFORE.test(lower.slice(Math.max(0, m.at - 20), m.at)) || PAIR_AFTER.test(lower.slice(m.end))) continue;
+    const owner = [...crews].reverse().find((crew) => crew.end <= m.at);
+    if (owner !== undefined && !starts.has(owner.callsign)) starts.set(owner.callsign, m.name);
+  }
+  const places: string[] = [];
+  for (const m of mentions) if (!places.includes(m.name)) places.push(m.name);
+  const order: string[] = [];
+  for (const c of crews) if (!order.includes(c.callsign)) order.push(c.callsign);
+  return { places, starts, crews: order };
+}
+
+function lineEnvelope(req: InterpretationRequest, names: readonly string[], line: LineOrder): IntentEnvelope {
+  const envelope: IntentEnvelope = {
+    commandId: req.commandId,
+    inputSequence: req.inputSequence,
+    kind: "objective",
+    evidenceQueries: [],
+    unsupportedClaims: [],
+  };
+  const [a, b] = line.places;
+  if (a === undefined || b === undefined) {
+    envelope.clarification = "Between which two places should the fire line run?";
+    envelope.objective = { kind: "line", ...(a === undefined ? {} : { fromName: a }) };
+    if (names.length === 1) envelope.explicitRecipient = names[0]!;
+    return envelope;
+  }
+  if (line.crews.length <= 1) {
+    const crew = line.crews[0];
+    if (crew !== undefined) envelope.explicitRecipient = crew;
+    const start = crew === undefined ? undefined : line.starts.get(crew);
+    const from = start ?? a;
+    envelope.objective = { kind: "line", fromName: from, toName: from === a ? b : a };
+    return envelope;
+  }
+  // Several crews: explicit starts first, then the ends nobody claimed, in mention order.
+  const ends = [a, b];
+  const unclaimed = ends.filter((end) => ![...line.starts.values()].includes(end));
+  const assignments = line.crews.map((crew) => ({ recipient: crew, startName: line.starts.get(crew) ?? unclaimed.shift() ?? a }));
+  envelope.objective = { kind: "line", fromName: a, toName: b, assignments };
+  return envelope;
 }
 
 function tokensOverlap(lower: string, name: string): boolean {

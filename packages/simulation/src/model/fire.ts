@@ -1,7 +1,7 @@
 import { SIM_DEFAULTS } from "./constants.js";
 import type { Terrain } from "./terrain.js";
 
-/** Cell burn states. Nonburnable cells never ignite (refuge protection areas). */
+/** Cell burn states. Nonburnable cells never ignite (refuge protection areas and finished firebreaks). */
 export const CELL_NONBURNABLE = 0;
 export const CELL_UNBURNED = 1;
 export const CELL_BURNING = 2;
@@ -102,17 +102,46 @@ export class FireField {
   private readonly progress: Float64Array;
   /** Accumulated suppression work per cell (structure protection does not touch this). */
   private readonly containmentWork: Float64Array;
+  /**
+   * Fraction of each cell's fuel cleared, 0..1. Spread into a cell keeps (1 - clearance) of its rate,
+   * and a diagonal step between two cleared corner cells keeps (1 - the smaller clearance), so a line
+   * whose cells only touch at corners still holds. A fully cleared cell is nonburnable.
+   */
+  readonly clearance: Float64Array;
   private burning: number[] = [];
   private readonly terrain: Terrain;
 
-  constructor(terrain: Terrain, nonburnable: ReadonlySet<number>) {
+  /** `cleared` cells are firebreaks: nonburnable and fully cleared, so they also block corner gaps. */
+  constructor(terrain: Terrain, nonburnable: ReadonlySet<number>, cleared: ReadonlySet<number> = new Set()) {
     const n = SIZE * SIZE;
     this.terrain = terrain;
     this.state = new Uint8Array(n).fill(CELL_UNBURNED);
     this.ignitedAtMs = new Float64Array(n).fill(Infinity);
     this.progress = new Float64Array(n * 8);
     this.containmentWork = new Float64Array(n);
+    this.clearance = new Float64Array(n);
     for (const cell of nonburnable) this.state[cell] = CELL_NONBURNABLE;
+    for (const cell of cleared) {
+      this.state[cell] = CELL_NONBURNABLE;
+      this.clearance[cell] = 1;
+    }
+  }
+
+  /**
+   * Clear `fraction` more of an unburned cell's fuel. Burning, burned and nonburnable cells cannot be
+   * cleared. Returns "completed" when the cell becomes a firebreak on this call.
+   */
+  applyClearance(cell: number, fraction: number): "none" | "progress" | "completed" {
+    if (this.state[cell] !== CELL_UNBURNED || fraction <= 0) return "none";
+    // Tolerance: a cell cleared in n equal steps of 1/n must finish despite rounding.
+    const after = this.clearance[cell]! + fraction;
+    if (after < 1 - 1e-9) {
+      this.clearance[cell] = after;
+      return "progress";
+    }
+    this.clearance[cell] = 1;
+    this.state[cell] = CELL_NONBURNABLE;
+    return "completed";
   }
 
   /** Fraction in [0,1] of spread rate retained from this burning cell (0 = fully restrained). */
@@ -189,6 +218,7 @@ export class FireField {
     }
     const reached: number[] = [];
     const seen = new Set<number>();
+    const clear = this.clearance;
     for (const cell of this.burning) {
       const spreadScale = this.spreadFactorFrom(cell);
       if (spreadScale <= 0) continue;
@@ -201,9 +231,13 @@ export class FireField {
         if (nx < 0 || ny < 0 || nx >= SIZE || ny >= SIZE) continue;
         const target = ny * SIZE + nx;
         if (this.state[target] !== CELL_UNBURNED) continue;
+        // Cleared fuel scales the clamped rate, so clearing can take spread below the clamp floor.
+        let fuelLeft = 1 - clear[target]!;
+        if (nb.dx !== 0 && nb.dy !== 0) fuelLeft *= 1 - Math.min(clear[gy * SIZE + nx]!, clear[ny * SIZE + gx]!);
+        if (fuelLeft <= 0) continue;
         const slot = cell * 8 + d;
         const raw = baseRate * stat[slot]! * windFactor[d]! * spreadScale;
-        const rate = raw < rateLo ? rateLo : raw > rateHi ? rateHi : raw;
+        const rate = (raw < rateLo ? rateLo : raw > rateHi ? rateHi : raw) * fuelLeft;
         const next = this.progress[slot]! + rate * dtSec;
         this.progress[slot] = next;
         if (next >= nb.dist && !seen.has(target)) {
@@ -227,6 +261,7 @@ export class FireField {
     copy.ignitedAtMs.set(this.ignitedAtMs);
     copy.progress.set(this.progress);
     copy.containmentWork.set(this.containmentWork);
+    copy.clearance.set(this.clearance);
     copy.burning = [...this.burning];
     copy.totalIgnitionsRecorded = this.totalIgnitionsRecorded;
     return copy;

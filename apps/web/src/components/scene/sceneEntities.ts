@@ -80,6 +80,12 @@ export interface FirebreakMarker {
   readonly position: SceneVector;
 }
 
+/** A cell partly cleared toward a firebreak; fire spreads into it more slowly. */
+export interface ClearingMarker extends FirebreakMarker {
+  /** Fraction of fuel cleared, strictly between 0 and 1. */
+  readonly clearance: number;
+}
+
 export interface SceneEntities {
   readonly agents: AgentMarker[];
   readonly sites: SiteMarker[];
@@ -89,6 +95,10 @@ export interface SceneEntities {
   readonly currentFire: CurrentFireLayer | null;
   /** Firebreak cells from the view; empty when the view carries none. */
   readonly firebreaks: FirebreakMarker[];
+  /** Cells being cleared (partial clearance). */
+  readonly clearing: ClearingMarker[];
+  /** Fire-line cells crews were sent to clear that have not been started yet. */
+  readonly plannedLine: FirebreakMarker[];
   /** Reportable plans (route emphasis); selection is applied at render time. */
   readonly routes: RouteLine[];
   /** Coordinator forecast envelope; null before the first build. */
@@ -139,6 +149,20 @@ export function buildSceneEntities(
     gridCellIndex,
     position: resolveGridCellPosition(map, gridCellIndex),
   }));
+  const clearing = (view.clearingCells ?? []).map(({ gridCellIndex, clearance }) => ({
+    key: `clearing-${gridCellIndex}`,
+    gridCellIndex,
+    position: resolveGridCellPosition(map, gridCellIndex),
+    clearance,
+  }));
+  const started = new Set([...(view.firebreakCells ?? []), ...clearing.map((cell) => cell.gridCellIndex)]);
+  const planned = new Set<number>();
+  for (const line of view.firelines ?? []) for (const cell of line.cells) if (!started.has(cell)) planned.add(cell);
+  const plannedLine = [...planned].sort((a, b) => a - b).map((gridCellIndex) => ({
+    key: `planned-${gridCellIndex}`,
+    gridCellIndex,
+    position: resolveGridCellPosition(map, gridCellIndex),
+  }));
 
   return {
     agents,
@@ -146,6 +170,8 @@ export function buildSceneEntities(
     fireCells,
     currentFire,
     firebreaks,
+    clearing,
+    plannedLine,
     routes: buildRouteLines(view, map, null),
     forecast: buildForecastLayer(view, map),
   };
