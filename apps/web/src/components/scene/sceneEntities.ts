@@ -156,8 +156,13 @@ export function buildSceneEntities(
     clearance,
   }));
   const started = new Set([...(view.firebreakCells ?? []), ...clearing.map((cell) => cell.gridCellIndex)]);
+  // Planned = ordered but not started. A resolved line has no unburned cell left, so whatever it
+  // did not clear was taken by the fire and is not work still to do.
   const planned = new Set<number>();
-  for (const line of view.firelines ?? []) for (const cell of line.cells) if (!started.has(cell)) planned.add(cell);
+  for (const line of view.firelines ?? []) {
+    if (line.resolved) continue;
+    for (const cell of line.cells) if (!started.has(cell)) planned.add(cell);
+  }
   const plannedLine = [...planned].sort((a, b) => a - b).map((gridCellIndex) => ({
     key: `planned-${gridCellIndex}`,
     gridCellIndex,

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { FormEvent, KeyboardEvent, PointerEvent } from "react";
 import type { TranscriptLine } from "../conversation/transcript.js";
 import { isNearBottom } from "../conversation/stickToBottom.js";
+import { FireLineHelp } from "./FireLineHelp.js";
 import { formatIncidentClock } from "../format/time.js";
 import { createBrowserVoiceCapture, type BrowserVoiceCapture } from "../net/browserVoiceCapture.js";
 import { GROK_CAPTURE_FAILURE_MESSAGE, settleGrokCapture } from "../net/settleGrokCapture.js";
@@ -225,6 +226,8 @@ export function ConversationPanel({
       <div aria-live="polite" className="sr-only">
         {latest ? `${latest.speaker}: ${latest.text}` : ""}
       </div>
+
+      <FireLineHelp />
 
       <form className="conversation-panel__composer" onSubmit={handleSubmit}>
         <label htmlFor="composer-input" className="sr-only">

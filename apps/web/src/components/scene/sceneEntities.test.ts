@@ -185,4 +185,40 @@ describe("components/scene/sceneEntities - fire line work", () => {
     expect(entities.clearing).toEqual([expect.objectContaining({ gridCellIndex: 1640, clearance: 0.5 })]);
     expect(entities.plannedLine.map((cell) => cell.gridCellIndex)).toEqual([1704, 1768]);
   });
+
+  it("reads lines from their points and cells alone; no node ids are involved", () => {
+    const line = { id: "line:1576~1768", start: { x: 1012.5, y: 612.5 }, end: { x: 1012.5, y: 687.5 }, cells: [1576, 1640, 1704, 1768], resolved: false };
+    expect(Object.keys(line)).not.toContain("fromNodeId");
+    const entities = buildSceneEntities({ ...fixtureCoordinatorView, firelines: [line] }, scenarioMap);
+    expect(entities.plannedLine.map((cell) => cell.gridCellIndex)).toEqual([1576, 1640, 1704, 1768]);
+    expect(entities.firebreaks).toEqual([]);
+    expect(entities.clearing).toEqual([]);
+  });
+
+  it("lists a cell once, in order, when two lines share it", () => {
+    const entities = buildSceneEntities(
+      {
+        ...fixtureCoordinatorView,
+        firelines: [
+          { id: "line:1576~1768", start: { x: 1012.5, y: 612.5 }, end: { x: 1012.5, y: 687.5 }, cells: [1768, 1704, 1640], resolved: false },
+          { id: "line:1640~1642", start: { x: 1012.5, y: 637.5 }, end: { x: 1112.5, y: 637.5 }, cells: [1640, 1641, 1642], resolved: false },
+        ],
+      },
+      scenarioMap,
+    );
+    expect(entities.plannedLine.map((cell) => cell.gridCellIndex)).toEqual([1640, 1641, 1642, 1704, 1768]);
+  });
+
+  it("shows no planned tiles for a resolved line, even where the fire took cells", () => {
+    const entities = buildSceneEntities(
+      {
+        ...fixtureCoordinatorView,
+        firebreakCells: [1576],
+        firelines: [{ id: "line:1576~1768", start: { x: 1012.5, y: 612.5 }, end: { x: 1012.5, y: 687.5 }, cells: [1576, 1640, 1704, 1768], resolved: true }],
+      },
+      scenarioMap,
+    );
+    expect(entities.firebreaks.map((cell) => cell.gridCellIndex)).toEqual([1576]);
+    expect(entities.plannedLine).toEqual([]);
+  });
 });
