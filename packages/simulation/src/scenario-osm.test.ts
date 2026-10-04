@@ -20,7 +20,7 @@ vi.setConfig({ testTimeout: 120_000 });
 // Host clock for measurement only; this package's tsconfig has no DOM/Node lib.
 declare const performance: { now(): number };
 
-const FROZEN_HASH = "9dcd7f91ed859211c42ca4bf52b72b3a";
+const FROZEN_HASH = "9a3258eb5336fb24444cd23ef4adb17a";
 
 /** Edge ids of the shortest road route between two nodes. */
 function route(road: RoadIndex, from: string, to: string): string[] {
@@ -93,7 +93,7 @@ describe("OSM Montclair scenario", () => {
     expect(validateScenario(scenario)).toEqual([]);
     const gates = scenarioGates(scenario);
     for (const g of gates) expect(g.ok, `${g.gate}: ${g.detail}`).toBe(true);
-    expect(gates).toHaveLength(5);
+    expect(gates).toHaveLength(4);
   });
 
   it("keeps real OSM identifiers and stays inside the 1.6 km grid", () => {
@@ -118,16 +118,15 @@ describe("OSM Montclair scenario", () => {
     expect(scenario.briefing).toContain("OpenStreetMap");
   });
 
-  it("matches the documented authored layer: two refuges, three named sites, scouts, one constrained segment", () => {
+  it("matches the documented authored layer: two refuges, three named sites, one constrained segment, crews only", () => {
     expect(scenario.map.refuges.map((r) => r.name)).toEqual(["Refuge West", "Refuge South"]);
     expect(scenario.map.sites.map((s) => [s.name, s.requiredWork, s.value])).toEqual([
       ["Ridge Cabins", 300, 1],
       ["Waterworks", 450, 1.5],
       ["Community Lodge", 600, 2],
     ]);
-    expect(scenario.map.scoutPoints.length).toBeGreaterThanOrEqual(2);
     expect(scenario.map.edges.filter((e) => e.singleCapacity)).toHaveLength(1);
-    expect(scenario.agents.map((a) => a.callsign)).toEqual(["Crew 1", "Crew 2", "Crew 3", "Scout"]);
+    expect(scenario.agents.map((a) => a.callsign)).toEqual(["Crew 1", "Crew 2", "Crew 3"]);
     expect(scenario.map.initialFireCells).toHaveLength(4);
   });
 

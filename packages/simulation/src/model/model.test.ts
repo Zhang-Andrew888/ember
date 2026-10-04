@@ -70,7 +70,6 @@ describe("model/grid and roads", () => {
       ],
       sites: [],
       refuges: [],
-      scoutPoints: [],
       terrainSeed: "t",
       initialFireCells: [],
     };

@@ -24,7 +24,7 @@ export function scenarioHash(scenario: SimScenario): string {
 }
 
 export interface SyntheticOptions {
-  /** Agent ids to include; defaults to crew-1, crew-2, crew-3 and scout. */
+  /** Agent ids to include; defaults to crew-1, crew-2 and crew-3. */
   readonly agents?: readonly string[];
   /** Site ids to include; defaults to site-a, site-b and site-c. */
   readonly sites?: readonly string[];
@@ -63,11 +63,10 @@ const EDGES: readonly [string, string, string, boolean][] = [
   ["e-rs-sc", "n-rs", "n-sc", false],
 ];
 
-const ALL_AGENTS: readonly [string, "protection_crew" | "scout", string, string][] = [
+const ALL_AGENTS: readonly [string, "protection_crew", string, string][] = [
   ["crew-1", "protection_crew", "Crew 1", "n-rw"],
   ["crew-2", "protection_crew", "Crew 2", "n-rw"],
   ["crew-3", "protection_crew", "Crew 3", "n-rs"],
-  ["scout", "scout", "Scout", "n-rs"],
 ];
 
 const ALL_SITES: readonly [string, string, string, number, number][] = [
@@ -80,7 +79,7 @@ const ALL_SITES: readonly [string, string, string, number, number][] = [
  * Authored synthetic graph used for tests and the no-provider harness. It is NOT the real
  * Oakland extract: geometry, sites, refuges and ignition are all authored. It has a loop
  * with two approaches (south 722 m, north 1052 m), a single-capacity segment (e-s-h) with
- * waiting nodes at both ends, three site branches and three scouting points.
+ * waiting nodes at both ends, and three site branches.
  */
 export function buildSyntheticScenario(options: SyntheticOptions = {}): SimScenario {
   const agentFilter = options.agents;
@@ -115,7 +114,6 @@ export function buildSyntheticScenario(options: SyntheticOptions = {}): SimScena
         { id: "refuge-west", name: "Refuge West", nodeId: NodeId.parse("n-rw") },
         { id: "refuge-south", name: "Refuge South", nodeId: NodeId.parse("n-rs") },
       ],
-      scoutPoints: [NodeId.parse("n-n"), NodeId.parse("n-s"), NodeId.parse("n-h")],
       terrainSeed: options.terrainSeed ?? "synthetic-terrain",
       initialFireCells,
     },
