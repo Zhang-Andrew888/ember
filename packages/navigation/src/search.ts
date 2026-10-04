@@ -201,6 +201,7 @@ export function startsFromPosition(
   config: NavConfig,
 ): SearchStart[] {
   if (position.kind === "node") return [{ nodeId: position.nodeId, k: 0, prefix: [] }];
+  if (position.kind === "offroad") return [];
   const road: RoadIndex = hm.road;
   const edge = road.mustEdge(position.edgeId);
   const dist = position.distanceAlongPolyline;

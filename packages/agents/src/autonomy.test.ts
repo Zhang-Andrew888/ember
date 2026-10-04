@@ -23,7 +23,7 @@ describe("when a crew refuses an order", () => {
   });
 
   it("accepts a feasible observe order the same way", () => {
-    expect(decideOrder("Scout", order({ kind: "observe" })).action).toBe("accept");
+    expect(decideOrder("Crew 1", order({ kind: "observe" })).action).toBe("accept");
   });
 
   it("refuses when the planner finds no mission with the required margin, keeping the planner's reason", () => {

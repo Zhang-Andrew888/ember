@@ -3,6 +3,7 @@ import { fixtureCoordinatorView } from "../../../../tests/fixtures/coordinator-v
 import type { WebSocketLike } from "./CoordinatorViewClient.js";
 import { adaptToScenarioIds } from "./mockBase.js";
 import { defaultRecordedMockSnapshots } from "./recordedMockPlayback.js";
+import { omitScoutFromView } from "../format/omitScout.js";
 
 /**
  * Hand-authored CoordinatorView snapshots for the Slice-1 dev/test harness.
@@ -145,7 +146,8 @@ const CLOSED = 3;
  * until Start" (docs/FRONTEND.md) even though the socket connects on mount.
  */
 export function createMockIncidentSocket(options: MockIncidentSocketOptions = {}): MockIncidentSocket {
-  const snapshots = options.snapshots ?? defaultRecordedMockSnapshots();
+  // New demo sessions present crews only (#118); recorded and preset views are filtered on the way out.
+  const snapshots = (options.snapshots ?? defaultRecordedMockSnapshots()).map(omitScoutFromView);
 
   let readyState = CONNECTING;
   let started = false;

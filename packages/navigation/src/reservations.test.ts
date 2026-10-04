@@ -60,7 +60,6 @@ describe("reservations on the single-capacity segment", () => {
     expect(ReservationService.outranks({ cls: "approach", enterMs: 100, agentId: a }, { cls: "approach", enterMs: 100, agentId: b })).toBe(true);
     expect(ReservationService.outranks({ cls: "emergency", enterMs: 900, agentId: c }, { cls: "return", enterMs: 1, agentId: a })).toBe(true);
     expect(ReservationService.outranks({ cls: "return", enterMs: 900, agentId: c }, { cls: "approach", enterMs: 1, agentId: a })).toBe(true);
-    expect(ReservationService.outranks({ cls: "approach", enterMs: 900, agentId: c }, { cls: "scout", enterMs: 1, agentId: a })).toBe(true);
   });
 
   it("moves a future reservation only after its holder verifies a safe yield", () => {
@@ -142,9 +141,9 @@ describe("reservations on the single-capacity segment", () => {
 
   it("ignores lower-class holders when a higher-class agent plans, so it can ask them to yield", () => {
     const svc = new ReservationService(road);
-    svc.reserve(a, corridorPlan(a, "pa", 100_000), "scout", 0);
+    svc.reserve(a, corridorPlan(a, "pa", 100_000), "approach", 0);
     expect(svc.oracleFor(b, "emergency").isFree(edge, "reverse", 110_000, 205_000)).toBe(true);
-    expect(svc.oracleFor(b, "scout").isFree(edge, "reverse", 110_000, 205_000)).toBe(false);
-    expect(svc.oracleFor(b, "approach").isFree(edge, "reverse", 110_000, 205_000)).toBe(true);
+    expect(svc.oracleFor(b, "approach").isFree(edge, "reverse", 110_000, 205_000)).toBe(false);
+    expect(svc.oracleFor(b, "return").isFree(edge, "reverse", 110_000, 205_000)).toBe(true);
   });
 });

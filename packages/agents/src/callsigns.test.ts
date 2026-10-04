@@ -7,7 +7,7 @@ const dir = new CallsignDirectory([
   { agentId: id("crew-1"), callsign: "Crew 1" },
   { agentId: id("crew-2"), callsign: "Crew 2" },
   { agentId: id("crew-10"), callsign: "Crew 10" },
-  { agentId: id("scout"), callsign: "Scout" },
+  { agentId: id("lookout"), callsign: "Lookout" },
 ]);
 
 describe("callsign tokens and defaults", () => {
@@ -20,7 +20,6 @@ describe("callsign tokens and defaults", () => {
   it("derives the documented fictional callsigns from authored ids", () => {
     expect(defaultCallsign("crew-1")).toBe("Crew 1");
     expect(defaultCallsign("crew-3")).toBe("Crew 3");
-    expect(defaultCallsign("scout")).toBe("Scout");
     expect(defaultCallsign("ridge-lead")).toBe("Ridge Lead");
   });
 });
@@ -30,9 +29,9 @@ describe("named-recipient resolution always resolves", () => {
     expect(dir.resolve(heard)).toMatchObject({ kind: "match", agentId: "crew-2", callsign: "Crew 2" });
   });
 
-  it("matches the scout by name, and a distinctive part of a name", () => {
-    expect(dir.resolve("scout")).toMatchObject({ kind: "match", agentId: "scout" });
-    expect(dir.resolve("the scout")).toMatchObject({ kind: "match", agentId: "scout" });
+  it("matches a one-word callsign by name, and a distinctive part of a name", () => {
+    expect(dir.resolve("lookout")).toMatchObject({ kind: "match", agentId: "lookout" });
+    expect(dir.resolve("the lookout")).toMatchObject({ kind: "match", agentId: "lookout" });
     expect(dir.resolve("please")).toMatchObject({ kind: "unknown" });
   });
 
@@ -67,12 +66,12 @@ describe("named-recipient resolution always resolves", () => {
 
   it("is deterministic regardless of directory order", () => {
     const shuffled = new CallsignDirectory([
-      { agentId: id("scout"), callsign: "Scout" },
+      { agentId: id("lookout"), callsign: "Lookout" },
       { agentId: id("crew-10"), callsign: "Crew 10" },
       { agentId: id("crew-2"), callsign: "Crew 2" },
       { agentId: id("crew-1"), callsign: "Crew 1" },
     ]);
-    for (const heard of ["crew", "Crew 2", "scout", "nobody"]) expect(shuffled.resolve(heard)).toEqual(dir.resolve(heard));
+    for (const heard of ["crew", "Crew 2", "lookout", "nobody"]) expect(shuffled.resolve(heard)).toEqual(dir.resolve(heard));
   });
 
   it("an empty directory resolves everything as unknown", () => {
@@ -87,6 +86,12 @@ describe("named-recipient resolution always resolves", () => {
   it("offers a clarification for ambiguous and unknown names only", () => {
     expect(dir.clarification(dir.resolve("Crew 2"))).toBeNull();
     expect(dir.clarification(dir.resolve("crew"))).toBe("Which do you mean: Crew 1 or Crew 10 or Crew 2?");
-    expect(dir.clarification(dir.resolve("Crew 7"))).toMatch(/Known callsigns: Crew 1, Crew 10, Crew 2, Scout/);
+    expect(dir.clarification(dir.resolve("Crew 7"))).toMatch(/Known callsigns: Crew 1, Crew 10, Crew 2, Lookout/);
+  });
+
+  it("explains plainly that there is no scout when one is asked for (#117)", () => {
+    expect(dir.resolve("scout").kind).toBe("unknown");
+    expect(dir.clarification(dir.resolve("the scout"))).toMatch(/There is no scout in this incident\. Known callsigns: Crew 1/);
+    expect(dir.clarification(dir.resolve("Crew 7"))).not.toMatch(/scout/i);
   });
 });

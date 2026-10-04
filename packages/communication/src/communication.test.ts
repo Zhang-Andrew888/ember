@@ -29,16 +29,11 @@ const directory: Directory = {
     { id: "crew-1", callsign: "Crew 1", role: "protection_crew" },
     { id: "crew-2", callsign: "Crew 2", role: "protection_crew" },
     { id: "crew-3", callsign: "Crew 3", role: "protection_crew" },
-    { id: "scout", callsign: "Scout", role: "scout" },
   ],
   sites: [
     { id: "site-a", name: "Ridge Cabins" },
     { id: "site-b", name: "Waterworks" },
     { id: "site-c", name: "Community Lodge" },
-  ],
-  scoutPoints: [
-    { id: "n-n", name: "north road" },
-    { id: "n-s", name: "south junction" },
   ],
   locations: [
     { name: "east corridor", x: 1000, y: 800, radius: 200 },
@@ -74,10 +69,10 @@ function makeGateway(over: Partial<GatewayEnv> & { reports?: Report[]; now?: { t
   return { gw, say, now, ended };
 }
 
-const scoutReport = (id: string, timeMs: number, x = 1000, y = 800): Report => ({
+const crewReport = (id: string, timeMs: number, x = 1000, y = 800): Report => ({
   id,
   kind: "sensor_observation",
-  sourceAgentId: "scout",
+  sourceAgentId: "crew-1",
   timeMs,
   text: "fire at the east corridor",
   footprint: { x, y, radius: 150 },
@@ -89,7 +84,7 @@ describe("recipient addressing", () => {
     const first = say("Crew 2, protect the lodge");
     expect(first.outcomes[0]?.receipt.recipientId).toBe("crew-2");
     expect(gw.activeRecipientId).toBe("crew-2");
-    // A report from the scout arrives; it is not an input and cannot retarget anything.
+    // A report from another crew arrives; it is not an input and cannot retarget anything.
     const follow = say("hold position");
     expect(follow.outcomes[0]?.receipt.recipientId).toBe("crew-2");
     expect(follow.outcomes[0]?.actions.some((a) => a.kind === "objective" && a.objective.recipientId === "crew-2")).toBe(true);
@@ -162,23 +157,23 @@ describe("recipient addressing", () => {
 });
 
 describe("evidence and claims", () => {
-  it("relays the scout's latest uniquely identified report, preserving source and time", () => {
-    const { say } = makeGateway({ reports: [scoutReport("obs:scout:50000", 50_000), scoutReport("obs:scout:90000", 90_000)] });
-    const out = say("Crew 2, use Scout's latest east corridor report and protect the lodge").outcomes[0]!;
+  it("relays another crew's latest uniquely identified report, preserving source and time", () => {
+    const { say } = makeGateway({ reports: [crewReport("obs:crew-1:50000", 50_000), crewReport("obs:crew-1:90000", 90_000)] });
+    const out = say("Crew 2, use Crew 1's latest east corridor report and protect the lodge").outcomes[0]!;
     const relay = out.actions.find((a) => a.kind === "relay");
-    expect(relay).toMatchObject({ kind: "relay", observationId: "obs:scout:90000", toAgentId: "crew-2" });
-    expect(out.evidence[0]).toMatchObject({ kind: "sensor_observation", sourceRecordId: "obs:scout:90000", timestamp: 90_000 });
+    expect(relay).toMatchObject({ kind: "relay", observationId: "obs:crew-1:90000", toAgentId: "crew-2" });
+    expect(out.evidence[0]).toMatchObject({ kind: "sensor_observation", sourceRecordId: "obs:crew-1:90000", timestamp: 90_000 });
     expect(out.actions.some((a) => a.kind === "objective")).toBe(true);
-    expect(out.reply).toMatch(/Passed Scout observation from 90 s to Crew 2/);
+    expect(out.reply).toMatch(/Passed Crew 1 observation from 90 s to Crew 2/);
   });
 
   it("does not invent facts for a nonexistent or ambiguous report", () => {
-    const none = makeGateway({ reports: [] }).say("Crew 2, use Scout's latest east corridor report").outcomes[0]!;
+    const none = makeGateway({ reports: [] }).say("Crew 2, use Crew 1's latest east corridor report").outcomes[0]!;
     expect(none.receipt.status).toBe("clarification_required");
     expect(none.actions.filter((a) => a.kind === "relay")).toHaveLength(0);
     expect(none.reply).toMatch(/no received report/);
     // Two different reports at the same instant from the same source: ask, do not guess.
-    const tie = makeGateway({ reports: [scoutReport("a", 70_000), scoutReport("b", 70_000)] }).say("Crew 2, use Scout's latest east corridor report").outcomes[0]!;
+    const tie = makeGateway({ reports: [crewReport("a", 70_000), crewReport("b", 70_000)] }).say("Crew 2, use Crew 1's latest east corridor report").outcomes[0]!;
     expect(tie.receipt.status).toBe("clarification_required");
     expect(tie.actions.filter((a) => a.kind === "relay")).toHaveLength(0);
   });
@@ -193,19 +188,24 @@ describe("evidence and claims", () => {
   });
 
   it("never converts an agent's own report into a measured observation", () => {
-    const report: Report = { id: "rep-1", kind: "agent_report", sourceAgentId: "scout", timeMs: 60_000, text: "forecast says east closes", footprint: { x: 1000, y: 800, radius: 150 } };
-    const out = makeGateway({ reports: [report] }).say("Crew 2, use Scout's latest east corridor report").outcomes[0]!;
+    const report: Report = { id: "rep-1", kind: "agent_report", sourceAgentId: "crew-1", timeMs: 60_000, text: "forecast says east closes", footprint: { x: 1000, y: 800, radius: 150 } };
+    const out = makeGateway({ reports: [report] }).say("Crew 2, use Crew 1's latest east corridor report").outcomes[0]!;
     expect(out.actions.some((a) => a.kind === "relay")).toBe(false);
     expect(out.notes).toContain("agent_report_not_converted_to_observation");
     expect(out.evidence[0]?.kind).toBe("agent_report");
   });
 
-  it("rejects objectives the recipient's role cannot do, still relaying supported evidence", () => {
-    const { say } = makeGateway({ reports: [scoutReport("o1", 80_000)] });
+  it("answers a scout-directed command with an unsupported-recipient reply and no action", () => {
+    const { say, gw } = makeGateway({ reports: [crewReport("o1", 80_000)] });
     const out = say("Scout, protect the lodge").outcomes[0]!;
-    expect(out.receipt.status).toBe("rejected");
-    expect(out.reply).toMatch(/does not do protection work/);
-    expect(out.actions.some((a) => a.kind === "objective")).toBe(false);
+    expect(out.receipt.status).toBe("clarification_required");
+    expect(out.reply).toMatch(/There is no scout in this incident/);
+    expect(out.reply).toMatch(/Crew 1, Crew 2, Crew 3/);
+    expect(out.actions.some((a) => a.kind === "objective" || a.kind === "relay")).toBe(false);
+    expect(gw.activeRecipientId).toBeNull();
+    // A scout-shaped name the model proposes explicitly gets the same answer.
+    const named = say("scouts, check the north road").outcomes[0]!;
+    expect(named.reply).toMatch(/There is no scout in this incident/);
   });
 });
 
@@ -242,18 +242,17 @@ describe("objective kinds", () => {
     expect(say("Crew 1, move north or east").outcomes[0]?.receipt.status).toBe("clarification_required");
   });
 
-  it("maps protect, observe, return, hold and resume onto contract objectives and actions", () => {
+  it("maps protect, return, hold and resume onto contract objectives and actions", () => {
     const { say } = makeGateway();
     const obj = (text: string) => say(text).outcomes[0]!.actions.find((a) => a.kind === "objective");
     expect(obj("Crew 1, protect Waterworks")).toMatchObject({ objective: { kind: "protect_site", targetId: "site-b", recipientId: "crew-1" } });
-    expect(obj("Scout, check the north road")).toMatchObject({ objective: { kind: "scout_location", targetId: "n-n", recipientId: "scout" } });
     expect(obj("Crew 1, return to refuge")).toMatchObject({ objective: { kind: "return_to_refuge", targetId: null } });
     expect(obj("Crew 1, hold position")).toMatchObject({ objective: { kind: "hold" } });
     const resume = say("Crew 1, resume your own judgment").outcomes[0]!;
     expect(resume.actions).toContainEqual({ kind: "resume_autonomous", agentId: "crew-1" });
   });
 
-  it("rejects what the contract or the recipient's role cannot take, with a reason", () => {
+  it("rejects what the contract cannot take, with a reason", () => {
     const { say } = makeGateway();
     const obj = (text: string) => say(text).outcomes[0]!.actions.find((a) => a.kind === "objective");
     expect(obj("Crew 1, avoid the east corridor")).toMatchObject({
@@ -261,7 +260,8 @@ describe("objective kinds", () => {
     });
     const crewObserve = say("Crew 1, check the north road").outcomes[0]!;
     expect(crewObserve.receipt.status).toBe("rejected");
-    expect(crewObserve.reply).toMatch(/not a scout/);
+    expect(crewObserve.reply).toMatch(/no scout in this incident/);
+    expect(crewObserve.actions.some((a) => a.kind === "objective")).toBe(false);
   });
 
   it("asks which site or point when the target is missing, unknown or ambiguous", () => {
@@ -334,7 +334,7 @@ describe("idempotency, timing and ending", () => {
     const { say } = makeGateway();
     const out = say("Crew 2, what are you doing?").outcomes[0]!;
     expect(out.reply).toBe("Crew 2 is heading to Waterworks. Return estimate: 240 incident seconds.");
-    expect(statusReply("Scout", null)).toBe("Scout has nothing to report.");
+    expect(statusReply("Crew 3", null)).toBe("Crew 3 has nothing to report.");
   });
 
   it("matches spoken names against public names", () => {
@@ -751,29 +751,29 @@ describe("ScriptedInterpreter robustness", () => {
       directory: odd,
       activeRecipientCallsign: null,
     };
-    expect(() => interpreter.interpret({ ...request, text: "relay crew (1's latest report to Scout" })).not.toThrow();
-    const env = interpreter.interpret({ ...request, text: "relay crew (1's latest report to Scout" });
+    expect(() => interpreter.interpret({ ...request, text: "relay crew (1's latest report to Crew 3" })).not.toThrow();
+    const env = interpreter.interpret({ ...request, text: "relay crew (1's latest report to Crew 3" });
     expect(env?.kind).toBe("relay");
     expect(env?.evidenceQueries[0]?.sourceName).toBe("Crew (1");
   });
 });
 
 describe("scripted demo phrases (#42)", () => {
-  const reports = [scoutReport("obs:scout:90000", 90_000)];
+  const reports = [crewReport("obs:crew-1:90000", 90_000)];
 
   it.each([
-    "Relay the scout's latest observation to Crew 2",
-    "Crew 2, use Scout's latest report",
-    "Crew 2, use Scout's latest east corridor report",
-    "Pass Scout's latest sighting to Crew 2",
-  ])("relays the scout's report once it exists: %s", (phrase) => {
+    "Relay Crew 1's latest observation to Crew 2",
+    "Crew 2, use Crew 1's latest report",
+    "Crew 2, use Crew 1's latest east corridor report",
+    "Pass Crew 1's latest sighting to Crew 2",
+  ])("relays the crew's report once it exists: %s", (phrase) => {
     const out = makeGateway({ reports }).say(phrase).outcomes[0]!;
     expect(out.receipt.recipientId).toBe("crew-2");
-    expect(out.actions.find((a) => a.kind === "relay")).toMatchObject({ observationId: "obs:scout:90000", toAgentId: "crew-2" });
+    expect(out.actions.find((a) => a.kind === "relay")).toMatchObject({ observationId: "obs:crew-1:90000", toAgentId: "crew-2" });
   });
 
   it("says plainly that no report was received instead of inventing one", () => {
-    const out = makeGateway({ reports: [] }).say("Relay the scout's latest observation to Crew 2").outcomes[0]!;
+    const out = makeGateway({ reports: [] }).say("Relay Crew 1's latest observation to Crew 2").outcomes[0]!;
     expect(out.receipt.status).toBe("clarification_required");
     expect(out.reply).toMatch(/no received report/);
   });

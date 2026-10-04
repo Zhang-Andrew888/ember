@@ -48,7 +48,7 @@ describe("scenario validation", () => {
     expect(siteNode).toMatchObject({ id: "n-sb", x: 1650, y: 800 });
     expect(cellsWithin(1650, 800, SIM_DEFAULTS.siteExposureRadiusM)).toEqual([]);
     const gates = scenarioGates(shifted);
-    expect(gates).toHaveLength(5);
+    expect(gates).toHaveLength(4);
     for (const g of gates) expect(g.ok, `${g.gate}: ${g.detail}`).toBe(true);
     expect(validateScenario(shifted).filter((e) => /off the grid/.test(e)).sort()).toEqual([
       "node n-sa is off the grid",
@@ -108,7 +108,7 @@ describe("incident creation", () => {
 describe("scenario geometry gates", () => {
   it("passes every acceptance gate for the synthetic scenario", () => {
     const gates = scenarioGates(buildSyntheticScenario());
-    expect(gates.map((g) => g.gate)).toEqual(["ignition clearance", "travel time", "alternative approach", "constrained segment", "scouting points"]);
+    expect(gates.map((g) => g.gate)).toEqual(["ignition clearance", "travel time", "alternative approach", "constrained segment"]);
     for (const g of gates) expect(g.ok, `${g.gate}: ${g.detail}`).toBe(true);
   });
 
@@ -118,9 +118,8 @@ describe("scenario geometry gates", () => {
     expect(closeFire.find((g) => g.gate === "ignition clearance")?.ok).toBe(false);
     // Remove the alternative routes: only the corridor road remains to the sites.
     const keep = new Set(["e-rw-j1", "e-j1-s", "e-s-h", "e-h-sa", "e-h-sb", "e-h-sc"]);
-    const single = { ...s, map: { ...s.map, edges: s.map.edges.filter((e) => keep.has(e.id)), refuges: [s.map.refuges[0]!], nodes: s.map.nodes.filter((n) => n.id !== "n-rs" && n.id !== "n-n"), scoutPoints: [NodeId.parse("n-s")] } };
+    const single = { ...s, map: { ...s.map, edges: s.map.edges.filter((e) => keep.has(e.id)), refuges: [s.map.refuges[0]!], nodes: s.map.nodes.filter((n) => n.id !== "n-rs" && n.id !== "n-n") } };
     const gates = scenarioGates({ ...single, agents: [s.agents[0]!] });
     expect(gates.find((g) => g.gate === "alternative approach")?.ok).toBe(false);
-    expect(gates.find((g) => g.gate === "scouting points")?.ok).toBe(false);
   });
 });

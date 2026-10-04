@@ -95,10 +95,18 @@ export function resolveEdgeHeading(
   return { dx: (sign * dx) / length, dz: (sign * dz) / length };
 }
 
-/** Resolves any CoordinatorAgentView position (edge or node) to a scene point. */
+/** Resolves any CoordinatorAgentView position to a scene point. */
 export function resolveAgentPosition(map: ScenarioMap, position: AgentPosition): SceneVector | null {
   if (position.kind === "node") {
     return resolveNodePosition(map, position.nodeId);
+  }
+  if (position.kind === "offroad") {
+    const { start, end, progress } = position;
+    return worldToScene(
+      start.x + (end.x - start.x) * progress,
+      start.y + (end.y - start.y) * progress,
+      map.worldMeters,
+    );
   }
   return resolveEdgePoint(map, position.edgeId, position.distanceAlongPolyline);
 }

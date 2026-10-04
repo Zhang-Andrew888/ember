@@ -4,6 +4,7 @@ import {
   Incident,
   authoredCommit,
   buildSyntheticScenario,
+  osmMontclairScenario,
   recordOf,
   replayRecord,
   type SimScenario,
@@ -153,7 +154,7 @@ describe("information boundary", () => {
       expect(text).not.toContain(forbidden);
     }
     const view: CoordinatorView = inc.projectCoordinator();
-    // Fire the coordinator has not observed is absent: only the briefed patch is known burning.
+    // observedCells holds observations only: just the briefed patch is known burning there.
     const burning = view.observedCells.filter((c) => c.burnState === "burning");
     expect(burning.length).toBeGreaterThanOrEqual(4);
     expect(burning.length).toBeLessThan(40);
@@ -188,49 +189,50 @@ describe("information boundary", () => {
 });
 
 describe("knowledge scoping and relay", () => {
-  function scoutScenario(): SimScenario {
-    const base = buildSyntheticScenario({ agents: ["crew-1", "scout"], sites: ["site-a"] });
-    const scout = base.agents.find((a) => a.id === "scout")!;
+  /** A second crew parked at the junction acts as the observer whose reports reach only the coordinator. */
+  function observerScenario(): SimScenario {
+    const base = buildSyntheticScenario({ agents: ["crew-1", "crew-2"], sites: ["site-a"] });
+    const observer = base.agents.find((a) => a.id === "crew-2")!;
     return {
       ...base,
-      agents: base.agents.map((a) => (a.id === "scout" ? { ...scout, startNodeId: NodeId.parse("n-j1") } : a)),
+      agents: base.agents.map((a) => (a.id === "crew-2" ? { ...observer, startNodeId: NodeId.parse("n-j1") } : a)),
       map: { ...base.map, initialFireCells: [cellIndexOf(450, 850)!] },
     };
   }
 
-  it("keeps a scout observation with the coordinator until it is relayed to one crew", () => {
-    const inc = new Incident({ scenario: scoutScenario(), seed: "k", overrides: { spreadMultiplier: 1, windShiftMs: 1e9, initialWindRad: 0 } });
+  it("keeps another crew's observation with the coordinator until it is relayed to one crew", () => {
+    const inc = new Incident({ scenario: observerScenario(), seed: "k", overrides: { spreadMultiplier: 1, windShiftMs: 1e9, initialWindRad: 0 } });
     const crewHashBefore = inc.projectAgent(crew1).inputHash;
     inc.advanceTo(90_000);
-    const scoutObs = inc.coordinator
+    const observerObs = inc.coordinator
       .observations()
-      .filter((o) => o.sourceAgentId === "scout" && o.observedFields.some((f) => f.kind === "cell" && f.burnState === "burning"))
+      .filter((o) => o.sourceAgentId === "crew-2" && o.observedFields.some((f) => f.kind === "cell" && f.burnState === "burning"))
       .at(-1);
-    expect(scoutObs).toBeDefined();
-    const burningCell = scoutObs!.observedFields.find((f) => f.kind === "cell" && f.burnState === "burning");
+    expect(observerObs).toBeDefined();
+    const burningCell = observerObs!.observedFields.find((f) => f.kind === "cell" && f.burnState === "burning");
     const cell = burningCell && burningCell.kind === "cell" ? burningCell.gridCellIndex : -1;
     // Coordinator knows; the crew does not and its planning input is unchanged.
     expect(inc.coordinator.cellBelief(cell)?.state).toBe("burning");
     expect(inc.agentStores.get(crew1)?.cellBelief(cell)).toBeUndefined();
     expect(inc.projectAgent(crew1).inputHash).toBe(crewHashBefore);
 
-    inc.submit({ kind: "relay", observationId: scoutObs!.id, toAgentId: crew1 });
+    inc.submit({ kind: "relay", observationId: observerObs!.id, toAgentId: crew1 });
     inc.advanceTo(95_000);
     const belief = inc.agentStores.get(crew1)?.cellBelief(cell);
     expect(belief?.state).toBe("burning");
     expect(belief?.provenance).toBe("relay");
-    expect(belief?.sourceAgentId).toBe("scout");
-    expect(belief?.observedAt).toBe(scoutObs!.observedAt);
+    expect(belief?.sourceAgentId).toBe("crew-2");
+    expect(belief?.observedAt).toBe(observerObs!.observedAt);
     expect(belief?.receivedAt).toBe(91_000);
     expect(inc.projectAgent(crew1).inputHash).not.toBe(crewHashBefore);
     // Other agents stay unchanged by a targeted relay.
-    expect(inc.projectAgent(AgentId.parse("scout")).knowledge.observations.every((o) => o.sourceAgentId !== "crew-1")).toBe(true);
+    expect(inc.projectAgent(AgentId.parse("crew-2")).knowledge.observations.every((o) => o.sourceAgentId !== "crew-1")).toBe(true);
   });
 
   it("applies a plan built on earlier knowledge before a relay that lands in the same step", () => {
-    const inc = new Incident({ scenario: scoutScenario(), seed: "k", overrides: { spreadMultiplier: 1, windShiftMs: 1e9, initialWindRad: 0 } });
+    const inc = new Incident({ scenario: observerScenario(), seed: "k", overrides: { spreadMultiplier: 1, windShiftMs: 1e9, initialWindRad: 0 } });
     inc.advanceTo(90_000);
-    const obs = inc.coordinator.observations().filter((o) => o.sourceAgentId === "scout").at(-1)!;
+    const obs = inc.coordinator.observations().filter((o) => o.sourceAgentId === "crew-2").at(-1)!;
     const plan = mission(inc);
     // The relay is queued first, but the plan was stamped with the revision the crew had.
     inc.submit({ kind: "relay", observationId: obs.id, toAgentId: crew1 });
@@ -242,7 +244,7 @@ describe("knowledge scoping and relay", () => {
   });
 
   it("does not create a fabricated observation for an unknown relay id", () => {
-    const inc = new Incident({ scenario: scoutScenario(), seed: "k", overrides: { spreadMultiplier: 1, windShiftMs: 1e9, initialWindRad: 0 } });
+    const inc = new Incident({ scenario: observerScenario(), seed: "k", overrides: { spreadMultiplier: 1, windShiftMs: 1e9, initialWindRad: 0 } });
     const before = inc.projectAgent(crew1).knowledge.observations.length;
     inc.submit({ kind: "relay", observationId: "obs:does-not-exist", toAgentId: crew1 });
     inc.advanceTo(2000);
@@ -276,5 +278,122 @@ describe("coordinator view sequence", () => {
     inc.advanceTo(12_000);
     expect(inc.eventCount).toBe(events);
     expect(inc.projectCoordinator().sequence).toBeGreaterThan(sequence);
+  });
+});
+
+describe("coordinator current fire (#113)", () => {
+  /** Ignitions in all four corners of the map, far from every road, site and crew. */
+  function cornerFires(): number[] {
+    return [cellIndexOf(30, 30)!, cellIndexOf(1540, 30)!, cellIndexOf(30, 1540)!, cellIndexOf(1540, 1540)!];
+  }
+
+  function fromTruth(inc: Incident): { burning: number[]; burned: number[] } {
+    const burning: number[] = [];
+    const burned: number[] = [];
+    inc.truth().cellState.forEach((state, cell) => {
+      if (state === 2) burning.push(cell);
+      else if (state === 3) burned.push(cell);
+    });
+    return { burning, burned };
+  }
+
+  it("publishes burning and burned cells in every direction at the same tick, including unobserved fire", () => {
+    const inc = new Incident({ scenario: small(cornerFires()), seed: "cf1" });
+    inc.advanceTo(300_000);
+    const view = inc.projectCoordinator();
+    const truth = fromTruth(inc);
+    expect(view.currentFire).toEqual({ simTimeMs: view.simTimeMs, burningCells: truth.burning, burnedCells: truth.burned });
+    // All four corners are represented and none of them was ever in a crew's observation radius.
+    const known = new Set([...truth.burning, ...truth.burned]);
+    for (const corner of cornerFires()) expect(known.has(corner)).toBe(true);
+    expect(view.observedCells.filter((c) => c.burnState === "burning").length).toBeLessThan(truth.burning.length);
+  });
+
+  it("tracks the authoritative field on every step and agrees with the view tick", () => {
+    const inc = new Incident({ scenario: small(cornerFires()), seed: "cf2" });
+    for (let t = 1_000; t <= 60_000; t += 1_000) {
+      inc.advanceTo(t);
+      const view = inc.projectCoordinator();
+      const truth = fromTruth(inc);
+      expect(view.currentFire?.simTimeMs).toBe(view.simTimeMs);
+      expect(view.currentFire?.burningCells).toEqual(truth.burning);
+      expect(view.currentFire?.burnedCells).toEqual(truth.burned);
+    }
+  });
+
+  it("never includes future state: a snapshot is a subset of everything later", () => {
+    const inc = new Incident({ scenario: small(cornerFires()), seed: "cf3", overrides: noWindShift });
+    inc.advanceTo(100_000);
+    const early = inc.projectCoordinator().currentFire!;
+    inc.advanceTo(400_000);
+    const late = inc.projectCoordinator().currentFire!;
+    const lateKnown = new Set([...late.burningCells, ...late.burnedCells]);
+    for (const cell of [...early.burningCells, ...early.burnedCells]) expect(lateKnown.has(cell)).toBe(true);
+    expect(lateKnown.size).toBeGreaterThan(early.burningCells.length + early.burnedCells.length);
+    // The early snapshot did not already contain cells that only ignited afterwards.
+    const earlyKnown = new Set([...early.burningCells, ...early.burnedCells]);
+    expect([...lateKnown].some((cell) => !earlyKnown.has(cell))).toBe(true);
+  });
+
+  it("serializes no private parameters, timers or extra keys with currentFire", () => {
+    const inc = new Incident({
+      scenario: small(cornerFires()),
+      seed: "secret-seed-cf4",
+      overrides: { spreadMultiplier: 1.2345678, windShiftMs: 311_111 },
+    });
+    inc.advanceTo(200_000);
+    const view = inc.projectCoordinator();
+    expect(Object.keys(view.currentFire!).sort()).toEqual(["burnedCells", "burningCells", "simTimeMs"]);
+    const text = JSON.stringify(view);
+    for (const forbidden of ["secret-seed-cf4", "spreadMultiplier", "windShift", "privateWorld", "ignitedAt", "1.2345678", "311111"]) {
+      expect(text).not.toContain(forbidden);
+    }
+  });
+
+  it("keeps crew projections free of current fire and independent of unobserved fire", () => {
+    // Same briefed patch; hidden spread differs, so the unobserved fire (and the coordinator feed) differs.
+    const make = (mult: number): Incident =>
+      new Incident({ scenario: buildSyntheticScenario(), seed: "cf5", overrides: { spreadMultiplier: mult, windShiftMs: 300_000 + mult * 1000 } });
+    const a = make(0.7);
+    const b = make(1.5);
+    a.advanceTo(60_000);
+    b.advanceTo(60_000);
+    expect(a.projectCoordinator().currentFire?.burningCells).not.toEqual(b.projectCoordinator().currentFire?.burningCells);
+    expect(a.projectAgent(crew1).inputHash).toBe(b.projectAgent(crew1).inputHash);
+    const text = JSON.stringify(a.projectAgent(crew1));
+    for (const forbidden of ["currentFire", "burningCells", "burnedCells"]) expect(text).not.toContain(forbidden);
+  });
+
+  it("leaves coordinator observedCells as observations only", () => {
+    const inc = new Incident({ scenario: small(cornerFires()), seed: "cf6" });
+    inc.advanceTo(200_000);
+    const view = inc.projectCoordinator();
+    const observed = new Set(view.observedCells.map((c) => c.gridCellIndex));
+    const current = new Set([...view.currentFire!.burningCells, ...view.currentFire!.burnedCells]);
+    expect(observed.size).toBeLessThan(current.size);
+  });
+});
+
+describe("crews only, no scout (#117)", () => {
+  it("has no scout agent in the live coordinator view of the default scenarios", () => {
+    for (const scenario of [buildSyntheticScenario(), osmMontclairScenario()]) {
+      const inc = new Incident({ scenario, seed: "no-scout" });
+      inc.advanceTo(30_000);
+      const view = inc.projectCoordinator();
+      expect(view.agents.map((a) => a.callsign)).toEqual(["Crew 1", "Crew 2", "Crew 3"]);
+      expect(view.agents.some((a) => a.role === "scout")).toBe(false);
+      expect(JSON.stringify(view).toLowerCase()).not.toContain("scout");
+    }
+  });
+
+  it("keeps crew observations and coordinator reports flowing without a scout", () => {
+    const inc = new Incident({ scenario: buildSyntheticScenario(), seed: "no-scout-2", overrides: noWindShift });
+    inc.advanceTo(10_000);
+    const view = inc.projectCoordinator();
+    // The briefed patch and what the crews sense reach the coordinator; no observation comes from a scout.
+    expect(view.observedCells.some((c) => c.burnState === "burning")).toBe(true);
+    const observers = new Set(view.observedCells.map((c) => c.observerAgentId as string));
+    expect([...observers].some((id) => id.startsWith("crew-"))).toBe(true);
+    expect([...observers].every((id) => id === "briefing" || id.startsWith("crew-"))).toBe(true);
   });
 });

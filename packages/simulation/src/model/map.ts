@@ -56,7 +56,6 @@ export const PublicMap = z.object({
   edges: z.array(MapEdge),
   sites: z.array(MapSite),
   refuges: z.array(MapRefuge),
-  scoutPoints: z.array(NodeId),
   /** Seed of the authored fuel and height layers (public, unlike the world seed). */
   terrainSeed: z.string(),
   /** Flat grid indices of the briefed initial burning patch. */

@@ -1,7 +1,7 @@
 // Build the frozen OSM scenario from the packaged Overpass extract.
 //   pnpm --filter @ember/simulation build && node packages/simulation/scripts/osm-to-scenario.mjs
 // Reads data/osm-montclair-roads.json, tries 1.6 km crops of it (docs/SIMULATION.md: shift the crop rather
-// than invent roads), keeps real road geometry, and picks the authored layer (refuges, sites, scouting points,
+// than invent roads), keeps real road geometry, and picks the authored layer (refuges, sites,
 // the single-capacity segment, ignition) so the crop passes the documented geometry gates. Deterministic: the
 // same extract always yields the same scenario. Writes data/scenario-osm-montclair-v1.json plus provenance.
 import { readFileSync, writeFileSync } from "node:fs";
@@ -217,18 +217,10 @@ function assemble(x0, y0, g) {
       }
     }
     if (corridor === null) continue;
-    // Scouting points: three nodes with pairwise disjoint 150 m observation discs, favoring the corridor ends.
-    const scoutPool = [corridor.edge.from, corridor.edge.to, ...nodes].filter((n) => ![rw, rs].includes(n));
-    const scouts = [];
-    for (const c of scoutPool) {
-      if (scouts.every((s) => Math.hypot(pt(s).x - pt(c).x, pt(s).y - pt(c).y) > 330) && !scouts.includes(c)) scouts.push(c);
-      if (scouts.length === 3) break;
-    }
-    if (scouts.length < 3) continue;
     const score = picks.reduce((acc, s) => acc + Math.min(d(rw, s), d(rs, s)), 0) + corridor.hits * 1000;
-    if (bestLayout === null || score > bestLayout.score) bestLayout = { rw, rs, picks, corridor: corridor.edge, scouts, score };
+    if (bestLayout === null || score > bestLayout.score) bestLayout = { rw, rs, picks, corridor: corridor.edge, score };
   }
-  if (bestLayout === null) return fail(refugeCandidates.length === 0 ? "no refuge pair" : "no site/corridor/scout layout");
+  if (bestLayout === null) return fail(refugeCandidates.length === 0 ? "no refuge pair" : "no site/corridor layout");
   return { ...bestLayout, edges, pt, adjList };
 }
 
@@ -303,7 +295,6 @@ for (let x0 = Math.ceil(minX); x0 + SIZE <= maxX; x0 += 50) {
           { id: "refuge-west", name: "Refuge West", nodeId: nodeIds.get(layout.rw) },
           { id: "refuge-south", name: "Refuge South", nodeId: nodeIds.get(layout.rs) },
         ],
-        scoutPoints: layout.scouts.map((n) => nodeIds.get(n)),
         terrainSeed: "osm-montclair-terrain",
         initialFireCells: [0],
       },
@@ -311,7 +302,6 @@ for (let x0 = Math.ceil(minX); x0 + SIZE <= maxX; x0 += 50) {
         { id: "crew-1", role: "protection_crew", callsign: "Crew 1", startNodeId: nodeIds.get(layout.rw) },
         { id: "crew-2", role: "protection_crew", callsign: "Crew 2", startNodeId: nodeIds.get(layout.rw) },
         { id: "crew-3", role: "protection_crew", callsign: "Crew 3", startNodeId: nodeIds.get(layout.rs) },
-        { id: "scout", role: "scout", callsign: "Scout", startNodeId: nodeIds.get(layout.rs) },
       ],
       briefing:
         "Montclair hills incident. Road geometry is from OpenStreetMap (© OpenStreetMap contributors, ODbL); terrain, fuel, sites, refuges, the single-capacity segment and the ignition are authored.",
@@ -335,8 +325,8 @@ for (let x0 = Math.ceil(minX); x0 + SIZE <= maxX; x0 += 50) {
 // All gates first; then prefer a travel time in the middle of its 150-350 s window; then a mid-incident closure.
 results.sort((a, b) => b.passed - a.passed || Math.abs(a.median - 250) - Math.abs(b.median - 250) || Math.abs(a.closedAt - 500_000) - Math.abs(b.closedAt - 500_000));
 console.log("layout failures:", Object.fromEntries(failures));
-console.log(`${results.length} crops produced a candidate layout; best gate counts:`, results.slice(0, 5).map((r) => `${r.passed}/5 @(${r.x0},${r.y0}) ${r.edges} edges`).join(" | "));
-const winner = results.find((r) => r.passed === 5);
+console.log(`${results.length} crops produced a candidate layout; best gate counts:`, results.slice(0, 5).map((r) => `${r.passed}/${r.gates.length} @(${r.x0},${r.y0}) ${r.edges} edges`).join(" | "));
+const winner = results.find((r) => r.passed === r.gates.length);
 if (winner === undefined) {
   console.log("no crop passed all gates; closest:");
   for (const g of results[0]?.gates ?? []) console.log(`  ${g.ok ? "ok  " : "FAIL"} ${g.gate}: ${g.detail}`);
@@ -357,7 +347,7 @@ writeFileSync(
       cropOrigin: { x: winner.x0, y: winner.y0, sizeM: SIZE },
       scenarioHash: scenarioHash(winner.scenario),
       nodeIdFormat: "n-<OSM node id>; edge ids are e-<from OSM node>-<to OSM node>",
-      authored: ["terrain height and fuel (seeded)", "site, refuge and scouting-point selection", "single-capacity segment", "initial ignition patch"],
+      authored: ["terrain height and fuel (seeded)", "site and refuge selection", "single-capacity segment", "initial ignition patch"],
       osmWaysByEdge: winner.wayMap,
       omitted: ["highway=service (driveway) ways", "pedestrian and cycle ways, which the query excluded", "road segments with an end outside the crop"],
     },

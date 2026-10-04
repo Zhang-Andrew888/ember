@@ -112,10 +112,10 @@ describe("autonomous mission selection", () => {
   });
 
   it("is unaffected by a coordinator-only observation until it is relayed", () => {
-    const run = (withScout: boolean): string[] => {
-      const base = scenarioWith({ agents: withScout ? ["crew-1", "scout"] : ["crew-1"], fire: patch(450, 850) });
-      const scenario = withScout
-        ? { ...base, agents: base.agents.map((a) => (a.id === "scout" ? { ...a, startNodeId: NodeId.parse("n-j1") } : a)) }
+    const run = (withObserver: boolean): string[] => {
+      const base = scenarioWith({ agents: withObserver ? ["crew-1", "crew-2"] : ["crew-1"], fire: patch(450, 850) });
+      const scenario = withObserver
+        ? { ...base, agents: base.agents.map((a) => (a.id === "crew-2" ? { ...a, startNodeId: NodeId.parse("n-j1") } : a)) }
         : base;
       const inc = new Incident({ scenario, seed: "co", overrides: { spreadMultiplier: 1, windShiftMs: 1e9, initialWindRad: 0 } });
       const c = crew(scenario);
@@ -542,8 +542,8 @@ describe("older relayed clear versus fresh local fire", () => {
       });
     tracker.ingest([obs("local", 300_000, "burning", "crew-1")]);
     expect(tracker.closed.has(cell)).toBe(true);
-    // A coordinator relay of a scout's older "clear" arrives afterwards.
-    tracker.ingest([obs("local", 300_000, "burning", "crew-1"), obs("old-clear", 200_000, "unburned", "scout")]);
+    // A coordinator relay of another crew's older "clear" arrives afterwards.
+    tracker.ingest([obs("local", 300_000, "burning", "crew-1"), obs("old-clear", 200_000, "unburned", "crew-2")]);
     expect(tracker.closed.has(cell)).toBe(true);
   });
 });
@@ -570,6 +570,7 @@ describe("controller capabilities", () => {
     const scenario = scenarioWith({ fire: far });
     const c = crew(scenario);
     expect(c.capabilities).toEqual({ speedMps: 4, workRate: 1 });
-    expect(new CrewController({ agentId: crew1, callsign: "Scout", role: "scout", map: scenario.map }).capabilities.workRate).toBe(0);
+    // The scout role stays in the wire enum for old replays; it never protects.
+    expect(new CrewController({ agentId: crew1, callsign: "Legacy", role: "scout", map: scenario.map }).capabilities.workRate).toBe(0);
   });
 });

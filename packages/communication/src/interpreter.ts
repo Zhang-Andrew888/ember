@@ -45,7 +45,9 @@ export class ScriptedInterpreter implements Interpreter {
     const lower = text.toLowerCase();
     const callsigns = new Set<string>();
     for (const a of req.directory.agents) if (lower.includes(a.callsign.toLowerCase())) callsigns.add(a.callsign);
-    // "Scout's latest report" names a source, not a recipient, when the text asks to use/relay it.
+    // New incidents have no scout; addressing one still names a recipient so the gateway can say so.
+    const addressesScout = !req.directory.agents.some((a) => /\bscout\b/i.test(a.callsign)) && /^\s*(?:(?:hey|ok|okay)[,\s]+)?scouts?\b/i.test(text);
+    // "Crew 1's latest report" names a source, not a recipient, when the text asks to use/relay it.
     const usesReport = /\b(use|relay|pass|forward|tell)\b[^.]*\b(report|observation|sighting)\b/.test(lower) || /\blatest\b[^.]*\breport\b/.test(lower);
     const sources: string[] = [];
     if (usesReport) {
@@ -66,6 +68,7 @@ export class ScriptedInterpreter implements Interpreter {
     };
     if (names.length > 1) envelope.clarification = `Which one: ${names.join(" or ")}?`;
     else if (names.length === 1) envelope.explicitRecipient = names[0]!;
+    else if (addressesScout) envelope.explicitRecipient = "Scout";
 
     const claim = lower.match(CLAIM);
     if (claim !== null) envelope.unsupportedClaims.push(text.trim());
@@ -104,8 +107,7 @@ export class ScriptedInterpreter implements Interpreter {
       };
       if (!movement && names.length === 0) envelope.kind = "clarification_answer";
     } else if (/\b(scout|observe|check|look at)\b/.test(lower) && !usesReport) {
-      const point = req.directory.scoutPoints.find((p) => lower.includes(p.name.toLowerCase()));
-      envelope.objective = { kind: "observe", ...(point === undefined ? {} : { targetName: point.name }) };
+      envelope.objective = { kind: "observe" };
     } else if (/\b(avoid)\b/.test(lower)) {
       const location = req.directory.locations.find((l) => lower.includes(l.name.toLowerCase()));
       envelope.objective = { kind: "avoid", ...(location === undefined ? {} : { targetName: location.name }) };

@@ -1,14 +1,14 @@
 import { AgentId } from "@ember/domain";
 import { hashValue } from "@ember/knowledge";
-import { CrewController, DispatchController, ScoutController, type ControllerConfig } from "@ember/agents";
+import { CrewController, DispatchController, type ControllerConfig } from "@ember/agents";
 import { computeMetrics, percentile, summarize, type MetricsSummary, type RunBundle, type RunMetrics } from "@ember/replay";
 import { buildSyntheticScenario, recordOf, type PrivateOverrides, type SimScenario } from "@ember/simulation";
 import { POLICY_NAME, POLICY_VERSION, ScriptedCoordinatorPolicy, type RelayLogEntry } from "./policy.js";
 import { IncidentSession, type ControllerFactory } from "./session.js";
 
-export type Variant = "dispatch" | "forecast_no_scout" | "ember_line";
+export type Variant = "dispatch" | "ember_line";
 
-export const VARIANTS: readonly Variant[] = ["dispatch", "forecast_no_scout", "ember_line"];
+export const VARIANTS: readonly Variant[] = ["dispatch", "ember_line"];
 
 /** Failure injection on seams the product really has: sensors and the coordinator relay path. */
 export type Fault =
@@ -40,7 +40,7 @@ export interface RunResult {
 export function factoryFor(variant: Variant): ControllerFactory {
   return (spec, map, config) => {
     const common = { agentId: spec.id, callsign: spec.callsign, map, ...(config === undefined ? {} : { config }) };
-    if (spec.role === "scout") return variant === "ember_line" ? new ScoutController({ ...common, role: "scout" }) : null;
+    if (spec.role === "scout") return null;
     return variant === "dispatch" ? new DispatchController({ ...common, role: "protection_crew" }) : new CrewController({ ...common, role: "protection_crew" });
   };
 }
