@@ -2,7 +2,7 @@ import { z } from "zod";
 import { AgentId, EdgeId, MissionPlanId, NodeId, SiteId } from "./ids.js";
 import { SequenceNumber, SimTimeMs, WallTimeMs, WorkUnits } from "./units.js";
 import { AgentPosition } from "./position.js";
-import { AgentRole, AgentState, ContainmentWorkResult, IncidentEnd, MissionWork } from "./records.js";
+import { AgentRole, AgentState, ContainmentWorkResult, IncidentEnd, MissionWork, OffroadTimedLeg } from "./records.js";
 import { WIRE_PROTOCOL_VERSION } from "./wire-protocol.js";
 
 /** Agent fields the coordinator serializer is allowed to send. */
@@ -30,6 +30,7 @@ export const CoordinatorAgentPlanView = z.object({
   agentId: AgentId,
   planId: MissionPlanId,
   legs: z.array(CoordinatorPlanLegView),
+  offroadLegs: z.array(OffroadTimedLeg).optional(),
   workInterval: z.object({ startMs: SimTimeMs, endMs: SimTimeMs }),
   /** When present, distinguishes structure protection from fire suppression on the map. */
   work: MissionWork.optional(),

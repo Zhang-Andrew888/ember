@@ -122,7 +122,7 @@ export function planRetreat(ctx: PlanningContext): ReturnPlan | null {
   const seeds: Label[] = [];
   if (ctx.position.kind === "node") {
     seeds.push({ node: ctx.position.nodeId, exposure: 0, timeMs: ctx.nowMs, legs: [] });
-  } else {
+  } else if (ctx.position.kind === "edge") {
     const pos = ctx.position;
     const edge = ctx.road.mustEdge(pos.edgeId);
     for (const [direction, delay] of [

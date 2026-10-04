@@ -31,4 +31,10 @@ describe("briefing/briefingContent", () => {
     expect(content.sites).toEqual(scenarioMap.briefing.sites);
     expect(content.preview).toBeNull();
   });
+
+  it("never lists a scout, even when the scenario roster still has one (#118)", () => {
+    const withScout = { ...scenarioMap, briefing: { ...scenarioMap.briefing, callsigns: ["Crew 1", "Scout", "Crew 2"] } };
+    expect(briefingContent(withScout, false).callsigns).toEqual(["Crew 1", "Crew 2"]);
+    expect(briefingContent(scenarioMap, true).callsigns.some((callsign) => /scout/i.test(callsign))).toBe(false);
+  });
 });

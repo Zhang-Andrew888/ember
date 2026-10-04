@@ -198,14 +198,10 @@ describe("losses", () => {
     expect(inc.end?.matchingReasons).toContain("all_protection_crews_lost");
   });
 
-  it("ends the incident when all crews are lost while the scout survives and is recorded alive", () => {
-    const s = scenarioWith({
-      agents: [
-        { id: "crew-1", start: "n-rw" },
-        { id: "scout", start: "n-rs" },
-      ],
-      fire: [at(300, 830)],
-    });
+  it("ends the incident when all crews are lost while a legacy scout (old replays) survives and is recorded alive", () => {
+    const base = scenarioWith({ agents: [{ id: "crew-1", start: "n-rw" }], fire: [at(300, 830)] });
+    // New scenarios have no scout; old replay scenarios still do, so build one by hand.
+    const s = { ...base, agents: [...base.agents, { id: AgentId.parse("scout"), role: "scout" as const, callsign: "Scout", startNodeId: NodeId.parse("n-rs") }] };
     const inc = new Incident({ scenario: s, seed: "l", overrides: normal });
     inc.submit(
       authoredCommit({

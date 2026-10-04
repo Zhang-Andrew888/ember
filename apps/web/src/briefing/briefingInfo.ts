@@ -1,3 +1,4 @@
+import { omitScoutCallsigns } from "../format/omitScout.js";
 import type { ScenarioMap } from "../map/scenarioMap.js";
 import { recordedMockStartSnapshot } from "../net/recordedMockPlayback.js";
 import { resolveScenario } from "../net/scenarioSelection.js";
@@ -54,7 +55,8 @@ export function briefingContent(map: ScenarioMap, mock: boolean, search = ""): B
     const selection = resolveScenario(search);
     const first = selection?.snapshots?.[0] ?? mockStart();
     const sites = first.sites.map((site) => ({ name: site.name, value: site.value as number }));
-    const callsigns = first.agents.map((agent) => agent.callsign);
+    // The demo presents crews only (#118), even if a recorded roster still lists a scout.
+    const callsigns = omitScoutCallsigns(first.agents.map((agent) => agent.callsign));
     const mapMatchesSites = sites.length === map.briefing.sites.length && sites.every((site) =>
       map.briefing.sites.some((mapped) => mapped.name === site.name && mapped.value === site.value));
     const initialBurning = first.observedCells
@@ -74,5 +76,5 @@ export function briefingContent(map: ScenarioMap, mock: boolean, search = ""): B
 
   // The live start contract does not return its public map before Start.
   // Avoid presenting local geometry as a verified live starting picture.
-  return { sites: map.briefing.sites, callsigns: map.briefing.callsigns, refugeNames, preview: null };
+  return { sites: map.briefing.sites, callsigns: omitScoutCallsigns(map.briefing.callsigns), refugeNames, preview: null };
 }

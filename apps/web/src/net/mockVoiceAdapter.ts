@@ -36,7 +36,7 @@ export interface MockVoiceAdapter {
 const DEFAULT_TRANSCRIPTS: readonly string[] = [
   "Status report, over.",
   "Crew 1, hold position and await instructions.",
-  "Relay the scout's latest observation.",
+  "Crew 2, report your status.",
 ];
 
 export function createMockVoiceAdapter(options: MockVoiceAdapterOptions = {}): MockVoiceAdapter {

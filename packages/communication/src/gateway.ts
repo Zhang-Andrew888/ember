@@ -253,7 +253,7 @@ export class CommandGateway {
     if (env.explicitRecipient !== undefined) {
       const m = matchName(env.explicitRecipient, this.env.directory.agents.map((a) => ({ id: a.id, name: a.callsign })));
       if (m.kind !== "unique") {
-        return this.ask(message, seq, env, m.kind === "ambiguous" ? "Which crew or scout do you mean?" : `I don't have a crew or scout called ${env.explicitRecipient}.`);
+        return this.ask(message, seq, env, m.kind === "ambiguous" ? "Which crew do you mean?" : this.unknownRecipient(env.explicitRecipient));
       }
       recipient = m.id;
       if (recipient !== this.active) {
@@ -262,7 +262,7 @@ export class CommandGateway {
         actions.push({ kind: "set_recipient", recipientId: AgentId.parse(recipient) });
       }
     }
-    if (recipient === null) return this.ask(message, seq, env, "Which crew or scout is this for?");
+    if (recipient === null) return this.ask(message, seq, env, "Which crew is this for?");
     const agent = this.env.directory.agents.find((a) => a.id === recipient)!;
     const recipientId = AgentId.parse(recipient);
     const now = this.env.nowSimMs();
@@ -307,15 +307,13 @@ export class CommandGateway {
         const kind = KIND_OF[o.kind]!;
         let targetId: string | null = null;
         let targetLabel = "";
-        if (o.kind === "protect" || o.kind === "observe" || o.kind === "avoid" || o.kind === "contain") {
+        if (o.kind === "protect" || o.kind === "avoid" || o.kind === "contain") {
           const pool =
             o.kind === "protect"
               ? this.env.directory.sites.map((s) => ({ id: s.id, name: s.name }))
-              : o.kind === "observe"
-                ? this.env.directory.scoutPoints.map((s) => ({ id: s.id, name: s.name }))
-                : o.kind === "contain"
-                  ? this.env.directory.locations.map((l) => ({ id: String(l.name), name: l.name }))
-                  : this.env.directory.corridors.map((s) => ({ id: s.id, name: s.name }));
+              : o.kind === "contain"
+                ? this.env.directory.locations.map((l) => ({ id: String(l.name), name: l.name }))
+                : this.env.directory.corridors.map((s) => ({ id: s.id, name: s.name }));
           if (o.targetName === undefined) {
             return this.ask(
               message,
@@ -323,11 +321,9 @@ export class CommandGateway {
               env,
               o.kind === "protect"
                 ? "Which site should it protect?"
-                : o.kind === "observe"
-                  ? "Which point should it observe?"
-                  : o.kind === "contain"
-                    ? "Which fire location should it contain?"
-                    : "Which corridor should it avoid?",
+                : o.kind === "contain"
+                  ? "Which fire location should it contain?"
+                  : "Which corridor should it avoid?",
               actions,
             );
           }
@@ -339,7 +335,7 @@ export class CommandGateway {
               env,
               m.kind === "ambiguous"
                 ? `Which one: ${m.ids.join(" or ")}?`
-                : `I don't know a ${o.kind === "protect" ? "site" : o.kind === "observe" ? "point" : o.kind === "contain" ? "location" : "corridor"} called ${o.targetName}.`,
+                : `I don't know a ${o.kind === "protect" ? "site" : o.kind === "contain" ? "location" : "corridor"} called ${o.targetName}.`,
               actions,
             );
           }
@@ -363,8 +359,8 @@ export class CommandGateway {
           rejectedObjective = `${agent.callsign} does not do protection work.`;
         } else if (o.kind === "contain" && agent.role !== "protection_crew") {
           rejectedObjective = `${agent.callsign} does not perform containment work.`;
-        } else if (o.kind === "observe" && agent.role !== "scout") {
-          rejectedObjective = `${agent.callsign} is not a scout.`;
+        } else if (o.kind === "observe") {
+          rejectedObjective = "there is no scout in this incident, so observation orders are not supported.";
         } else if (o.kind === "avoid" && agent.role !== "protection_crew") {
           rejectedObjective = `${agent.callsign} cannot take corridor-avoidance orders.`;
         } else {
@@ -409,6 +405,13 @@ export class CommandGateway {
     if (env.unsupportedClaims.length > 0) parts.push("That claim is not backed by a report, so no hazard was changed.");
     const status: CommandStatus = rejectedObjective !== null && actions.every((a) => a.kind === "set_recipient") ? "rejected" : "accepted";
     return this.finish(message, seq, status, recipientId, actions, parts.join(" "), evidence, notes, now);
+  }
+
+  /** Question for a named recipient that is not in the directory; scouts no longer exist in new incidents. */
+  private unknownRecipient(heard: string): string {
+    const known = this.env.directory.agents.map((a) => a.callsign).join(", ");
+    if (/\bscouts?\b/i.test(heard)) return `There is no scout in this incident. Known callsigns: ${known}.`;
+    return `I don't have a crew called ${heard}. Known callsigns: ${known}.`;
   }
 
   private ask(message: IncomingMessage, seq: number, env: IntentEnvelope, question: string, actions: readonly GatewayAction[] = []): GatewayOutcome {

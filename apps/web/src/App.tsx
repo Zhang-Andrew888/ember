@@ -42,6 +42,10 @@ import { MockPlaybackEndedOverlay } from "./components/MockPlaybackEndedOverlay.
 import { handleGrokAudioCue, PreparedSpeechPlayback } from "./net/grokSpeechPlayback.js";
 import { transcribeViaServer } from "./net/grokStt.js";
 import { fetchServerHealth, type ServerHealthResponse } from "./net/serverHealth.js";
+import { MapCommandPanel } from "./components/MapCommandPanel.js";
+import { applyReceipts, registerSentCommand, type MapCommandDelivery } from "./command/mapCommandDelivery.js";
+import { buildMoveDirectionDraft, type MapMovementDraft } from "./map/moveDirectionCommand.js";
+import { agentWorldPoint, sceneToWorld, worldToScenePoint } from "./map/worldPoint.js";
 
 const INCIDENT_ID = import.meta.env.VITE_INCIDENT_ID ?? "demo";
 const INCIDENT_TOKEN = import.meta.env.VITE_INCIDENT_TOKEN as string | undefined;
@@ -66,6 +70,10 @@ export function App() {
   const [startError, setStartError] = useState<string | null>(null);
   const [client, setClient] = useState<CoordinatorViewClient | null>(null);
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
+  const [mapAssignMode, setMapAssignMode] = useState(false);
+  const [mapDraft, setMapDraft] = useState<MapMovementDraft | null>(null);
+  const [mapPickHint, setMapPickHint] = useState<string | null>(null);
+  const [mapDeliveries, setMapDeliveries] = useState<readonly MapCommandDelivery[]>([]);
   const [replaySource, setReplaySource] = useState<ReplaySource>("illustrative");
   const [replayRecording, setReplayRecording] = useState<IncidentReplayRecording | null>(null);
   const [replayLoading, setReplayLoading] = useState(false);
@@ -249,14 +257,14 @@ export function App() {
   const handleExitReplay = useCallback(() => setPhase("live"), []);
 
   const dispatchSay = useCallback(
-    (text: string) => {
+    (text: string): string => {
       const commandId = newCommandId();
       const simTimeMs = view ? (view.simTimeMs as number) : 0;
 
       const socket = protocolSocketRef.current;
       if (socket !== null) {
         socket.sendCommand({ type: "say", text, idempotencyKey: commandId });
-        return;
+        return commandId;
       }
 
       if (IS_MOCK_MODE) {
@@ -265,6 +273,7 @@ export function App() {
           setTimeout(() => mockSocketRef.current?.deliver(frame), 200 + index * 120);
         }
       }
+      return commandId;
     },
     [view],
   );
@@ -275,6 +284,69 @@ export function App() {
     },
     [dispatchSay],
   );
+
+  useEffect(() => {
+    setMapDeliveries((rows) => applyReceipts(rows, sideband.receipts));
+  }, [sideband.receipts]);
+
+  const selectedAgent = useMemo(
+    () => view?.agents.find((agent) => agent.id === selectedAgentId) ?? null,
+    [view, selectedAgentId],
+  );
+
+  const mapPreviewFrom = useMemo(() => {
+    if (selectedAgent === null || view === null) return null;
+    const scene = buildSceneEntities(view, scenarioMap).agents.find((a) => a.id === selectedAgent.id);
+    return scene ? { x: scene.position.x, z: scene.position.z } : null;
+  }, [selectedAgent, view]);
+
+  const mapPreviewTo = useMemo(() => {
+    if (mapDraft === null) return null;
+    return worldToScenePoint(mapDraft.to, scenarioMap.worldMeters);
+  }, [mapDraft]);
+
+  const latestMapDelivery = mapDeliveries.length > 0 ? mapDeliveries[mapDeliveries.length - 1]! : null;
+
+  const handleMapDestinationPick = useCallback(
+    (sceneX: number, sceneZ: number) => {
+      if (!mapAssignMode || selectedAgent === null) return;
+      const from = agentWorldPoint(scenarioMap, selectedAgent.position);
+      if (from === null) {
+        setMapPickHint("Could not read the crew position.");
+        return;
+      }
+      const to = sceneToWorld(sceneX, sceneZ, scenarioMap.worldMeters);
+      const draft = buildMoveDirectionDraft({
+        agentId: selectedAgent.id as string,
+        callsign: selectedAgent.callsign,
+        from,
+        to,
+      });
+      if (draft === null) {
+        setMapPickHint("Choose a destination at least 25 m from the crew.");
+        setMapDraft(null);
+        return;
+      }
+      setMapPickHint(null);
+      setMapDraft(draft);
+      setMapAssignMode(false);
+    },
+    [mapAssignMode, selectedAgent],
+  );
+
+  const handleSendMapCommand = useCallback(() => {
+    if (mapDraft === null) return;
+    const commandId = dispatchSay(mapDraft.commandText);
+    setMapDeliveries((rows) =>
+      registerSentCommand(rows, {
+        commandId,
+        commandText: mapDraft.commandText,
+        agentId: mapDraft.agentId,
+        callsign: mapDraft.callsign,
+      }),
+    );
+    setMapDraft(null);
+  }, [dispatchSay, mapDraft]);
 
   const handlePttBegin = useCallback(() => {
     speechStubRef.current.setRecording(true);
@@ -323,6 +395,42 @@ export function App() {
   const composerDisabled =
     connectionStatus !== "open" || Boolean(view?.incidentEnd) || (IS_MOCK_MODE && mockPlaybackEnded);
 
+  useEffect(() => {
+    if (phase !== "live") return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "m" && event.key !== "M") return;
+      const target = event.target;
+      if (target instanceof HTMLElement && (target.tagName === "INPUT" || target.tagName === "TEXTAREA")) return;
+      if (composerDisabled || selectedAgentId === null) return;
+      event.preventDefault();
+      setMapAssignMode((value) => !value);
+      setMapPickHint(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [phase, selectedAgentId, composerDisabled]);
+
+  const mapCommandPanel = (
+    <MapCommandPanel
+      assignMode={mapAssignMode}
+      onToggleAssignMode={() => {
+        setMapAssignMode((value) => !value);
+        setMapPickHint(null);
+      }}
+      selectedCallsign={selectedAgent?.callsign ?? null}
+      selectedAgentId={selectedAgentId}
+      draft={mapDraft}
+      pickHint={mapPickHint}
+      delivery={latestMapDelivery}
+      disabled={composerDisabled}
+      onSend={handleSendMapCommand}
+      onCancelDraft={() => {
+        setMapDraft(null);
+        setMapPickHint(null);
+      }}
+    />
+  );
+
   if (phase === "briefing") {
     return (
       <Briefing
@@ -369,6 +477,11 @@ export function App() {
             onInspectAgent={setSelectedAgentId}
             reducedMotion={reducedMotion}
             simTimeMs={view ? (view.simTimeMs as number) : null}
+            mapAssignMode={mapAssignMode}
+            mapPreviewFrom={mapPreviewFrom}
+            mapPreviewTo={mapPreviewTo}
+            onMapDestinationPick={handleMapDestinationPick}
+            mapCommandPanel={mapCommandPanel}
           />
           <ConversationPanel
             transcript={transcript}

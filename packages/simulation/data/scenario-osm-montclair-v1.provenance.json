@@ -16,11 +16,11 @@
     "y": -505,
     "sizeM": 1600
   },
-  "scenarioHash": "9dcd7f91ed859211c42ca4bf52b72b3a",
+  "scenarioHash": "9a3258eb5336fb24444cd23ef4adb17a",
   "nodeIdFormat": "n-<OSM node id>; edge ids are e-<from OSM node>-<to OSM node>",
   "authored": [
     "terrain height and fuel (seeded)",
-    "site, refuge and scouting-point selection",
+    "site and refuge selection",
     "single-capacity segment",
     "initial ignition patch"
   ],

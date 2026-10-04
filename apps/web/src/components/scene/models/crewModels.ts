@@ -2,10 +2,9 @@ import { BoxGeometry, ConeGeometry, CylinderGeometry, type BufferGeometry } from
 import { box, cone, cylinder, merge, PAINT, type Part, type Rgb } from "./geometry.js";
 
 /**
- * Crew and scout silhouettes, in scene units, facing +x, base at y = 0.
+ * Crew silhouette, in scene units, facing +x, base at y = 0.
  * A crew is a truck (long body, cab, bed, wheels) carrying 1..5 tally pegs on
- * its bed = the crew number; the scout is a pair of binoculars on a post - a
- * different outline at any zoom, not just a different colour.
+ * its bed = the crew number.
  */
 const DARK: Rgb = [0.1, 0.1, 0.11];
 const GLASS: Rgb = [0.72, 0.86, 1.0];
@@ -33,29 +32,6 @@ export function createCrewGeometry(crewNumber: number): BufferGeometry {
     const z = (i - (n - 1) / 2) * spacing;
     parts.push({ geometry: cylinder(1.1, 7, -8, 14, z, 6), color: PEG });
   }
-  return merge(parts);
-}
-
-export function createScoutGeometry(): BufferGeometry {
-  const parts: Part[] = [
-    { geometry: cylinder(1.8, 10, 0, 0, 0, 6), color: DARK }, // post
-    { geometry: box(6, 3, 5, 0, 9, 0), color: PAINT }, // saddle
-  ];
-  for (const z of [-5.5, 5.5]) {
-    const barrel = new CylinderGeometry(4.6, 4.6, 16, 10);
-    barrel.rotateZ(Math.PI / 2); // axis along x (forward)
-    barrel.translate(4, 17, z);
-    parts.push({ geometry: barrel, color: PAINT });
-    const lens = new CylinderGeometry(5.4, 5.4, 2.6, 10);
-    lens.rotateZ(Math.PI / 2);
-    lens.translate(12.5, 17, z);
-    parts.push({ geometry: lens, color: DARK });
-    const eyepiece = new CylinderGeometry(3.2, 3.2, 3, 10);
-    eyepiece.rotateZ(Math.PI / 2);
-    eyepiece.translate(-5.5, 17, z);
-    parts.push({ geometry: eyepiece, color: DARK });
-  }
-  parts.push({ geometry: box(8, 3, 6, 3, 15.5, 0), color: PAINT }); // bridge between the barrels
   return merge(parts);
 }
 
