@@ -7,6 +7,7 @@
  * status rather than throwing into the render tree.
  */
 
+import { PublicScenarioBriefing, ScenarioBriefingResponse } from "@ember/domain";
 import { ReplayRecording, type ReplayRecording as IncidentReplayRecording } from "../replay/recording.js";
 
 export type { IncidentReplayRecording };
@@ -16,6 +17,8 @@ export interface CreatedIncident {
   readonly token: string;
   /** Path or absolute URL for the events WebSocket (includes token query). */
   readonly websocketEventsPath: string;
+  /** Public scenario this incident runs, when the server includes a valid one. */
+  readonly scenario: PublicScenarioBriefing | null;
 }
 
 function restUrl(baseUrl: string, path: string): string {
@@ -49,16 +52,35 @@ export async function createIncident(baseUrl: string): Promise<CreatedIncident |
       incidentId?: string;
       token?: string;
       websocket?: { events?: string };
+      scenario?: unknown;
     };
     const events = data.websocket?.events;
     if (data.incidentId === undefined || data.token === undefined || events === undefined) {
       return null;
     }
+    const scenario = PublicScenarioBriefing.safeParse(data.scenario);
     return {
       incidentId: data.incidentId,
       token: data.token,
       websocketEventsPath: events,
+      scenario: scenario.success ? scenario.data : null,
     };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Public scenario the server will run for the next incident (`GET /scenario`), fetched before Start
+ * so the briefing can show the server's own starting picture. Null when unavailable or invalid; the
+ * briefing then falls back to the local roster without a map.
+ */
+export async function fetchScenarioBriefing(baseUrl: string): Promise<PublicScenarioBriefing | null> {
+  try {
+    const response = await fetch(restUrl(baseUrl, "/scenario"));
+    if (!response.ok) return null;
+    const parsed = ScenarioBriefingResponse.safeParse(await response.json());
+    return parsed.success ? parsed.data.scenario : null;
   } catch {
     return null;
   }

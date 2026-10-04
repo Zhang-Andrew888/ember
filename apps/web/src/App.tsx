@@ -8,10 +8,12 @@ import { resolveScenario } from "./net/scenarioSelection.js";
 import {
   createIncident,
   fetchIncidentReplay,
+  fetchScenarioBriefing,
   resolveWebSocketUrl,
   startIncident,
   type IncidentReplayRecording,
 } from "./net/incidentRestClient.js";
+import type { PublicScenarioBriefing } from "@ember/domain";
 import { newCommandId } from "./net/commandId.js";
 import { planStart, START_FAILED_MESSAGE } from "./net/startPlan.js";
 import { transportModeFromStartPlan } from "./net/transportMode.js";
@@ -87,15 +89,19 @@ export function App() {
   const grokPlaybackRef = useRef(new PreparedSpeechPlayback());
   const reducedMotion = useReducedMotion();
   const [serverHealth, setServerHealth] = useState<ServerHealthResponse | null>(null);
+  const [liveScenario, setLiveScenario] = useState<PublicScenarioBriefing | null>(null);
   const briefing = useMemo(
-    () => briefingContent(scenarioMap, IS_MOCK_MODE, typeof window === "undefined" ? "" : window.location.search),
-    [],
+    () =>
+      briefingContent(scenarioMap, IS_MOCK_MODE, typeof window === "undefined" ? "" : window.location.search, liveScenario),
+    [liveScenario],
   );
 
   useEffect(() => {
     if (!HAS_LIVE_REST) return;
     const base = REST_BASE_URL ?? "";
     void fetchServerHealth(base).then(setServerHealth);
+    // The briefing's starting picture comes from the server's published scenario, never the bundled map.
+    void fetchScenarioBriefing(base).then(setLiveScenario);
   }, []);
 
   const { status: connectionStatus, view, sideband } = useCoordinatorView(client);
@@ -197,6 +203,8 @@ export function App() {
         }
         liveSessionRef.current = { incidentId: created.incidentId, token: created.token };
         liveWsUrlRef.current = resolveWebSocketUrl(REST_BASE_URL ?? "", created.websocketEventsPath);
+        // The incident's own scenario is authoritative over the pre-start briefing fetch.
+        if (created.scenario !== null) setLiveScenario(created.scenario);
       }
       const nextClient = createCoordinatorViewClient(openSocket);
       if (!IS_MOCK_MODE) {

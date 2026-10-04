@@ -2,10 +2,12 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import {
   createIncident,
   fetchIncidentReplay,
+  fetchScenarioBriefing,
   resolveWebSocketUrl,
   startIncident,
 } from "./incidentRestClient.js";
 import { mockRecording } from "../replay/mockRecording.js";
+import { publicScenario } from "../briefing/publicScenario.fixture.js";
 
 describe("net/incidentRestClient - startIncident", () => {
   afterEach(() => {
@@ -83,12 +85,70 @@ describe("net/incidentRestClient - createIncident", () => {
       incidentId: "abc",
       token: "tok",
       websocketEventsPath: "/incidents/abc/events?token=tok",
+      scenario: null,
     });
+  });
+
+  it("keeps a valid scenario from the create response and drops an invalid one", async () => {
+    const respond = (scenario: unknown) =>
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: true,
+          json: async () => ({ incidentId: "abc", token: "tok", websocket: { events: "/e" }, scenario }),
+        }),
+      );
+    respond(publicScenario);
+    expect((await createIncident("http://localhost:3000"))?.scenario).toEqual(publicScenario);
+    respond({ ...publicScenario, nodes: [] });
+    expect((await createIncident("http://localhost:3000"))?.scenario).toBeNull();
   });
 
   it("returns null on failed response", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false }));
     expect(await createIncident("http://localhost:3000")).toBeNull();
+  });
+});
+
+describe("net/incidentRestClient - fetchScenarioBriefing", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("GET /scenario and returns the validated public scenario", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ protocolVersion: 1, scenario: publicScenario }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await fetchScenarioBriefing("http://localhost:3000")).toEqual(publicScenario);
+    expect(fetchMock).toHaveBeenCalledWith("http://localhost:3000/scenario");
+  });
+
+  it("strips fields the contract does not allow instead of passing them through", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          protocolVersion: 1,
+          scenario: { ...publicScenario, worldSeed: "secret", sites: [{ ...publicScenario.sites[0], requiredWork: 300 }] },
+        }),
+      }),
+    );
+    const scenario = await fetchScenarioBriefing("");
+    expect(scenario).not.toBeNull();
+    expect(JSON.stringify(scenario)).not.toContain("secret");
+    expect(JSON.stringify(scenario)).not.toContain("requiredWork");
+  });
+
+  it("returns null for a non-ok status, an invalid body, or a network failure", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false }));
+    expect(await fetchScenarioBriefing("http://localhost:3000")).toBeNull();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({ protocolVersion: 1 }) }));
+    expect(await fetchScenarioBriefing("http://localhost:3000")).toBeNull();
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("down")));
+    expect(await fetchScenarioBriefing("http://localhost:3000")).toBeNull();
   });
 });
 
