@@ -121,10 +121,32 @@ export const EvidenceReference = z.object({
 });
 export type EvidenceReference = z.infer<typeof EvidenceReference>;
 
+// ---------- Mission work (structure vs fire; not incident end) ----------
+
+/**
+ * What timed work at the mission anchor accomplishes.
+ * - `protect_structure`: site `completedWork` reduces structure damage (not burn spread).
+ * - `suppress_fire`: containment work on one grid cell (burn progression; deterministic slice TBD in sim).
+ * Incident terminal `fire_extinguished` (EndReason) is a world outcome, not a crew work class.
+ */
+export const MissionWork = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("protect_structure"),
+    siteId: SiteId,
+  }),
+  z.object({
+    kind: z.literal("suppress_fire"),
+    gridCellIndex: z.number().int().nonnegative().max(4095),
+  }),
+]);
+export type MissionWork = z.infer<typeof MissionWork>;
+
 // ---------- Objective ----------
 
 export const ObjectiveKind = z.enum([
   "protect_site",
+  /** Direct a crew to perform fire suppression / containment at a grid cell (see MissionWork.suppress_fire). */
+  "contain_fire",
   "scout_location",
   "return_to_refuge",
   "hold",
@@ -138,6 +160,11 @@ export const ObjectiveConstraints = z.object({
     .object({ minMs: SimTimeMs, maxMs: SimTimeMs })
     .optional(),
   deadline: SimTimeMs.optional(),
+  /**
+   * For `contain_fire`: optional explicit cell anchor (decimal string also allowed in `targetId`).
+   * Duration is still expressed via issued plan `workInterval` once committed.
+   */
+  gridCellIndex: z.number().int().nonnegative().max(4095).optional(),
 });
 export type ObjectiveConstraints = z.infer<typeof ObjectiveConstraints>;
 
@@ -145,7 +172,9 @@ export const Objective = z.object({
   id: ObjectiveId,
   recipientId: AgentId,
   kind: ObjectiveKind,
-  /** SiteId, NodeId, or other target identifier; null for hold/generic objectives. */
+  /**
+   * SiteId, corridor EdgeId, grid cell index (decimal string for `contain_fire`), or null for hold.
+   */
   targetId: z.string().nullable(),
   constraints: ObjectiveConstraints,
   issueSequence: SequenceNumber,
@@ -167,13 +196,33 @@ export const MissionPlan = z.object({
   recipientId: AgentId,
   knowledgeRevision: SequenceNumber,
   timedLegs: z.array(TimedLeg),
+  /** Sim-time window for on-scene work; length is the committed duration for structure or containment work. */
   workInterval: z.object({ startMs: SimTimeMs, endMs: SimTimeMs }),
+  /**
+   * When set, names work class and location. Omitted legacy plans imply structure protection via
+   * simulator `workSiteId` on commit.
+   */
+  work: MissionWork.optional(),
   refugeId: NodeId,
   reservationRevision: SequenceNumber,
   /** Non-null when a constraint caps the mission (e.g. forecast horizon). */
   limitingReason: z.string().nullable(),
 });
 export type MissionPlan = z.infer<typeof MissionPlan>;
+
+/** Reportable outcome after containment work completes or fails (coordinator-visible). */
+export const ContainmentOutcome = z.enum(["succeeded", "failed"]);
+export type ContainmentOutcome = z.infer<typeof ContainmentOutcome>;
+
+export const ContainmentWorkResult = z.object({
+  agentId: AgentId,
+  gridCellIndex: z.number().int().nonnegative().max(4095),
+  outcome: ContainmentOutcome,
+  /** e.g. `safety_refused`, `duration_elapsed`, `cell_burned_out` */
+  reasonCode: z.string(),
+  reportedAt: SimTimeMs,
+});
+export type ContainmentWorkResult = z.infer<typeof ContainmentWorkResult>;
 
 // ---------- DecisionEvent ----------
 
@@ -184,6 +233,10 @@ export const DecisionType = z.enum([
   "retreat_triggered",
   "stranded_reported",
   "objective_rejected",
+  /** Containment work finished with the cell no longer spreading (sim applies mechanics later). */
+  "containment_succeeded",
+  /** Containment work ended without success (includes safety refusal before or during work). */
+  "containment_failed",
   "idle",
 ]);
 export type DecisionType = z.infer<typeof DecisionType>;

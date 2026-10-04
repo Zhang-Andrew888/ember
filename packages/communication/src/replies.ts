@@ -62,6 +62,15 @@ export function replyForDecision(callsign: string, d: DecisionEvent, phrasing: P
     case "idle":
       text = phrasing === "radio" ? `${callsign}, holding. ${reason}` : `${callsign} is holding. ${reason}`;
       break;
+    case "containment_succeeded":
+      text = phrasing === "radio" ? `${callsign}, containment holding. ${action}` : `${callsign} reports containment holding. ${action}`;
+      break;
+    case "containment_failed":
+      text =
+        phrasing === "radio"
+          ? `${callsign}, containment failed. ${reason || action}`
+          : `${callsign} could not hold containment. ${reason || action}`;
+      break;
   }
   return { text: text.replace(/\s+/g, " ").trim(), tier };
 }
