@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { mockBriefing } from "../briefing/briefingInfo.js";
+import { briefingContent } from "../briefing/briefingInfo.js";
+import { scenarioMap } from "../map/activeScenario.js";
 import { Briefing } from "./Briefing.js";
 import { TopBar } from "./TopBar.js";
 import { UrgentStrip } from "./UrgentStrip.js";
@@ -11,7 +12,7 @@ import { DemoBanner } from "./DemoBanner.js";
 describe("components markup", () => {
   it("Briefing exposes start control and site list", () => {
     const html = renderToStaticMarkup(
-      createElement(Briefing, { onStart: () => {}, starting: false, content: mockBriefing, demoMode: false, transportMode: "live" }),
+      createElement(Briefing, { onStart: () => {}, starting: false, content: briefingContent(scenarioMap, true), demoMode: false, transportMode: "live" }),
     );
     expect(html).toContain("Start incident");
     expect(html).toContain("Sites to protect");
@@ -22,7 +23,7 @@ describe("components markup", () => {
       createElement(Briefing, {
         onStart: () => {},
         starting: false,
-        content: { sites: [{ name: "Test Site", value: 1 }], callsigns: ["Crew 1", "Crew 3", "Scout"] },
+        content: { sites: [{ name: "Test Site", value: 1 }], callsigns: ["Crew 1", "Crew 3", "Scout"], refugeNames: [], preview: null },
         demoMode: false,
         transportMode: "live",
       }),

@@ -726,62 +726,373 @@ input {
 
 /* ---------- Briefing ---------- */
 
+@font-face {
+  font-family: "Barlow Condensed";
+  src: url("/fonts/barlow-condensed-600.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Source Sans 3";
+  src: url("/fonts/source-sans-3-400.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Source Sans 3";
+  src: url("/fonts/source-sans-3-600.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+}
+
 .briefing {
-  max-width: 640px;
-  /* Padding, not margin: a vertical margin here leaks out of the full-height page and adds a scrollbar. */
+  --brief-bg: #11191c;
+  --brief-surface: #1b272b;
+  --brief-text: #f1f4ed;
+  --brief-muted: #b9c6c1;
+  --brief-line: #647b83;
+  --brief-accent: #ff6b35;
+  --brief-accent-hover: #ff8658;
+  --brief-accent-pressed: #e65a2b;
+  --brief-accent-ink: #11191c;
+  --brief-error: #ffaaa0;
+  --brief-space-1: 4px;
+  --brief-space-2: 8px;
+  --brief-space-3: 12px;
+  --brief-space-4: 16px;
+  --brief-space-5: 24px;
+  --brief-space-6: 32px;
+  --brief-space-7: 48px;
+  --brief-radius-control: 6px;
+  --brief-radius-panel: 10px;
+  --brief-shadow-panel: none;
+  --brief-shadow-focus: 0 0 0 3px #11191c, 0 0 0 5px #ff6b35;
+  min-height: 100%;
+  background: var(--brief-bg);
+  color: var(--brief-text);
+  font-family: "Source Sans 3", system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 24px;
+}
+
+.briefing__shell {
+  max-width: 1120px;
   margin: 0 auto;
-  padding: 0.75rem 1.5rem;
+  padding: var(--brief-space-6) 40px var(--brief-space-7);
+}
+
+.briefing__skip {
+  position: absolute;
+  top: var(--brief-space-3);
+  left: var(--brief-space-5);
+  z-index: 2;
+  padding: var(--brief-space-2) var(--brief-space-4);
+  color: var(--brief-accent-ink);
+  background: var(--brief-accent);
+  border-radius: var(--brief-radius-control);
+  transform: translateY(-150%);
+}
+
+.briefing__skip:focus-visible {
+  transform: translateY(0);
+  outline: none;
+  box-shadow: var(--brief-shadow-focus);
+}
+
+.briefing__masthead {
   display: flex;
-  flex-direction: column;
-  gap: 0.85rem;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--brief-space-4);
+  margin-bottom: var(--brief-space-7);
 }
 
-.briefing h2 {
-  margin: 0 0 0.35rem;
+.briefing__brand {
+  font-family: "Barlow Condensed", "Arial Narrow", sans-serif;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 24px;
 }
 
-.briefing__title {
-  letter-spacing: 0.08em;
+.briefing .transport-mode {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--brief-muted);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.briefing__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+  gap: 64px;
+}
+
+.briefing__intro h1 {
+  max-width: 14ch;
+  margin: 0 0 var(--brief-space-4);
+  font-family: "Barlow Condensed", "Arial Narrow", sans-serif;
+  font-size: 56px;
+  font-weight: 600;
+  line-height: 58px;
+  text-wrap: balance;
+}
+
+.briefing__intro p {
+  max-width: 62ch;
   margin: 0;
+  color: var(--brief-muted);
 }
 
-.briefing__incident-label {
-  opacity: 0.85;
-  font-style: italic;
+.briefing__preview {
+  margin: var(--brief-space-6) 0 0;
+}
+
+.briefing__preview figcaption {
+  margin-bottom: var(--brief-space-3);
+  color: var(--brief-muted);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.briefing__map {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: var(--brief-surface);
+  border: 1px solid var(--brief-line);
+  border-radius: var(--brief-radius-panel);
+}
+
+.briefing__map-label {
+  fill: var(--brief-text);
+  font: 600 13px "Source Sans 3", system-ui, sans-serif;
+  paint-order: stroke;
+  stroke: var(--brief-surface);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+
+.briefing__right {
+  min-width: 0;
+}
+
+.briefing__facts {
+  padding: var(--brief-space-5);
+  background: var(--brief-surface);
+  border: 1px solid var(--brief-line);
+  border-radius: var(--brief-radius-panel);
+  box-shadow: var(--brief-shadow-panel);
+}
+
+.briefing__facts section + section {
+  margin-top: var(--brief-space-5);
+  padding-top: var(--brief-space-5);
+  border-top: 1px solid var(--brief-line);
+}
+
+.briefing__facts h2 {
+  margin: 0 0 var(--brief-space-3);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 26px;
+}
+
+.briefing__site-heading,
+.briefing__site-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--brief-space-4);
+}
+
+.briefing__site-heading {
+  color: var(--brief-muted);
+  font-size: 13px;
+  line-height: 18px;
 }
 
 .briefing__sites,
 .briefing__callsigns,
-.briefing__legend {
+.briefing__refuges {
   list-style: none;
   margin: 0;
   padding: 0;
+}
+
+.briefing__site-row {
+  padding-top: var(--brief-space-2);
+  overflow-wrap: anywhere;
+}
+
+.briefing__site-value {
+  font-variant-numeric: tabular-nums;
+}
+
+.briefing__callsigns,
+.briefing__refuges {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: var(--brief-space-3);
+  overflow-wrap: anywhere;
+}
+
+.briefing__callsigns li:not(:last-child)::after,
+.briefing__refuges li:not(:last-child)::after {
+  content: ",";
+}
+
+.briefing__empty {
+  margin: 0;
+  color: var(--brief-muted);
+}
+
+.briefing__actions {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  align-items: flex-start;
+  gap: var(--brief-space-5);
+  margin-top: var(--brief-space-6);
 }
 
-.briefing__sites li {
+.briefing__voice-note,
+.briefing__demo-note,
+.briefing__mic-status {
+  margin: 0;
+  color: var(--brief-muted);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.briefing__voice-note {
+  margin-bottom: var(--brief-space-2);
+}
+
+.briefing__demo-note {
+  margin-top: var(--brief-space-2);
+}
+
+.briefing__mic {
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
+  align-items: flex-start;
 }
 
-.briefing__swatch {
-  display: inline-block;
-  width: 0.8rem;
-  height: 0.8rem;
-  border-radius: 2px;
-  margin-right: 0.5rem;
+.briefing__mic button {
+  min-height: 44px;
+  padding: var(--brief-space-2) 0;
+  border: 0;
+  border-radius: var(--brief-radius-control);
+  background: none;
+  color: var(--brief-text);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.briefing__mic button:hover {
+  color: var(--brief-accent-hover);
+}
+
+.briefing__mic button:active {
+  text-decoration-thickness: 2px;
+}
+
+.briefing__mic button:disabled {
+  color: var(--brief-muted);
+  cursor: default;
+}
+
+.briefing__mic-status:not(:empty) {
+  margin-top: var(--brief-space-1);
+}
+
+.briefing__error {
+  margin: 0;
+  color: var(--brief-error);
+}
+
+.briefing__error:focus {
+  outline: none;
+  box-shadow: var(--brief-shadow-focus);
 }
 
 .briefing__start {
-  align-self: flex-start;
-  padding: 0.6rem 1.25rem;
-  border-radius: 6px;
-  border: 1px solid var(--color-refuge);
-  background: var(--color-panel);
-  color: var(--color-text);
-  font-weight: 700;
+  width: min(200px, 100%);
+  min-height: 48px;
+  padding: var(--brief-space-3) var(--brief-space-5);
+  border: 1px solid var(--brief-accent);
+  border-radius: var(--brief-radius-control);
+  background: var(--brief-accent);
+  color: var(--brief-accent-ink);
+  font-weight: 600;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.briefing__start:hover:not(:disabled) {
+  background: var(--brief-accent-hover);
+  border-color: var(--brief-accent-hover);
+}
+
+.briefing__start:active:not(:disabled) {
+  background: var(--brief-accent-pressed);
+  border-color: var(--brief-accent-pressed);
+}
+
+.briefing__start:disabled {
+  background: var(--brief-surface);
+  border-color: var(--brief-line);
+  color: var(--brief-text);
+  cursor: default;
+}
+
+.briefing button:focus-visible,
+.briefing a:focus-visible {
+  outline: none;
+  box-shadow: var(--brief-shadow-focus);
+}
+
+@media (max-width: 760px) {
+  .briefing__shell {
+    padding: var(--brief-space-5) var(--brief-space-5) var(--brief-space-7);
+  }
+
+  .briefing__masthead {
+    margin-bottom: var(--brief-space-6);
+  }
+
+  .briefing__grid {
+    display: flex;
+    flex-direction: column;
+    gap: var(--brief-space-6);
+  }
+
+  .briefing__intro h1 {
+    font-size: 40px;
+    line-height: 42px;
+  }
+
+  .briefing__preview {
+    margin-top: var(--brief-space-5);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .briefing__start,
+  .briefing__mic button {
+    transition: background-color 140ms, border-color 140ms, color 140ms;
+  }
 }
 
 /* ---------- End overlay ---------- */
