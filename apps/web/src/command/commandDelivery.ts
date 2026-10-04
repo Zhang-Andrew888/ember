@@ -8,6 +8,7 @@ export type CommandDeliveryPhase =
   | "sent"
   | "interpreting"
   | "received"
+  | "replied"
   | "accepted"
   | "rejected"
   | "clarification_required"
@@ -28,6 +29,8 @@ export interface SentCommand {
   readonly submitted: boolean;
   /** `notices.length` when sent: only later notices can describe this command. */
   readonly noticeIndexAtSend: number;
+  /** `receipts.length` when sent: a later receipt under another id is a reply that may or may not be to this command. */
+  readonly receiptIndexAtSend: number;
 }
 
 export interface CommandDelivery extends SentCommand {
@@ -74,6 +77,11 @@ export function deriveDelivery(
   if (received !== undefined) {
     return { ...command, phase: "received", explanation: received.receipt.explanation || null };
   }
+  // The live server tags receipts with its own command ids, so a later reply cannot be tied to
+  // this command; say that Control replied without claiming what the reply decided.
+  if (receipts.length > command.receiptIndexAtSend) {
+    return { ...command, phase: "replied", explanation: null };
+  }
   return { ...command, phase: "sent", explanation: null };
 }
 
@@ -87,6 +95,8 @@ export function deliveryLabel(phase: CommandDeliveryPhase): string {
       return "Control is still interpreting";
     case "received":
       return "Received by Control";
+    case "replied":
+      return "Control has replied since this was sent";
     case "accepted":
       return "Accepted";
     case "rejected":
@@ -112,6 +122,8 @@ export function deliveryGuidance(phase: CommandDeliveryPhase): string | null {
       return "Control's reply appears in the conversation.";
     case "interpreting":
       return "Wait for the reply before resending.";
+    case "replied":
+      return "Read the reply in the conversation; it may answer this or an earlier message.";
     case "outcome_unknown":
       return "Check the conversation for a reply before resending.";
     default:
@@ -120,5 +132,5 @@ export function deliveryGuidance(phase: CommandDeliveryPhase): string | null {
 }
 
 export function isAwaitingOutcome(phase: CommandDeliveryPhase): boolean {
-  return phase === "sent" || phase === "interpreting" || phase === "received";
+  return phase === "sent" || phase === "interpreting" || phase === "received" || phase === "replied";
 }

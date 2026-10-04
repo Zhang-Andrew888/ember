@@ -153,6 +153,7 @@ describe("U02/U08/U14 map movement drafts", () => {
           callsign: "Crew 1",
           submitted: true,
           noticeIndexAtSend: 0,
+          receiptIndexAtSend: 0,
           phase: "sent",
           explanation: null,
         },

@@ -281,6 +281,8 @@ export function App() {
 
   const noticeCountRef = useRef(0);
   noticeCountRef.current = sideband.notices.length;
+  const receiptCountRef = useRef(0);
+  receiptCountRef.current = sideband.receipts.length;
 
   const dispatchSay = useCallback(
     (text: string): { readonly commandId: string; readonly submitted: boolean } => {
@@ -321,6 +323,7 @@ export function App() {
           callsign: recipient?.callsign ?? null,
           submitted: sent.submitted,
           noticeIndexAtSend: noticeCountRef.current,
+          receiptIndexAtSend: receiptCountRef.current,
         },
       ]);
     },

@@ -11,6 +11,7 @@ const sent: SentCommand = {
   callsign: "Crew 1",
   submitted: true,
   noticeIndexAtSend: 0,
+  receiptIndexAtSend: 0,
 };
 
 function receipt(commandId: string, status: CommandReceipt["status"], explanation = ""): SidebandReceipt {
@@ -38,9 +39,17 @@ describe("deriveDelivery", () => {
     expect(deriveDelivery({ ...sent, submitted: false }, [], []).phase).toBe("not_submitted");
   });
 
-  it("stays sent while no receipt carries this command's id", () => {
-    const delivery = deriveDelivery(sent, [receipt("cmd-7", "accepted")], []);
+  it("stays sent while no receipt has arrived since sending", () => {
+    const earlier = receipt("cmd-7", "accepted");
+    const delivery = deriveDelivery({ ...sent, receiptIndexAtSend: 1 }, [earlier], []);
     expect(delivery.phase).toBe("sent");
+    expect(isAwaitingOutcome(delivery.phase)).toBe(true);
+  });
+
+  it("says Control replied, without claiming an outcome, when a later receipt has another id", () => {
+    const delivery = deriveDelivery(sent, [receipt("cmd-7", "accepted")], []);
+    expect(delivery.phase).toBe("replied");
+    expect(deliveryLabel(delivery.phase)).not.toMatch(/accepted|refused/i);
     expect(isAwaitingOutcome(delivery.phase)).toBe(true);
   });
 
