@@ -10,6 +10,7 @@ import {
   SimTimeMs,
   WIRE_PROTOCOL_VERSION,
   WorkUnits,
+  scheduledLegCount,
   type AgentPosition,
   type CoordinatorAgentPlanView,
   type CoordinatorForecastView,
@@ -388,11 +389,12 @@ export class Incident {
       let phase: CoordinatorAgentPlanView["phase"] = "approach";
       if (agent.working) phase = "work";
       else if (c.hasWork && now >= c.plan.workInterval.endMs && c.legIndex >= c.approachCount) phase = "return";
-      else if (!c.hasWork && c.legIndex >= c.plan.timedLegs.length - 1 && now >= c.plan.workInterval.startMs) phase = "return";
+      else if (!c.hasWork && c.legIndex >= scheduledLegCount(c.plan) - 1 && now >= c.plan.workInterval.startMs) phase = "return";
       agentPlans.push({
         agentId: agent.id,
         planId: c.plan.id,
         legs: c.plan.timedLegs.map((leg) => ({ edgeId: leg.edgeId, direction: leg.direction })),
+        ...(c.plan.offroadLegs === undefined ? {} : { offroadLegs: c.plan.offroadLegs }),
         workInterval: c.plan.workInterval,
         ...(c.plan.work === undefined ? {} : { work: c.plan.work }),
         refugeId: c.plan.refugeId,
