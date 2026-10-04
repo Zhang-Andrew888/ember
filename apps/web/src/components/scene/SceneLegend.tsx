@@ -22,6 +22,8 @@ export interface SceneLegendProps {
   readonly forecast: ForecastLayer | null;
   /** Replay with the full fire on: explain the dashed frames. */
   readonly showUnseenKey?: boolean;
+  /** Firebreak cells on the map; the key entry shows only when there are some. */
+  readonly firebreakCount?: number;
   readonly canFollow: boolean;
   readonly follow: boolean;
   readonly onToggleFollow: () => void;
@@ -51,6 +53,7 @@ export const SceneLegend = forwardRef<HTMLDivElement, SceneLegendProps>(function
     onToggleForecast,
     forecast,
     showUnseenKey = false,
+    firebreakCount = 0,
     canFollow,
     follow,
     onToggleFollow,
@@ -131,6 +134,12 @@ export const SceneLegend = forwardRef<HTMLDivElement, SceneLegendProps>(function
           <li>
             <span className="scene-legend__swatch scene-legend__swatch--unseen" />
             Dashed frame: fire the coordinator has not observed (replay only)
+          </li>
+        ) : null}
+        {firebreakCount > 0 ? (
+          <li data-key="firebreak">
+            <span className="scene-legend__swatch scene-legend__swatch--firebreak" />
+            Firebreak: crosshatched cleared ground, fire cannot cross ({firebreakCount} cells)
           </li>
         ) : null}
         <li>

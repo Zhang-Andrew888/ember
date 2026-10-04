@@ -3,6 +3,7 @@ import { WebSocketServer } from "ws";
 import type { WebSocket } from "ws";
 import type { IncomingMessage } from "node:http";
 import { WIRE_PROTOCOL_VERSION } from "@ember/domain";
+import type { SimScenario } from "@ember/simulation";
 import { IncidentRegistry } from "./incident-registry.js";
 import { stopReplayWorker } from "./replay-offloop.js";
 import { grokVoiceEnabled } from "./xai/env.js";
@@ -76,9 +77,11 @@ function errorText(error: unknown): string {
  * Fastify HTTP routes plus WebSocket upgrade for `/incidents/:id/events` and `/incidents/:id/voice`.
  * Voice uses the same validated JSON push-to-talk messages as events (provider audio is future work).
  */
-export async function startHttpApp(options: { port?: number; clock?: MonotonicClock; seed?: string } = {}): Promise<HttpAppHandle> {
+export async function startHttpApp(
+  options: { port?: number; clock?: MonotonicClock; seed?: string; scenario?: SimScenario } = {},
+): Promise<HttpAppHandle> {
   const clock: MonotonicClock = options.clock ?? { nowMs: () => performance.now() };
-  const registry = new IncidentRegistry(options.seed);
+  const registry = new IncidentRegistry(options.seed, options.scenario);
   const fastify = Fastify({ logger: false });
   const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_MESSAGE_BYTES });
   const extraHosts = allowedHostsFromEnv(process.env.EMBER_ALLOWED_HOSTS);

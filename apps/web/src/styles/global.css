@@ -1399,6 +1399,14 @@ input {
   outline: 2px dashed #b79cff;
 }
 
+.scene-legend__swatch--firebreak {
+  background:
+    repeating-linear-gradient(45deg, #5c4a2e 0 1px, transparent 1px 4px),
+    repeating-linear-gradient(-45deg, #5c4a2e 0 1px, transparent 1px 4px),
+    #d9c79e;
+  outline: 1px solid var(--color-border);
+}
+
 .scene-legend__swatch--burned {
   background: #1c1714;
   outline: 1px solid var(--color-border);

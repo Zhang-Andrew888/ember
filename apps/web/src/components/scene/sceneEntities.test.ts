@@ -154,3 +154,18 @@ describe("components/scene/sceneEntities - agent display state", () => {
     expect(crewState(null)).toBe("approaching");
   });
 });
+
+describe("components/scene/sceneEntities - firebreaks", () => {
+  it("has none when the view carries none", () => {
+    expect(buildSceneEntities(fixtureCoordinatorView, scenarioMap).firebreaks).toEqual([]);
+  });
+
+  it("places one marker per firebreak cell at that cell's centre", () => {
+    const entities = buildSceneEntities({ ...fixtureCoordinatorView, firebreakCells: [1576, 1640] }, scenarioMap);
+    expect(entities.firebreaks.map((cell) => cell.gridCellIndex)).toEqual([1576, 1640]);
+    const [a, b] = entities.firebreaks;
+    // One row apart in the grid: same scene x, different z.
+    expect(a!.position.x).toBeCloseTo(b!.position.x, 6);
+    expect(a!.position.z).not.toBeCloseTo(b!.position.z, 1);
+  });
+});

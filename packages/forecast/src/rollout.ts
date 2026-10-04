@@ -1,4 +1,4 @@
-import { FireField, SIM_DEFAULTS, createTerrain, refugeCells, RoadIndex, type PublicMap, type Terrain } from "@ember/simulation/model";
+import { FireField, createTerrain, nonburnableCells, RoadIndex, type PublicMap, type Terrain } from "@ember/simulation/model";
 import { hashValue } from "@ember/knowledge";
 import { forecastStep } from "./dynamics.js";
 import type { ForecastParams } from "./types.js";
@@ -14,14 +14,14 @@ export interface RolloutContext {
 const contexts = new Map<string, RolloutContext>();
 
 export function rolloutContext(map: PublicMap): RolloutContext {
-  const key = hashValue({ t: map.terrainSeed, f: map.initialFireCells, r: map.refuges, n: map.nodes.length });
+  const key = hashValue({ t: map.terrainSeed, f: map.initialFireCells, r: map.refuges, n: map.nodes.length, b: map.firebreakCells ?? [] });
   const hit = contexts.get(key);
   if (hit !== undefined) return hit;
   const road = new RoadIndex(map);
   const ctx: RolloutContext = {
     key,
     terrain: createTerrain(map.terrainSeed),
-    nonburnable: refugeCells(road, SIM_DEFAULTS.refugeRadiusM),
+    nonburnable: nonburnableCells(road),
     initialCells: map.initialFireCells,
   };
   contexts.set(key, ctx);

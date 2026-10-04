@@ -140,6 +140,11 @@ export const CoordinatorView = z.object({
   observedCells: z.array(CoordinatorCellView),
   /** Authorized live current fire (#112); absent when the sender does not provide it. */
   currentFire: CoordinatorCurrentFireView.optional(),
+  /**
+   * Firebreak cells: ground cleared of fuel, which never ignites. Public map knowledge (no private
+   * parameters), sorted and unique like the current-fire lists; absent when there are none.
+   */
+  firebreakCells: CurrentFireCells.optional(),
   /** Active reportable plans per agent (empty when idle). */
   agentPlans: z.array(CoordinatorAgentPlanView),
   /** Coordinator forecast envelope for the map; null before the first build. */

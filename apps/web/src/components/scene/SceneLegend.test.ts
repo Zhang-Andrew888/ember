@@ -96,3 +96,12 @@ describe("issue #122 - legend separates forecast from actual fire", () => {
     expect(html).toContain("Grid index");
   });
 });
+
+describe("firebreak legend entry", () => {
+  it("appears only when the map has firebreaks, with a pattern swatch and the cell count", () => {
+    expect(legend()).not.toContain('data-key="firebreak"');
+    const html = legend({ firebreakCount: 40 });
+    expect(html).toMatch(/data-key="firebreak"><span class="scene-legend__swatch scene-legend__swatch--firebreak"/);
+    expect(html).toContain("(40 cells)");
+  });
+});

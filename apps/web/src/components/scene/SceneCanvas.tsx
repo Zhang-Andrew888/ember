@@ -10,6 +10,7 @@ import { currentTier, useQualityState } from "./quality/qualityStore.js";
 import { RenderPipeline } from "./RenderPipeline.js";
 import { Roads } from "./Roads.js";
 import { FireCells } from "./FireCells.js";
+import { FirebreakCells } from "./FirebreakCells.js";
 import { SiteMarkers, RefugeMarkers } from "./SiteMarkers.js";
 import { RouteLayer } from "./RouteLayer.js";
 import { ForecastLayer } from "./ForecastLayer.js";
@@ -96,6 +97,7 @@ export const SceneCanvas = forwardRef<CameraControlsHandle, SceneCanvasProps>(fu
     [showCurrentFire, entities.currentFire],
   );
   const refuges = listRefugeNodes(scenarioMap);
+  const clearedCells = useMemo(() => new Set(entities.firebreaks.map((cell) => cell.gridCellIndex)), [entities.firebreaks]);
   const routeLines = useMemo(
     () => entities.routes.map((line) => ({ ...line, selected: line.agentId === selectedAgentId })),
     [entities.routes, selectedAgentId],
@@ -137,7 +139,8 @@ export const SceneCanvas = forwardRef<CameraControlsHandle, SceneCanvasProps>(fu
       <QualityProvider value={quality}>
       <Terrain tilePickEnabled={!mapAssignMode} onSelectTile={onSelectMapTile} />
       <SceneClock animated={!reducedMotion} />
-      <Trees fireCells={visibleCells} reducedMotion={reducedMotion} />
+      <Trees fireCells={visibleCells} clearedCells={clearedCells} reducedMotion={reducedMotion} />
+      <FirebreakCells cells={entities.firebreaks} />
       <Fire cells={visibleCells} reducedMotion={reducedMotion} />
       <Roads />
       {showForecast && entities.forecast ? <ForecastLayer layer={entities.forecast} /> : null}

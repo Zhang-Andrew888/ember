@@ -66,3 +66,23 @@ export function createSolidTexture(color: string): CanvasTexture {
     ctx.fillRect(0, 0, 8, 8);
   });
 }
+
+/** Opaque ground with crossed diagonal lines (firebreak: cleared ground). Distinct from the one-way forecast hatch. */
+export function createCrosshatchTexture(ground: string, line: string): CanvasTexture {
+  return makeTexture([32, 32], (ctx) => {
+    ctx.fillStyle = ground;
+    ctx.fillRect(0, 0, 32, 32);
+    ctx.strokeStyle = line;
+    ctx.lineWidth = 3;
+    for (const offset of [-32, 0, 32]) {
+      ctx.beginPath();
+      ctx.moveTo(offset, 32);
+      ctx.lineTo(offset + 32, 0);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(offset, 0);
+      ctx.lineTo(offset + 32, 32);
+      ctx.stroke();
+    }
+  });
+}

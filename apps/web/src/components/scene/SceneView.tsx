@@ -220,6 +220,7 @@ export function SceneView({
         onToggleForecast={() => setShowForecast((value) => !value)}
         forecast={entities.forecast}
         showUnseenKey={entities.fireCells.some((cell) => cell.unseen === true)}
+        firebreakCount={entities.firebreaks.length}
         onResetCamera={() => {
           setFollow(false);
           controlsRef.current?.reset();

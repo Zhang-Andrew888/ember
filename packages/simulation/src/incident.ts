@@ -441,6 +441,7 @@ export class Incident {
         observerAgentId: b.sourceAgentId,
       })),
       currentFire: this.currentFire(),
+      ...(this.world.firebreakCells.length === 0 ? {} : { firebreakCells: [...this.world.firebreakCells] }),
       agentPlans,
       coordinatorForecast: options.coordinatorForecast ?? null,
       recentReports: this.reports.slice(-20),

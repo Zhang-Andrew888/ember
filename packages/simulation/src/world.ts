@@ -10,7 +10,7 @@ import {
   cellIndexOf,
   cellsWithin,
   createTerrain,
-  refugeCells,
+  nonburnableCells,
   streamRng,
   offRoadSegmentTraversable,
   type FireParams,
@@ -126,14 +126,17 @@ export class World {
   readonly agents: TruthAgent[] = [];
   readonly sites: TruthSite[] = [];
   readonly closedEdges = new Set<EdgeId>();
+  /** Firebreak cells, sorted and unique. Pre-placed from the map; they never ignite. */
+  readonly firebreakCells: readonly number[];
   readonly notices: SimNotice[] = [];
   timeMs = 0;
 
   constructor(scenario: SimScenario, privateParams: PrivateWorldParameters) {
     this.road = new RoadIndex(scenario.map);
     this.params = privateParams;
+    this.firebreakCells = [...new Set(scenario.map.firebreakCells ?? [])].sort((a, b) => a - b);
     const terrain = createTerrain(scenario.map.terrainSeed);
-    this.fire = new FireField(terrain, refugeCells(this.road, SIM_DEFAULTS.refugeRadiusM));
+    this.fire = new FireField(terrain, nonburnableCells(this.road));
     this.fire.ignite(scenario.map.initialFireCells, 0);
     this.refreshClosedEdges(scenario.map.initialFireCells);
     for (const spec of scenario.agents) {

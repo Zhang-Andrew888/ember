@@ -73,6 +73,13 @@ export interface CurrentFireLayer {
   readonly burnedCount: number;
 }
 
+/** A firebreak cell: ground cleared of fuel, which the fire cannot cross. Public map knowledge. */
+export interface FirebreakMarker {
+  readonly key: string;
+  readonly gridCellIndex: number;
+  readonly position: SceneVector;
+}
+
 export interface SceneEntities {
   readonly agents: AgentMarker[];
   readonly sites: SiteMarker[];
@@ -80,6 +87,8 @@ export interface SceneEntities {
   readonly fireCells: FireCellMarker[];
   /** Live current fire; null when the view carries none (older sender, mock, fixture): nothing is invented. */
   readonly currentFire: CurrentFireLayer | null;
+  /** Firebreak cells from the view; empty when the view carries none. */
+  readonly firebreaks: FirebreakMarker[];
   /** Reportable plans (route emphasis); selection is applied at render time. */
   readonly routes: RouteLine[];
   /** Coordinator forecast envelope; null before the first build. */
@@ -125,11 +134,18 @@ export function buildSceneEntities(
     map,
   );
 
+  const firebreaks = (view.firebreakCells ?? []).map((gridCellIndex) => ({
+    key: `firebreak-${gridCellIndex}`,
+    gridCellIndex,
+    position: resolveGridCellPosition(map, gridCellIndex),
+  }));
+
   return {
     agents,
     sites,
     fireCells,
     currentFire,
+    firebreaks,
     routes: buildRouteLines(view, map, null),
     forecast: buildForecastLayer(view, map),
   };

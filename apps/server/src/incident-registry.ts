@@ -50,13 +50,18 @@ export class IncidentRegistry {
   /**
    * @param defaultSeed Operator-chosen seed (server side only, e.g. `DEMO_SEED`) so a rehearsed fire can
    *   be replayed. When absent each incident gets a random seed that is independent of its public id.
+   * @param defaultScenario Operator-chosen scenario (e.g. with `EMBER_FIREBREAK` firebreaks) used when a
+   *   request names none; the synthetic scenario otherwise.
    */
-  constructor(private readonly defaultSeed?: string) {}
+  constructor(
+    private readonly defaultSeed?: string,
+    private readonly defaultScenario?: SimScenario,
+  ) {}
 
   create(body: CreateIncidentBody = {}, clock: MonotonicClock): IncidentRecord {
     const id = randomBytes(12).toString("hex");
     const token = randomBytes(24).toString("hex");
-    const scenario = body.scenario ?? buildSyntheticScenario();
+    const scenario = body.scenario ?? this.defaultScenario ?? buildSyntheticScenario();
     const seed = this.defaultSeed ?? randomBytes(16).toString("hex");
     const session = new IncidentSession({ scenario, seed, ...body.session });
     const speechStore = new SpeechAudioStore();
