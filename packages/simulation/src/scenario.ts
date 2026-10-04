@@ -32,13 +32,13 @@ export interface SyntheticOptions {
   readonly version?: string;
 }
 
-const NODES: readonly [string, number, number][] = [
+const NODES: readonly [string, number, number, string?][] = [
   ["n-rw", 100, 800],
   ["n-rs", 800, 100],
-  ["n-j1", 400, 800],
-  ["n-s", 700, 600],
-  ["n-h", 1000, 800],
-  ["n-n", 500, 1200],
+  ["n-j1", 400, 800, "West Junction"],
+  ["n-s", 700, 600, "South Junction"],
+  ["n-h", 1000, 800, "East Junction"],
+  ["n-n", 500, 1200, "North Junction"],
   ["n-sa", 1200, 1050],
   ["n-sb", 1250, 800],
   ["n-sc", 1200, 550],
@@ -95,7 +95,7 @@ export function buildSyntheticScenario(options: SyntheticOptions = {}): SimScena
   const scenario: SimScenario = {
     version: ScenarioVersion.parse(options.version ?? "synthetic-v1"),
     map: {
-      nodes: NODES.map(([id, x, y]) => ({ id: NodeId.parse(id), x, y })),
+      nodes: NODES.map(([id, x, y, name]) => ({ id: NodeId.parse(id), x, y, ...(name === undefined ? {} : { name }) })),
       edges: EDGES.map(([id, from, to, singleCapacity]) => ({
         id: EdgeId.parse(id),
         from: NodeId.parse(from),

@@ -156,4 +156,39 @@ describe("conversation over a session (no provider)", () => {
     expect(dir.sites.map((s) => s.name)).toContain("Community Lodge");
     expect(dir.locations.some((l) => l.name === "east corridor")).toBe(true);
   });
+
+  it("lists sites, refuges and named junctions as places with map positions", () => {
+    const places = directoryFor(farScenario()).places ?? [];
+    const byName = new Map(places.map((p) => [p.name, p]));
+    // Sites, refuges and junctions, at the node positions in the synthetic map.
+    expect(byName.get("Waterworks")).toMatchObject({ id: "n-sb", x: 1250, y: 800 });
+    expect(byName.get("Ridge Cabins")).toMatchObject({ id: "n-sa", x: 1200, y: 1050 });
+    expect(byName.get("Refuge West")).toMatchObject({ id: "n-rw", x: 100, y: 800 });
+    expect(byName.get("East Junction")).toMatchObject({ id: "n-h", x: 1000, y: 800 });
+    expect(byName.get("West Junction")).toMatchObject({ x: 400, y: 800 });
+    // Unnamed junctions are not places, and nothing sits at a made-up (0, 0).
+    expect(places.every((p) => p.name.length > 0 && !(p.x === 0 && p.y === 0))).toBe(true);
+    expect(new Set(places.map((p) => p.id)).size).toBe(places.length);
+    expect(JSON.stringify(places)).not.toMatch(/terrainSeed|spreadMultiplier/);
+  });
+
+  it("lists a node once when it is both a site and a named junction", () => {
+    const base = farScenario();
+    const named = { ...base, map: { ...base.map, nodes: base.map.nodes.map((n) => (n.id === "n-sb" ? { ...n, name: "Water Junction" } : n)) } };
+    const places = directoryFor(named).places ?? [];
+    expect(places.filter((p) => p.id === "n-sb")).toEqual([{ id: "n-sb", name: "Waterworks", x: 1250, y: 800 }]);
+  });
+
+  it("turns a fire line order into a two-point objective for the crew", () => {
+    const session = new IncidentSession({ scenario: farScenario(["crew-1"]), seed: "line-order", overrides: calm, controllerConfig: { forecast: steady } });
+    const bridge = new ConversationBridge(session);
+    const sent = bridge.say("Crew 1, cut line from East Junction north 200 meters", 0)[0]!;
+    expect(sent.receipt.status).toBe("accepted");
+    expect(sent.reply).toBe(
+      "Sent to Crew 1: cut line from the south end (East Junction) toward the north end (200 m). Its own feasibility check decides.",
+    );
+    const objective = sent.actions.flatMap((a) => (a.kind === "objective" ? [a.objective] : []))[0];
+    expect(objective?.kind).toBe("build_line");
+    expect(objective?.constraints.line).toEqual({ start: { x: 1000, y: 800 }, end: { x: 1000, y: 1000 } });
+  });
 });

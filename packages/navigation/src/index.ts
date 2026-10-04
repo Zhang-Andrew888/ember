@@ -8,6 +8,8 @@ export { bucketTravelMs, offRoadSpeedMps, offRoadTravelMs } from "./travel.js";
 export { planMissions, planWithHazard, protectionTargets, workOptions } from "./mission.js";
 export { directionalTargets, planDirectionalMove } from "./directional.js";
 export { containmentTargets, nearestReachableNode } from "./containment.js";
+export { firelineTarget, nearestRoadNodeWithin } from "./firelines.js";
+export type { FirelineRefusal, FirelineTargetResult } from "./firelines.js";
 export { certifyPlan, type CertifyFailure, type CertifyInput, type CertifyResult } from "./certify.js";
 export { planRetreat, planReturn, type ReturnPlan } from "./retreat.js";
 export { makeEnsemble, cellOnEdge, cellsOfEdge, type MemberSpec } from "./testing.js";

@@ -1,5 +1,6 @@
 // Process entry point for the browser-facing HTTP + WebSocket server.
 // `index.ts` is the library barrel and starts nothing; this file is what `pnpm dev` / `pnpm start` run.
+import { FIREBREAK_PRESETS, buildSyntheticScenario, firebreakPresetCells, isFirebreakPreset, withFirebreaks, type SimScenario } from "@ember/simulation";
 import { startHttpApp } from "./http-app.js";
 
 function portFromEnv(): number {
@@ -18,9 +19,29 @@ function seedFromEnv(): string | undefined {
   return raw === undefined || raw === "" ? undefined : raw;
 }
 
+/** Optional hand-placed firebreaks for every new incident (`EMBER_FIREBREAK=head-line`, etc.). */
+function scenarioFromEnv(): SimScenario | undefined {
+  const raw = process.env["EMBER_FIREBREAK"];
+  if (raw === undefined || raw === "") return undefined;
+  if (!isFirebreakPreset(raw)) {
+    throw new Error(`EMBER_FIREBREAK must be one of ${FIREBREAK_PRESETS.join(", ")}; got "${raw}"`);
+  }
+  const base = buildSyntheticScenario();
+  return withFirebreaks(base, firebreakPresetCells(base, raw));
+}
+
 async function main(): Promise<void> {
   const seed = seedFromEnv();
-  const app = await startHttpApp({ port: portFromEnv(), ...(seed === undefined ? {} : { seed }) });
+  const scenario = scenarioFromEnv();
+  const app = await startHttpApp({
+    port: portFromEnv(),
+    ...(seed === undefined ? {} : { seed }),
+    ...(scenario === undefined ? {} : { scenario }),
+  });
+  if (scenario !== undefined) {
+    process.stdout.write(`firebreaks: ${process.env["EMBER_FIREBREAK"]} (${scenario.map.firebreakCells?.length ?? 0} cells)
+`);
+  }
   // The web dev server (apps/web/vite.config.ts) proxies /incidents and /health to this address.
   process.stdout.write(`ember-server listening on http://127.0.0.1:${app.port}\n`);
 

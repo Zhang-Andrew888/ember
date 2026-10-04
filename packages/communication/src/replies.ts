@@ -47,6 +47,11 @@ export function replyForDecision(callsign: string, d: DecisionEvent, phrasing: P
       text = phrasing === "radio" ? `${callsign}, stranded. ${reason}` : `${callsign} is stranded. ${reason}`;
       break;
     case "objective_rejected":
+      if (d.reasonCode === "no_road_near_line_end") {
+        // Not a safety margin: the crew's end of the line has no road within reach (plan 2.5).
+        text = phrasing === "radio" ? `${callsign}, cannot comply. No road reaches that end. Try the other end.` : `${callsign} cannot cut line from that end: no road reaches it. Try the other end.`;
+        break;
+      }
       text = phrasing === "radio" ? `${callsign}, cannot comply. ${reason || action}` : `${callsign} cannot do that and return with the required margin. ${reason}`;
       break;
     case "mission_update":

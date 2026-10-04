@@ -1,8 +1,10 @@
-import type { AgentId, AgentPosition, AgentState, EdgeId, MissionPlan, NodeId, SiteId } from "@ember/domain";
+import type { AgentId, AgentPosition, AgentState, EdgeId, MapPoint, MissionPlan, NodeId, SiteId } from "@ember/domain";
 import { EdgePosition, Meters, OffroadPosition, SimTimeMs, approachLegCount, scheduledLegCount, scheduledLegs } from "@ember/domain";
 import {
   CELL_BURNED,
   CELL_BURNING,
+  CELL_NONBURNABLE,
+  CELL_UNBURNED,
   FireField,
   RoadIndex,
   SIM_DEFAULTS,
@@ -10,6 +12,10 @@ import {
   cellIndexOf,
   cellsWithin,
   createTerrain,
+  firelineCells,
+  firelineId,
+  mapFirebreakCells,
+  reachableFirelineCells,
   refugeCells,
   streamRng,
   offRoadSegmentTraversable,
@@ -102,6 +108,7 @@ export type SimNotice =
   | { tick: number; kind: "agent_lost"; agentId: AgentId }
   | { tick: number; kind: "site_resolved"; siteId: SiteId; how: "protected" | "destroyed" }
   | { tick: number; kind: "edge_closed"; edgeId: EdgeId }
+  | { tick: number; kind: "fireline_resolved"; lineId: string; outcome: "complete" | "breached" }
   | {
       tick: number;
       kind: "containment_completed";
@@ -110,6 +117,16 @@ export type SimNotice =
       outcome: "succeeded" | "failed";
       reasonCode: string;
     };
+
+/** A fire line crews were sent to build; `cells` run from `from` to `to`. */
+export interface TruthFireline {
+  readonly id: string;
+  /** Canonical order (lower end cell first), so the line does not depend on which crew registered it. */
+  readonly start: MapPoint;
+  readonly end: MapPoint;
+  readonly cells: readonly number[];
+  resolved: boolean;
+}
 
 export interface CommitResult {
   readonly accepted: boolean;
@@ -126,14 +143,21 @@ export class World {
   readonly agents: TruthAgent[] = [];
   readonly sites: TruthSite[] = [];
   readonly closedEdges = new Set<EdgeId>();
+  /** Pre-placed firebreak cells from the map. */
+  private readonly mapFirebreaks: ReadonlySet<number>;
+  /** Cells crews have cleared into firebreaks during the run. */
+  readonly builtFirebreaks = new Set<number>();
+  /** Fire lines by id, in the order crews were first sent to them. */
+  readonly firelines = new Map<string, TruthFireline>();
   readonly notices: SimNotice[] = [];
   timeMs = 0;
 
   constructor(scenario: SimScenario, privateParams: PrivateWorldParameters) {
     this.road = new RoadIndex(scenario.map);
     this.params = privateParams;
+    this.mapFirebreaks = mapFirebreakCells(this.road);
     const terrain = createTerrain(scenario.map.terrainSeed);
-    this.fire = new FireField(terrain, refugeCells(this.road, SIM_DEFAULTS.refugeRadiusM));
+    this.fire = new FireField(terrain, refugeCells(this.road, SIM_DEFAULTS.refugeRadiusM), this.mapFirebreaks);
     this.fire.ignite(scenario.map.initialFireCells, 0);
     this.refreshClosedEdges(scenario.map.initialFireCells);
     for (const spec of scenario.agents) {
@@ -165,6 +189,11 @@ export class World {
         exposureCells: cellsWithin(p.x, p.y, SIM_DEFAULTS.siteExposureRadiusM),
       });
     }
+  }
+
+  /** Every firebreak cell (pre-placed and built), sorted and unique. */
+  firebreakCells(): number[] {
+    return [...new Set([...this.mapFirebreaks, ...this.builtFirebreaks])].sort((a, b) => a - b);
   }
 
   agent(id: AgentId): TruthAgent {
@@ -256,6 +285,22 @@ export class World {
     const suppress =
       plan.work?.kind === "suppress_fire" ? plan.work : undefined;
     if (suppress !== undefined && workSiteId !== null) return reject("containment_with_site_work");
+    const line = plan.work?.kind === "build_line" ? plan.work : undefined;
+    if (line !== undefined) {
+      if (workSiteId !== null) return reject("fireline_with_site_work");
+      if (!this.road.nodes.has(line.workNodeId)) return reject("fireline_unknown_node");
+      if (line.start.x === line.end.x && line.start.y === line.end.y) return reject("fireline_needs_two_points");
+      if (firelineCells(line.start, line.end).length === 0) return reject("fireline_off_map");
+      // `start` is this crew's end of the line; its work node must be within reach of it (plan 2.5).
+      const workPoint = this.road.nodePoint(line.workNodeId);
+      if (Math.hypot(workPoint.x - line.start.x, workPoint.y - line.start.y) > SIM_DEFAULTS.lineReachM) {
+        return reject("fireline_end_out_of_reach");
+      }
+      if (hasWork) {
+        const endNode = approachEndNode ?? (agent.pos.kind === "node" && approachCount === 0 ? agent.pos.nodeId : null);
+        if (endNode !== line.workNodeId) return reject("fireline_work_not_at_work_node");
+      }
+    }
     if (hasWork && workSiteId !== null) {
       const site = this.sites.find((s) => s.id === workSiteId);
       if (site === undefined) return reject("unknown_site");
@@ -290,6 +335,7 @@ export class World {
         reason: "superseded",
       });
     }
+    if (line !== undefined) this.registerFireline(line.start, line.end);
     agent.commitment = { plan, workSiteId, mode, legIndex: 0, approachCount, hasWork, blockedNoticed: false };
     agent.planRevision += 1;
     agent.working = false;
@@ -522,6 +568,35 @@ export class World {
     }
   }
 
+  private registerFireline(start: MapPoint, end: MapPoint): void {
+    const id = firelineId(start, end);
+    if (this.firelines.has(id)) return;
+    // Canonical direction (lower end cell first), so the stored line does not depend on who came first.
+    const cells = firelineCells(start, end);
+    const reversed = cells.length > 0 && cells[0]! > cells[cells.length - 1]!;
+    const [a, b] = reversed ? [end, start] : [start, end];
+    this.firelines.set(id, { id, start: a, end: b, cells: reversed ? cells.reverse() : cells, resolved: false });
+  }
+
+  /** One step of line clearing: each working crew clears the first unburned cell on its side, in reach. */
+  private applyLineWork(dt: number): void {
+    const fraction = (dt * SIM_DEFAULTS.lineWorkRate) / SIM_DEFAULTS.lineWorkPerCell;
+    for (const agent of this.agents) {
+      if (agent.state === "lost" || agent.role !== "protection_crew" || !agent.working) continue;
+      const work = agent.commitment?.plan.work;
+      if (work?.kind !== "build_line") continue;
+      const next = reachableFirelineCells(this.road, work.workNodeId, work.start, work.end).find((c) => this.fire.state[c] === CELL_UNBURNED);
+      if (next === undefined) continue;
+      if (this.fire.applyClearance(next, fraction) === "completed") this.builtFirebreaks.add(next);
+    }
+    for (const line of this.firelines.values()) {
+      if (line.resolved || line.cells.some((c) => this.fire.state[c] === CELL_UNBURNED)) continue;
+      line.resolved = true;
+      const complete = line.cells.every((c) => this.fire.state[c] === CELL_NONBURNABLE);
+      this.notices.push({ tick: this.timeMs + STEP, kind: "fireline_resolved", lineId: line.id, outcome: complete ? "complete" : "breached" });
+    }
+  }
+
   private nodeCanSuppressCell(nodeId: NodeId, gridCellIndex: number): boolean {
     const p = this.road.nodePoint(nodeId);
     const c = cellCenter(gridCellIndex);
@@ -530,6 +605,7 @@ export class World {
 
   private applyWorkAndDamage(): void {
     const dt = STEP / 1000;
+    this.applyLineWork(dt);
     for (const agent of this.agents) {
       if (agent.state === "lost" || agent.role !== "protection_crew" || !agent.working) continue;
       const work = agent.commitment?.plan.work;

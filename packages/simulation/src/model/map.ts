@@ -19,6 +19,8 @@ export const MapNode = z
     id: NodeId,
     x: finiteMeters,
     y: finiteMeters,
+    /** Public place name for a junction (sites and refuges carry their own names). Optional. */
+    name: z.string().min(1).optional(),
   })
   .superRefine(rejectOffGrid);
 export type MapNode = z.infer<typeof MapNode>;
@@ -60,6 +62,8 @@ export const PublicMap = z.object({
   terrainSeed: z.string(),
   /** Flat grid indices of the briefed initial burning patch. */
   initialFireCells: z.array(z.number().int().nonnegative()),
+  /** Flat grid indices of firebreaks: ground cleared of fuel, which never ignites. Optional. */
+  firebreakCells: z.array(z.number().int().nonnegative().max(4095)).optional(),
 });
 export type PublicMap = z.infer<typeof PublicMap>;
 

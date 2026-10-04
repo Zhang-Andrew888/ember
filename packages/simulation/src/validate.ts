@@ -64,6 +64,8 @@ export function validateScenario(scenario: SimScenario): string[] {
   const road = new RoadIndex(m);
   const protectedCells = refugeCells(road, SIM_DEFAULTS.refugeRadiusM);
   for (const c of m.initialFireCells) if (protectedCells.has(c)) errors.push(`initial fire cell ${c} is inside a refuge area`);
+  const firebreaks = new Set(m.firebreakCells ?? []);
+  for (const c of m.initialFireCells) if (firebreaks.has(c)) errors.push(`initial fire cell ${c} is a firebreak cell`);
   // Every node must be reachable from a refuge, otherwise something can never be reached or left.
   const seen = new Set<string>();
   const stack = m.refuges.map((r) => r.nodeId as string);
