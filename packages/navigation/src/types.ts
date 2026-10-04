@@ -78,6 +78,15 @@ export interface PlanningContext {
   readonly avoidEdges?: ReadonlySet<EdgeId>;
   /** Name the forecast members that rule out every mission when rejecting (costly; default true). */
   readonly diagnose?: boolean;
+  /** When true, use game-changes hose reach, fire-first missions, and off-road directional fallback. */
+  readonly gameChanges?: boolean;
+  /** Burn cells other crews are suppressing (brigade spread along the fire line). */
+  readonly peerSuppressCells?: ReadonlySet<number>;
+  readonly brigadePeer?: {
+    readonly suppressCells: ReadonlySet<number>;
+    readonly standoffNodes: ReadonlySet<string>;
+    readonly peerCountOnCell: (cell: number) => number;
+  };
 }
 
 export interface RankedMission {

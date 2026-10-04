@@ -13,6 +13,7 @@ import {
   createWarnGeometry,
   createWorkGlyphGeometry,
 } from "./models/crewModels.js";
+import { HoseMist } from "./models/HoseMist.js";
 
 /** Models sit on the ground; the base of each is y = 0 in its own frame. */
 const MODEL_LIFT = 1.5;
@@ -173,6 +174,7 @@ function AgentModel({
         <primitive object={material} attach="material" />
       </mesh>
       <GlyphMeshes glyph={cue.glyph} />
+      {agent.state === "working" ? <HoseMist headingRad={headingRotationY(agent)} /> : null}
       {selected ? (
         <mesh position={[0, 0.6, 0]} rotation={[-Math.PI / 2, 0, 0]}>
           <ringGeometry args={[27, 30, 40]} />

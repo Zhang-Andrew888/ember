@@ -56,7 +56,7 @@ export class IncidentRegistry {
   create(body: CreateIncidentBody = {}, clock: MonotonicClock): IncidentRecord {
     const id = randomBytes(12).toString("hex");
     const token = randomBytes(24).toString("hex");
-    const scenario = body.scenario ?? buildSyntheticScenario();
+    const scenario = body.scenario ?? buildSyntheticScenario({ gameChanges: true });
     const seed = this.defaultSeed ?? randomBytes(16).toString("hex");
     const session = new IncidentSession({ scenario, seed, ...body.session });
     const speechStore = new SpeechAudioStore();

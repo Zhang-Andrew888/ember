@@ -1206,6 +1206,11 @@ input {
   color: var(--color-text);
 }
 
+.replay-controls__play {
+  min-width: 5.5rem;
+  font-weight: 600;
+}
+
 .replay-controls__time {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;

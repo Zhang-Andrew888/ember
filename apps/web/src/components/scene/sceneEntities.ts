@@ -5,6 +5,7 @@ import {
   resolveGridCellPosition,
   resolveNodePosition,
   resolveEdgeHeading,
+  resolveOffroadHeading,
   type SceneHeading,
   type SceneVector,
 } from "../../map/positions.js";
@@ -148,7 +149,9 @@ function resolveAgents(view: CoordinatorView, map: ScenarioMap): AgentMarker[] {
             agent.position.direction,
             agent.position.distanceAlongPolyline,
           )
-        : null;
+        : agent.position.kind === "offroad"
+          ? resolveOffroadHeading(agent.position)
+          : null;
     agents.push({
       id: agent.id,
       callsign: agent.callsign,

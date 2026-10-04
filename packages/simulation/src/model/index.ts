@@ -7,3 +7,4 @@ export * from "./terrain.js";
 export * from "./fire.js";
 export * from "./refuge.js";
 export * from "./offRoad.js";
+export * from "./game-changes.js";

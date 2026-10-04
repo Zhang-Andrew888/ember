@@ -2,8 +2,11 @@ import { AgentId, SimTimeMs, type CoordinatorView, type DecisionEvent, type Miss
 import { ForecastService, toCoordinatorForecastView } from "@ember/forecast";
 import {
   CrewController,
+  brigadePeerPicture,
+  pendingSuppressFromPlan,
   type AgentController,
   type ControllerConfig,
+  type PendingSuppress,
   type ReservationHooks,
 } from "@ember/agents";
 import { ReservationService } from "@ember/navigation";
@@ -80,7 +83,14 @@ export class IncidentSession {
         // Old replay scenarios may still carry a scout; it has no controller and stays put.
         a.role === "scout"
           ? null
-          : new CrewController({ agentId: a.id, callsign: a.callsign, role: a.role, map, ...(config === undefined ? {} : { config }) }));
+          : new CrewController({
+              agentId: a.id,
+              callsign: a.callsign,
+              role: a.role,
+              map,
+              gameChanges: this.incident.scenario.gameChanges === true,
+              ...(config === undefined ? {} : { config }),
+            }));
     for (const a of this.incident.scenario.agents) {
       if (skip.has(a.id)) continue;
       const controller = factory(a, this.incident.scenario.map, options.controllerConfig);
@@ -111,11 +121,25 @@ export class IncidentSession {
       }
     }
     const controllersStart = Date.now();
+    const pendingSuppress = new Map<AgentId, PendingSuppress>();
     for (const [id, controller] of this.controllers) {
       const t0 = Date.now();
-      const out = controller.tick(inc.projectAgent(id), { reservations: this.hooks });
+      const brigadePeer = brigadePeerPicture(inc, this.road, id, pendingSuppress);
+      const out = controller.tick(inc.projectAgent(id), {
+        reservations: this.hooks,
+        peerSuppressCells: brigadePeer.suppressCells,
+        brigadePeer,
+      });
       if (out.orders.length > 0) this.replanLatencyMs.push(Date.now() - t0);
-      for (const order of out.orders) inc.submit(order);
+      for (const order of out.orders) {
+        inc.submit(order);
+        if (order.kind === "commit_plan") {
+          const work = order.plan.work;
+          if (work?.kind === "suppress_fire") {
+            pendingSuppress.set(id, pendingSuppressFromPlan(this.road, work.gridCellIndex, undefined, order.plan));
+          }
+        }
+      }
       for (const r of out.reports) inc.submit({ kind: "report", agentId: id, text: r.text, urgent: r.urgent });
       const callsign = inc.scenario.agents.find((a) => a.id === id)?.callsign ?? id;
       for (const event of out.decisions) this.decisions.push({ event, callsign });

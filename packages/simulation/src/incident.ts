@@ -16,10 +16,11 @@ import {
   type CoordinatorForecastView,
   type DomainEvent,
   type EndReason,
+  type MissionPlan,
   type SiteId,
 } from "@ember/domain";
 import { KnowledgeStore, STALE_AFTER_MS, type AgentKnowledgeSnapshot } from "@ember/knowledge";
-import { CELL_BURNED, CELL_BURNING, SIM_DEFAULTS, cellsWithin, hashValue } from "./model/index.js";
+import { CELL_BURNED, CELL_BURNING, GAME_CHANGES, SIM_DEFAULTS, cellsWithin, hashValue, scenarioUsesGameChanges } from "./model/index.js";
 import { SimInput, type AppliedInput, type InputReceipt } from "./inputs.js";
 import { SimScenario } from "./scenario.js";
 import { validateScenario } from "./validate.js";
@@ -274,6 +275,15 @@ export class Incident {
     if (w.sites.length > 0 && w.sites.every((s) => w.siteResolved(s))) matching.push("all_sites_resolved");
     if (w.fire.burningCount === 0) matching.push("fire_extinguished");
     if (w.timeMs >= SIM_DEFAULTS.incidentHorizonMs) matching.push("time_expired");
+    if (
+      scenarioUsesGameChanges(this.scenario) &&
+      GAME_CHANGES.deferWinOnFireOut &&
+      matching.length === 1 &&
+      matching[0] === "fire_extinguished" &&
+      !w.allSitesSecure()
+    ) {
+      return;
+    }
     if (matching.length === 0) return;
     const ordered = END_ORDER.filter((r) => matching.includes(r));
     const displayReason = ordered[0];
@@ -494,6 +504,31 @@ export class Incident {
       knowledge: store.snapshot(SimTimeMs.parse(this.world.timeMs)),
       inputHash: store.inputHash(),
     };
+  }
+
+  /** Grid cell this agent is committed to suppress, if any (session brigade deconfliction only). */
+  activeSuppressCell(agentId: AgentId): number | null {
+    const work = this.world.agent(agentId).commitment?.plan.work;
+    if (work?.kind !== "suppress_fire") return null;
+    return work.gridCellIndex;
+  }
+
+  /** The suppress plan this agent is committed to, if any (session brigade lines only, never sent to clients). */
+  activeSuppressPlan(agentId: AgentId): MissionPlan | null {
+    const plan = this.world.agent(agentId).commitment?.plan;
+    return plan?.work?.kind === "suppress_fire" ? plan : null;
+  }
+
+  /** Whether a crew is visibly spraying its hose right now (session brigade lines only). */
+  crewSpraying(agentId: AgentId): boolean {
+    const agent = this.world.agent(agentId);
+    return agent.state !== "lost" && agent.working && agent.commitment?.plan.work?.kind === "suppress_fire";
+  }
+
+  /** Where a crew is, as other crews nearby could see it; null once lost (session brigade lines only). */
+  crewPoint(agentId: AgentId): { x: number; y: number } | null {
+    const agent = this.world.agent(agentId);
+    return agent.state === "lost" ? null : this.world.agentPoint(agent);
   }
 
   // ---------- truth (replay, tests and the server's private side only) ----------

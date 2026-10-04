@@ -95,6 +95,15 @@ export function resolveEdgeHeading(
   return { dx: (sign * dx) / length, dz: (sign * dz) / length };
 }
 
+/** Travel direction for an off-road leg (world x → scene dx, world y → scene dz). */
+export function resolveOffroadHeading(position: Extract<AgentPosition, { kind: "offroad" }>): SceneHeading | null {
+  const dx = position.end.x - position.start.x;
+  const dy = position.end.y - position.start.y;
+  const len = Math.hypot(dx, dy);
+  if (len < 1e-6) return null;
+  return { dx: dx / len, dz: dy / len };
+}
+
 /** Resolves any CoordinatorAgentView position to a scene point. */
 export function resolveAgentPosition(map: ScenarioMap, position: AgentPosition): SceneVector | null {
   if (position.kind === "node") {

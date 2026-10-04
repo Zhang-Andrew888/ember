@@ -10,6 +10,7 @@ import { UrgentStrip } from "./UrgentStrip.js";
 import { formatIncidentClock } from "../format/time.js";
 import { useReducedMotion } from "../state/useReducedMotion.js";
 import { latestUrgentReport } from "../format/reports.js";
+import { replayStepDelayMs } from "../replay/playback.js";
 
 export type ReplaySource = "incident" | "illustrative";
 
@@ -34,6 +35,7 @@ export interface ReplayViewProps {
 export function ReplayView({ onExit, source, recording }: ReplayViewProps) {
   const bundle = source === "illustrative" ? mockRecording : recording!;
   const [index, setIndex] = useState(0);
+  const [playing, setPlaying] = useState(false);
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [showFullFire, setShowFullFire] = useState(false);
   const reducedMotion = useReducedMotion();
@@ -49,6 +51,19 @@ export function ReplayView({ onExit, source, recording }: ReplayViewProps) {
   }, []);
 
   const replayLog = bundle.coordinatorLog;
+
+  useEffect(() => {
+    if (!playing || index >= replayLog.length - 1) return;
+    const curr = replayLog[index]!;
+    const next = replayLog[index + 1]!;
+    const delay = replayStepDelayMs((next.simTimeMs as number) - (curr.simTimeMs as number), reducedMotion);
+    const id = window.setTimeout(() => setIndex((i) => i + 1), delay);
+    return () => window.clearTimeout(id);
+  }, [playing, index, replayLog, reducedMotion]);
+
+  useEffect(() => {
+    if (index >= replayLog.length - 1) setPlaying(false);
+  }, [index, replayLog.length]);
   const view = replayLog[index]!;
   const baseEntities = useMemo(() => buildSceneEntities(view, scenarioMap, { phase: "replay" }), [view]);
   const truth = truthForDisplay({
@@ -123,6 +138,21 @@ export function ReplayView({ onExit, source, recording }: ReplayViewProps) {
       <AgentRail agents={view.agents} selectedAgentId={selectedAgentId} onSelectAgent={setSelectedAgentId} />
 
       <div className="replay-controls">
+        <button
+          type="button"
+          className="replay-controls__play"
+          onClick={() => {
+            if (!playing && index >= replayLog.length - 1) {
+              setIndex(0);
+              setPlaying(true);
+              return;
+            }
+            setPlaying((p) => !p);
+          }}
+          aria-pressed={playing}
+        >
+          {playing ? "Pause" : "Play"}
+        </button>
         <button type="button" onClick={() => setIndex((i) => Math.max(0, i - 1))} disabled={index === 0}>
           ◀ Previous event
         </button>
@@ -135,7 +165,10 @@ export function ReplayView({ onExit, source, recording }: ReplayViewProps) {
           min={0}
           max={replayLog.length - 1}
           value={index}
-          onChange={(event) => setIndex(Number(event.target.value))}
+          onChange={(event) => {
+            setPlaying(false);
+            setIndex(Number(event.target.value));
+          }}
           aria-valuetext={`${formatIncidentClock(view.simTimeMs)}, event ${index + 1} of ${replayLog.length}`}
         />
         <button

@@ -7,7 +7,21 @@ export { Reach, ReturnTable, startsFromPosition, timeExpandedSearch, type Search
 export { bucketTravelMs, offRoadSpeedMps, offRoadTravelMs } from "./travel.js";
 export { planMissions, planWithHazard, protectionTargets, workOptions } from "./mission.js";
 export { directionalTargets, planDirectionalMove } from "./directional.js";
-export { containmentTargets, nearestReachableNode } from "./containment.js";
+export { pathClearanceM, planRejoinRoad } from "./rejoin-road.js";
+export { planHoseInPlace } from "./hose-in-place.js";
+export { forecastBurningCells, mergeBurnCellLists } from "./forecast-burn.js";
+export {
+  containmentTargets,
+  nearestReachableNode,
+  type ContainmentBrigadeOptions,
+  type ContainmentLine,
+} from "./containment.js";
+export {
+  lineStandoffNode,
+  nearestStandoffNode,
+  nearestStandoffNodeForBrigade,
+  type LineStandoffOptions,
+} from "./containment-standoff.js";
 export { certifyPlan, type CertifyFailure, type CertifyInput, type CertifyResult } from "./certify.js";
 export { planRetreat, planReturn, type ReturnPlan } from "./retreat.js";
 export { makeEnsemble, cellOnEdge, cellsOfEdge, type MemberSpec } from "./testing.js";

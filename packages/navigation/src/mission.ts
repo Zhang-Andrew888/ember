@@ -1,8 +1,10 @@
 import { MissionPlan, MissionPlanId, NodeId, SequenceNumber, SimTimeMs, type EdgeId } from "@ember/domain";
 import { admitsProtection } from "@ember/forecast";
 import { hashValue } from "@ember/knowledge";
+import { GAME_CHANGES, cellCenter, gameHoseRadiusM } from "@ember/simulation/model";
+import { offRoadTravelMs } from "./travel.js";
 import { enumerateApproachRoutes, routeIdOf } from "./approach-routes.js";
-import { HazardModel } from "./hazard.js";
+import { HazardModel, navConfigFireFirst, planningHazardModel } from "./hazard.js";
 import { ReturnTable, timeExpandedSearch, startsFromPosition, type Reach, type SearchStart } from "./search.js";
 import {
   ALWAYS_FREE,
@@ -83,21 +85,56 @@ export function planWithHazard(ctx: PlanningContext, hm: HazardModel, targets: r
         const workEndK = approach.k + Math.ceil(w / config.bucketMs);
         const arriveMs = ctx.nowMs + approach.k * config.bucketMs;
         const endMs = ctx.nowMs + workEndK * config.bucketMs;
-        if (!(endMs < nodeSafeLimit) || !(endMs + config.bufferMs < hm.horizonEndMs)) break;
+        const gc = ctx.gameChanges === true;
+        const skipReturn =
+          gc &&
+          GAME_CHANGES.skipReturnLegAfterSuppress &&
+          (target.kind === "contain" || (GAME_CHANGES.allowOffroadDirectional && target.kind === "observe"));
+        let offroadLegs: MissionPlan["offroadLegs"];
+        let workStartMs = arriveMs;
+        let workEndMs = endMs;
+        if (gc && target.kind === "contain" && target.gridCellIndex !== undefined) {
+          const startPt = ctx.road.nodePoint(target.nodeId);
+          const endPt = cellCenter(target.gridCellIndex);
+          const hoseFromRoad = Math.hypot(endPt.x - startPt.x, endPt.y - startPt.y) <= gameHoseRadiusM();
+          if (!hoseFromRoad) {
+            const offMs = offRoadTravelMs(Math.hypot(endPt.x - startPt.x, endPt.y - startPt.y), config);
+            workStartMs = arriveMs + offMs;
+            workEndMs = workStartMs + w;
+            offroadLegs = [
+              {
+                kind: "offroad" as const,
+                start: { x: startPt.x, y: startPt.y },
+                end: { x: endPt.x, y: endPt.y },
+                departMs: SimTimeMs.parse(arriveMs),
+                arriveMs: SimTimeMs.parse(workStartMs),
+                speedFactor: 0.5 as const,
+              },
+            ];
+          } else {
+            workStartMs = arriveMs;
+            workEndMs = arriveMs + w;
+          }
+        }
+        if (!(workEndMs < nodeSafeLimit) || !(workEndMs + config.bufferMs < hm.horizonEndMs)) break;
         const table = returns();
-        const arrivalK = table.arrival(target.nodeId, workEndK);
-        if (arrivalK < 0) continue;
-        const ret = table.returnFrom(target.nodeId, workEndK);
-        const hit = { k: arrivalK, nodeId: ret.refuge };
-        const returnLegs = ret.legs;
+        const workEndKAdj = Math.ceil((workEndMs - ctx.nowMs) / config.bucketMs);
+        const arrivalK = skipReturn ? workEndKAdj : table.arrival(target.nodeId, workEndKAdj);
+        if (!skipReturn && arrivalK < 0) continue;
+        const ret = skipReturn ? null : table.returnFrom(target.nodeId, workEndKAdj);
+        const hit = skipReturn
+          ? { k: workEndKAdj, nodeId: target.nodeId }
+          : { k: arrivalK, nodeId: ret!.refuge };
+        const returnLegs = skipReturn ? [] : ret!.legs;
         const legs = [...approach.legs, ...returnLegs];
-        const returnMs = (hit.k - workEndK) * config.bucketMs;
+        const returnMs = skipReturn ? 0 : (hit.k - workEndKAdj) * config.bucketMs;
         const total = Math.max(1, ((hit.k * config.bucketMs) / 1000));
         const planBody = {
           recipientId: ctx.agentId,
           knowledgeRevision: revision,
           timedLegs: legs,
-          workInterval: { startMs: SimTimeMs.parse(arriveMs), endMs: SimTimeMs.parse(endMs) },
+          ...(offroadLegs === undefined ? {} : { offroadLegs }),
+          workInterval: { startMs: SimTimeMs.parse(workStartMs), endMs: SimTimeMs.parse(workEndMs) },
           refugeId: NodeId.parse(hit.nodeId),
           reservationRevision: SequenceNumber.parse(0),
           limitingReason:
@@ -162,23 +199,29 @@ export function planMissions(ctx: PlanningContext, targets: readonly MissionTarg
     limitingReason: reason,
     limitingMemberIds: limiting,
   });
-  if (!admitsProtection(ctx.ensemble)) return reject("forecast_unreliable");
+  const gc = ctx.gameChanges === true;
+  const fireOnly = targets.length > 0 && targets.every((t) => t.kind === "contain") && gc;
+  const directionalOnly = targets.length > 0 && targets.every((t) => t.kind === "observe") && gc;
+  if (!admitsProtection(ctx.ensemble) && !fireOnly && !directionalOnly) return reject("forecast_unreliable");
   if (targets.length === 0) return reject("no_unresolved_target");
 
-  const hm = new HazardModel(ctx.road, ctx.ensemble, ctx.closedCells, config);
-  const candidates = planWithHazard(ctx, hm, targets);
+  const fireFirst = gc && GAME_CHANGES.ignoreForecastSpreadForFire && (fireOnly || directionalOnly);
+  const planCtx: PlanningContext =
+    fireFirst ? { ...ctx, config: navConfigFireFirst(config) } : ctx;
+  const hm = planningHazardModel(planCtx, fireFirst);
+  const candidates = planWithHazard(planCtx, hm, targets);
   const best = candidates[0] ?? null;
   if (best !== null) {
     return { feasible: true, best, candidates, plan: best.plan, limitingReason: best.plan.limitingReason, limitingMemberIds: [] };
   }
   // Why: does the horizon alone rule it out, or do specific forecast futures?
-  const open = new HazardModel(ctx.road, ctx.ensemble, new Set(), config, []);
-  if (planWithHazard(ctx, open, targets).length === 0) return reject("forecast_horizon_insufficient");
+  const open = new HazardModel(planCtx.road, planCtx.ensemble, new Set(), planCtx.config ?? config, []);
+  if (planWithHazard(planCtx, open, targets).length === 0) return reject("forecast_horizon_insufficient");
   const limiting: string[] = [];
   if (ctx.diagnose === false) return reject("no_feasible_mission_in_model");
-  for (const member of ctx.ensemble.members) {
-    const single = new HazardModel(ctx.road, ctx.ensemble, ctx.closedCells, config, [member]);
-    if (planWithHazard(ctx, single, targets).length === 0) limiting.push(member.id);
+  for (const member of planCtx.ensemble.members) {
+    const single = new HazardModel(planCtx.road, planCtx.ensemble, planCtx.closedCells, planCtx.config ?? config, [member]);
+    if (planWithHazard(planCtx, single, targets).length === 0) limiting.push(member.id);
   }
   return reject("no_feasible_mission_in_model", limiting);
 }

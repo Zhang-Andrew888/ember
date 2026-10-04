@@ -9,6 +9,7 @@ import {
   cellOnEdge,
   cellsOfEdge,
   certifyPlan,
+  containmentTargets,
   makeEnsemble,
   offRoadTravelMs,
   planMissions,
@@ -21,6 +22,7 @@ import {
   type ReservationOracle,
   type SiteKnowledge,
 } from "./index.js";
+import { Incident } from "@ember/simulation";
 
 const scenario = buildSyntheticScenario();
 const map = scenario.map;
@@ -427,5 +429,34 @@ describe("backward return table agrees with the forward search", () => {
       }
     }
     expect(compared).toBe(72);
+  });
+});
+
+describe("game-changes containment plans", () => {
+  it("simulator accepts a game-changes suppress plan (road hose standoff or off-road leg)", () => {
+    const gcScenario = { ...scenario, gameChanges: true as const };
+    const cell = map.initialFireCells[0]!;
+    const ignition = new Map<number, number>([[cell, 0]]);
+    const ensemble = makeEnsemble(map, [{ id: "a", ignition }]);
+    const targets = containmentTargets([cell], road, DEFAULT_NAV_CONFIG.crewWorkRate, DEFAULT_NAV_CONFIG, true);
+    const result = planMissions(ctxWith({ ensemble, gameChanges: true }), targets);
+    expect(result.best).not.toBeNull();
+    const plan = result.best!.plan;
+    expect(plan.work?.kind).toBe("suppress_fire");
+    expect(plan.offroadLegs === undefined || plan.offroadLegs.length <= 1).toBe(true);
+    const inc = new Incident({ scenario: gcScenario, seed: "nav-contain-commit" });
+    expect(
+      inc.submit({
+        kind: "commit_plan",
+        agentId: agent,
+        plan: { ...plan, knowledgeRevision: SequenceNumber.parse(inc.agentRevision(agent)) },
+        workSiteId: null,
+        mode: "normal",
+      }).accepted,
+    ).toBe(true);
+    inc.advanceTo(5_000);
+    const rejected = inc.notices.filter((n) => n.kind === "plan_rejected");
+    expect(rejected).toEqual([]);
+    expect(inc.notices.some((n) => n.kind === "plan_accepted")).toBe(true);
   });
 });
