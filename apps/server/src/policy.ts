@@ -95,7 +95,9 @@ export class ScriptedCoordinatorPolicy {
     if (agent === undefined) return new Set();
     const siteId = this.reportedSite(agentId);
     const cells = new Set<number>();
-    const startNodes = agent.position.kind === "node" ? [agent.position.nodeId as string] : this.endpoints(agent.position.edgeId);
+    const startNodes = agent.position.kind === "node"
+      ? [agent.position.nodeId as string]
+      : agent.position.kind === "edge" ? this.endpoints(agent.position.edgeId) : [];
     const targets: string[] = [];
     if (siteId !== null) {
       const site = this.road.map.sites.find((s) => s.id === siteId);

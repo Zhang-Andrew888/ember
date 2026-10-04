@@ -197,6 +197,7 @@ export class World {
     };
     if (agent.state === "lost") return reject("agent_lost");
     if (plan.recipientId !== agentId) return reject("recipient_mismatch");
+    if (plan.offroadLegs?.length) return reject("offroad_movement_not_supported");
 
     const legs = plan.timedLegs;
     const hasWork = plan.workInterval.endMs > plan.workInterval.startMs;

@@ -106,6 +106,11 @@ export function ReplayView({ onExit, source, recording }: ReplayViewProps) {
           onInspectAgent={setSelectedAgentId}
           reducedMotion={reducedMotion}
           simTimeMs={view.simTimeMs as number}
+          mapAssignMode={false}
+          mapPreviewFrom={null}
+          mapPreviewTo={null}
+          onMapDestinationPick={() => undefined}
+          mapCommandPanel={null}
         />
       </div>
 

@@ -9,9 +9,13 @@ export interface AgentRailProps {
   readonly onSelectAgent: (agentId: string) => void;
 }
 
+/**
+ * The demo presents crews only (#118). A view that still carries another role (an old recording, or a
+ * sim that predates #117) gets a neutral label here; the callsign comes from the data.
+ */
 const ROLE_LABEL: Record<CoordinatorAgentView["role"], string> = {
   protection_crew: "Crew",
-  scout: "Scout",
+  scout: "Agent",
 };
 
 const STATE_LABEL: Record<AgentDisplayState, string> = {

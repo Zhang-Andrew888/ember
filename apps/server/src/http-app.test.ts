@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { connect } from "node:net";
 import { WebSocket } from "ws";
 import { startHttpApp } from "./http-app.js";
@@ -211,6 +211,29 @@ describe("http-app transport", () => {
       expect(opaque.startsWith("HTTP/1.1 403")).toBe(true);
       const local = await holdUpgrade(app.port, body.websocket.events, "Origin: http://localhost:5173\r\n");
       local.destroy();
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("GET /health reports Grok integration without exposing credentials", async () => {
+    vi.stubEnv("XAI_API_KEY", "must-not-appear-in-health-json");
+    vi.stubEnv("XAI_INTENT", "1");
+    const app = await startHttpApp({});
+    try {
+      const response = await fetch(`http://127.0.0.1:${app.port}/health`);
+      expect(response.status).toBe(200);
+      const body = (await response.json()) as Record<string, unknown>;
+      const raw = JSON.stringify(body);
+      expect(raw).not.toContain("must-not-appear-in-health-json");
+      expect(body).toMatchObject({
+        ok: true,
+        grokVoice: true,
+        grokIntent: true,
+        crewMissionPlanning: "deterministic",
+        llmCrewPlanning: false,
+        coordinatorIntent: { mode: "grok", active: true, missingEnv: [] },
+      });
     } finally {
       await app.close();
     }

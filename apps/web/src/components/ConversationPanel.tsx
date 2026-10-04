@@ -281,6 +281,6 @@ export function ConversationPanel({
 
 const DEMO_TRANSCRIPTS: readonly string[] = [
   "Crew 2, status report.",
-  "Scout, relay fire on the north road.",
+  "Crew 1, hold position and await instructions.",
   "Crew 1, protect Ridge Cabins.",
 ];

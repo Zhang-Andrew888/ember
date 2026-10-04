@@ -19,7 +19,8 @@ describe("components/scene/sceneEntities - listRefugeNodes", () => {
 describe("components/scene/sceneEntities - buildSceneEntities", () => {
   const entities = buildSceneEntities(fixtureCoordinatorView, scenarioMap);
 
-  it("resolves all three fixture agents", () => {
+  // The shared fixture still has a scout-role agent: a view that carries one (old recording, pre-#117 sim) must resolve.
+  it("resolves all three fixture agents, including one with a non-crew role", () => {
     expect(entities.agents).toHaveLength(3);
     expect(entities.agents.map((a) => a.id).sort()).toEqual(["crew-1", "crew-2", "scout"].sort());
   });

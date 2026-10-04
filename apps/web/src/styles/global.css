@@ -3,6 +3,7 @@
   --color-panel: #1b272b;
   --color-text: #f1f4ed;
   --color-observed-fire: #ff6b35;
+  --color-forecast: #e85cd0;
   --color-refuge: #70d6d1;
   --color-rejected: #c1443b;
   --color-stale: #5b6a6d;
@@ -86,6 +87,20 @@ input {
   border-color: #6a5a40;
   background: #2a2418;
   color: #e8c878;
+}
+
+.grok-integration {
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  border: 1px dashed var(--color-border);
+  color: var(--color-muted, #9aa8ab);
+}
+
+.grok-integration--grok {
+  border-color: #6a9fd4;
+  color: #b8d4f0;
 }
 
 .briefing__header {
@@ -197,6 +212,104 @@ input {
   display: block;
   width: 100%;
   height: 100%;
+}
+
+.scene-view--map-assign canvas {
+  cursor: crosshair;
+}
+
+.map-command-panel {
+  position: absolute;
+  left: 0.75rem;
+  bottom: 0.75rem;
+  z-index: 6;
+  max-width: min(22rem, calc(100% - 1.5rem));
+  padding: 0.75rem 0.85rem;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: rgba(27, 39, 43, 0.94);
+  font-size: 0.875rem;
+}
+
+.map-command-panel__title {
+  margin: 0 0 0.35rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.map-command-panel__crew {
+  margin: 0 0 0.5rem;
+}
+
+.map-command-panel__mode {
+  width: 100%;
+  margin-bottom: 0.5rem;
+}
+
+.map-command-panel__hint {
+  margin: 0 0 0.5rem;
+  color: var(--color-refuge);
+}
+
+.map-command-panel__preview-label {
+  margin: 0.35rem 0 0.25rem;
+  font-weight: 600;
+}
+
+.map-command-panel__command {
+  margin: 0 0 0.35rem;
+  padding: 0.35rem 0.5rem;
+  border-left: 3px solid var(--color-refuge);
+  background: rgba(17, 25, 28, 0.55);
+}
+
+.map-command-panel__meta {
+  margin: 0 0 0.5rem;
+  color: var(--color-stale);
+  font-size: 0.8rem;
+}
+
+.map-command-panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.map-command-panel__delivery {
+  margin-top: 0.65rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.map-command-panel__status {
+  font-weight: 700;
+}
+
+.map-command-panel__status--accepted {
+  color: var(--color-refuge);
+}
+
+.map-command-panel__status--rejected {
+  color: var(--color-rejected);
+}
+
+.map-command-panel__status--clarification_required {
+  color: #ffb347;
+}
+
+.map-command-panel__status--sent,
+.map-command-panel__status--received {
+  color: var(--color-stale);
+}
+
+.map-command-panel__explanation {
+  font-size: 0.8rem;
+  color: var(--color-stale);
 }
 
 .scene-view__loading {
@@ -758,12 +871,19 @@ input {
 
 .scene-label--forecast {
   border-style: dashed;
-  border-color: var(--color-forecast, #ffc98b);
-  color: #ffc98b;
+  border-color: var(--color-forecast);
+  color: var(--color-forecast);
 }
 
 .scene-legend__swatch--hatch {
-  background: repeating-linear-gradient(135deg, #ffc98b 0 2px, rgba(255, 201, 139, 0.15) 2px 4px);
+  background: repeating-linear-gradient(135deg, var(--color-forecast) 0 2px, rgba(232, 92, 208, 0.15) 2px 4px);
+}
+
+/* Unreliable or rebuilding forecast: the same hatch, drawn faint (matches the dimmed map ribbon). */
+.scene-legend__swatch--hatch-faint {
+  background: repeating-linear-gradient(135deg, var(--color-forecast) 0 2px, rgba(232, 92, 208, 0.08) 2px 4px);
+  opacity: 0.45;
+  outline: 1px dashed var(--color-forecast);
 }
 
 .scene-legend__swatch--route {
@@ -774,6 +894,11 @@ input {
   margin: 0;
   font-size: 0.8rem;
   max-width: 320px;
+}
+
+.scene-legend__forecast[data-reliability="reliable"] {
+  border-left: 3px solid var(--color-forecast);
+  padding-left: 0.4rem;
 }
 
 .scene-legend__forecast[data-reliability="unreliable"],

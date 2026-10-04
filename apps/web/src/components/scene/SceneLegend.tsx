@@ -67,7 +67,7 @@ export const SceneLegend = forwardRef<HTMLDivElement, SceneLegendProps>(function
             </li>
           </>
         ) : (
-          <li>
+          <li data-key="observed-fire">
             <span className="scene-legend__swatch" style={{ background: colors.observedFire }} />
             Observed fire
           </li>
@@ -76,9 +76,13 @@ export const SceneLegend = forwardRef<HTMLDivElement, SceneLegendProps>(function
           <span className="scene-legend__swatch scene-legend__swatch--stale" />
           Stale: faded, hatched; inspect for exact time
         </li>
-        <li>
+        <li data-key="forecast">
           <span className="scene-legend__swatch scene-legend__swatch--hatch" />
-          Forecast envelope (hatched, simulated time)
+          Forecast envelope: magenta hatching, simulated time
+        </li>
+        <li data-key="forecast-unreliable">
+          <span className="scene-legend__swatch scene-legend__swatch--hatch-faint" />
+          Faint hatching, labelled &quot;unreliable&quot;: forecast unreliable or rebuilding
         </li>
         <li>
           <span className="scene-legend__swatch scene-legend__swatch--route" />
