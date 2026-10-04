@@ -31,7 +31,11 @@ Contents
   named by compass ("Crew 1 on the south end") or by place. Each crew starts on its own.
 - **One line form everywhere:** two points. Named-place lines and offset lines are turned into
   points by the order gateway; the sim, planner and web never see the wording.
-- **Reach 800 m:** one crew can anchor a line on the map edge (Phase 0's best line).
+- **Reach 400 m** (unchanged from Phase 1b), sized to the road spacing. On the synthetic map road
+  nodes are about 300 m apart (largest gap 510 m), so every point between two neighbouring nodes
+  is within reach of one of them; 400 m covers 80% of the synthetic map and 98% of Montclair. Two
+  crews can build a line up to 800 m. Trade-off: on the synthetic map a line from East Junction
+  north to the map edge (800 m, no road near the edge) can only be built 400 m out.
 
 **Out:**
 - **Grid references:** too game-like.
@@ -80,7 +84,7 @@ Replaced by contract v2:
   `ObjectiveConstraints.line { fromNodeId, toNodeId }` and `CoordinatorFirelineView.fromNodeId/toNodeId`.
 - Intent `fromName/toName/assignments`.
 
-Phase 1b is not committed yet, so this is a replacement, not a second form.
+Nothing outside this branch uses the node form, so this is a replacement, not a second form.
 
 ### 2.3 Contract v2 (Track A writes this first)
 
@@ -133,7 +137,7 @@ firelineCells(start: { x; y }, end: { x; y }): number[];      // 8-connected, st
 firelineId(start: { x; y }, end: { x; y }): string;          // "line:<cellA>~<cellB>", cellA <= cellB
 reachableFirelineCells(road, workNodeId, start, end, reachM = lineReachM): number[];
 ```
-`SIM_DEFAULTS.lineReachM`: 400 → **800**.
+`SIM_DEFAULTS.lineReachM` stays **400** (section 1).
 
 Contract tests:
 - Each objective form parses.
@@ -181,7 +185,7 @@ Rules:
 ### 2.5 Crew rule (authoritative for Track C)
 
 - **Work node:** the crew's work node is the nearest road node to its end that lies within
-  `lineReachM` (800 m) of that end.
+  `lineReachM` (400 m) of that end.
 - **No road nearby:** refuse with `no_road_near_line_end`. The reply suggests both crews take the
   other end.
 - **What it clears:** from its end toward the other, the first unburned cell in order that lies
@@ -216,7 +220,7 @@ Edit only your **owned paths**. If you need something outside them, ask Track A 
 ### Track A: contract and integration
 - **Mission:** ship contract v2 (2.3) with tests and helper implementations, then integrate.
 - **Starts:** immediately. Everyone else starts when A1 merges.
-- [ ] **A1. Contract v2:** schema, helpers, `lineReachM` 800, and Phase 1b code moved onto the new
+- [ ] **A1. Contract v2:** schema, helpers, and Phase 1b code moved onto the new
   form so everything compiles. Check: contract tests (2.3); full checks green.
 - [ ] **A2. Integration:** rebase the tracks; full checks; live run with the three example orders
   in 2.4, including the two-crew one. Check: lines appear where ordered, crews start from the
@@ -303,7 +307,7 @@ architecture.
   them; web tiles and legend. Check: `firebreaks.test.ts`, `firebreak-contract.test.ts`,
   `forecast/src/firebreak.test.ts`, web scene tests.
 
-### Phase 1b: partial clearance, built lines, diagonal gaps (done, not committed)
+### Phase 1b: partial clearance, built lines, diagonal gaps (commit `e097f4f`)
 - [x] Partial clearance slows spread; full clearance makes a firebreak.
   Check: `model/clearance.test.ts`.
 - [x] Diagonal steps between cleared corners blocked; refuges unchanged. Check: same file.
@@ -334,7 +338,7 @@ Specified but not scheduled. Pick up after Phase 2 if time allows.
 
 ## 7. Housekeeping
 
-- [ ] **H1.** Commit Phase 1b on `firebreak-test` before A1 starts.
+- [x] **H1.** Commit Phase 1b on `firebreak-test` before A1 starts. Done: `e097f4f`.
 - [ ] **H2.** Split into lane PRs: domain + sim-lane packages + server into `lane/sim`; `apps/web`
   into `lane/web`. Check: CI green on both.
 - [ ] **H3.** Docs (human-authored, Andrew): `docs/SIMULATION.md:80`, `EMBER_LINE.md:113` and
