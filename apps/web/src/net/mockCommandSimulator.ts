@@ -68,5 +68,17 @@ export function mockWireRepliesForSay(text: string, simTimeMs: number, commandId
     ];
   }
 
+  if (/\bmove (north|northeast|east|southeast|south|southwest|west|northwest)\b/i.test(lower)) {
+    return [
+      receipt("received", `Received: ${trimmed}`, "Directional movement order logged.", commandId),
+      receipt(
+        "accepted",
+        `${trimmed.split(",")[0]?.trim() ?? "Crew"} acknowledged the movement order.`,
+        "Objective queued for planning.",
+        commandId,
+      ),
+    ];
+  }
+
   return [receipt("received", `Received: ${trimmed}`, "", commandId)];
 }
