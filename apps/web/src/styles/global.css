@@ -3,6 +3,7 @@
   --color-panel: #1b272b;
   --color-text: #f1f4ed;
   --color-observed-fire: #ff6b35;
+  --color-forecast: #e85cd0;
   --color-refuge: #70d6d1;
   --color-rejected: #c1443b;
   --color-stale: #5b6a6d;
@@ -771,12 +772,19 @@ input {
 
 .scene-label--forecast {
   border-style: dashed;
-  border-color: var(--color-forecast, #ffc98b);
-  color: #ffc98b;
+  border-color: var(--color-forecast);
+  color: var(--color-forecast);
 }
 
 .scene-legend__swatch--hatch {
-  background: repeating-linear-gradient(135deg, #ffc98b 0 2px, rgba(255, 201, 139, 0.15) 2px 4px);
+  background: repeating-linear-gradient(135deg, var(--color-forecast) 0 2px, rgba(232, 92, 208, 0.15) 2px 4px);
+}
+
+/* Unreliable or rebuilding forecast: the same hatch, drawn faint (matches the dimmed map ribbon). */
+.scene-legend__swatch--hatch-faint {
+  background: repeating-linear-gradient(135deg, var(--color-forecast) 0 2px, rgba(232, 92, 208, 0.08) 2px 4px);
+  opacity: 0.45;
+  outline: 1px dashed var(--color-forecast);
 }
 
 .scene-legend__swatch--route {
@@ -787,6 +795,11 @@ input {
   margin: 0;
   font-size: 0.8rem;
   max-width: 320px;
+}
+
+.scene-legend__forecast[data-reliability="reliable"] {
+  border-left: 3px solid var(--color-forecast);
+  padding-left: 0.4rem;
 }
 
 .scene-legend__forecast[data-reliability="unreliable"],

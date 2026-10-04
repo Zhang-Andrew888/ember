@@ -36,7 +36,7 @@ function BandRibbon({ band, trusted }: { readonly band: ForecastBand; readonly t
 
 /**
  * Coordinator forecast envelope (docs/FRONTEND.md layer 4): translucent
- * amber hatching, never identical to observed flames. Ribbon width encodes
+ * magenta hatching (colors.forecastEnvelope), never identical to observed flames. Ribbon width encodes
  * arrival-time uncertainty; an unreliable or rebuilding forecast is dimmed
  * and labelled as such in the legend and band labels.
  */
