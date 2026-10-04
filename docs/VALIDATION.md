@@ -139,11 +139,13 @@ Different policies may end at different times when sites resolve. Final health i
 |---|---|
 | 0:00–0:20 | Three.js incident desk: crew, sites, two approaches, refuges, incomplete fire picture |
 | 0:20–0:40 | Explain a crew's chosen approach/work/return and conditional work window |
-| 0:40–1:00 | Scout discovers a change; use push-to-talk to relay its evidence to one crew |
-| 1:00–1:25 | Show independent replanning, urgent withdrawal, and automatic safe yielding |
+| 0:40–1:00 | Use push-to-talk to redirect one crew (for example "Crew 2, protect Ridge Cabins"); show the receipt and the crew's changed plan |
+| 1:00–1:25 | Show safe refusal and holding: ask for work that cannot return with the required margin, show the crew's refusal ("cannot do that and return with the required margin"), then crews holding at refuge with "no safe mission found" and reassessing on new evidence |
 | 1:25–1:45 | Show retained protection, actual crew state, and an ending condition |
 | 1:45–2:00 | Replay full fire; run `scripts/demo.sh --comparison` for **held-out** aggregates and caveats (not `showcase-1`). For safety contrast, cite **heldout-15**, **heldout-18**, or **heldout-19** (dispatch losses vs zero forecast losses). |
 
 Use recorded/condensed portions of a five-minute-capable run where necessary; do not imply that the two-minute presentation is the entire interaction duration. Rehearse a showcase seed separately from evaluation seeds. The system should still run live, and the presentation must not fabricate its outcomes.
+
+On the current forecast ensembles (PR #32) the shipped scenario no longer produces urgent withdrawals, automatic yields, or a scout fire report on `showcase-1` or the 20 held-out seeds, with identical work, sites standing and crews lost. The presentation therefore shows only events that occur in the run: accepted redirects, refusals, holding at refuge, and the ending. Do not describe a withdrawal or yield unless it appears in the run being shown. See issue #94.
 
 Release evidence still missing for a full product sign-off: Playwright captures on a named machine, real-provider smoke test, production `vite build` on target hardware, and rehearsed demo recording. **Existing evidence:** green CI on typecheck/lint/test, held-out JSON comparison reports, representative failure lists in evaluation output, and session logs with browser verification notes. Describe headline evaluation wins/losses only with the scenario and policy caveats in [SERVER_AND_EVALUATION.md](SERVER_AND_EVALUATION.md).
