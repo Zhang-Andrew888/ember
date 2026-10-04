@@ -7,6 +7,8 @@ export interface PreparedSpeechPlayParams {
   readonly incidentId: string;
   readonly token: string;
   readonly itemId: string;
+  /** Called once the browser has actually started the clip (not when the fetch begins). */
+  readonly onPlaying?: () => void;
 }
 
 /** Minimal surface used for playback; injectable in tests. */
@@ -81,7 +83,12 @@ export class PreparedSpeechPlayback {
         abort.signal.addEventListener("abort", onAbort);
         audio.onended = () => settle(resolve);
         audio.onerror = () => settle(() => reject(new Error("playback failed")));
-        void audio.play().catch((err) => settle(() => reject(err instanceof Error ? err : new Error("playback failed"))));
+        void audio
+          .play()
+          .then(() => {
+            if (!abort.signal.aborted) params.onPlaying?.();
+          })
+          .catch((err) => settle(() => reject(err instanceof Error ? err : new Error("playback failed"))));
       });
       return "completed";
     } catch (error) {
@@ -143,6 +150,9 @@ export interface GrokAudioCueContext {
   readonly incidentId: string;
   readonly token: string;
   readonly notifyPlayback: (itemId: string, outcome: SpeechPlaybackOutcome) => void;
+  /** Local playback progress for on-screen audio status. */
+  readonly onPlaying?: (itemId: string) => void;
+  readonly onOutcome?: (itemId: string, outcome: PreparedSpeechOutcome) => void;
 }
 
 /** Maps server audio wire cues to browser playback (#75) and `speech_playback` acks (#85). */
@@ -154,8 +164,15 @@ export function handleGrokAudioCue(
   switch (cue.event) {
     case "started":
       void playback
-        .play({ apiBase: ctx.apiBase, incidentId: ctx.incidentId, token: ctx.token, itemId: cue.itemId })
+        .play({
+          apiBase: ctx.apiBase,
+          incidentId: ctx.incidentId,
+          token: ctx.token,
+          itemId: cue.itemId,
+          onPlaying: () => ctx.onPlaying?.(cue.itemId),
+        })
         .then((outcome: PreparedSpeechOutcome) => {
+          ctx.onOutcome?.(cue.itemId, outcome);
           const wire = preparedOutcomeToSpeechPlayback(outcome);
           if (wire !== null) ctx.notifyPlayback(cue.itemId, wire);
         });

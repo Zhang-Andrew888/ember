@@ -14,9 +14,10 @@ export interface VoiceCaptureOptions extends MockVoiceAdapterOptions {
 }
 
 /**
- * Push-to-talk capture for the web UI. Uses the mock transcript rotator by default;
- * when `preferMicrophone` is set, probes real microphone permission for briefing status
- * and future provider wiring (Slice 5). Speech-to-text remains mock until Grok Voice lands.
+ * Sample-line push-to-talk: every capture returns the next canned transcript and never records
+ * the user. Real speech goes through the server STT path in `ConversationPanel` instead.
+ * `probeMicrophone` only reports permission; a granted microphone does not mean speech recognition
+ * is available.
  */
 export function createVoiceCapture(options: VoiceCaptureOptions = {}): VoiceCaptureAdapter {
   const inner = createMockVoiceAdapter(options);
@@ -45,6 +46,9 @@ export function createVoiceCapture(options: VoiceCaptureOptions = {}): VoiceCapt
       return micPermission;
     },
     probeMicrophone,
+    peekTranscript() {
+      return inner.peekTranscript();
+    },
     start() {
       if (options.preferMicrophone && micPermission === "unknown") {
         void probeMicrophone();

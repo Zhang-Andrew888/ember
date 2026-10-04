@@ -51,10 +51,10 @@ describe("components markup", () => {
     );
     expect(html).toContain("Connected");
     expect(html).toContain("Audio idle");
-    expect(html).toContain("LIVE");
+    expect(html).toContain("Simulation · live server");
   });
 
-  it("TopBar shows MOCK when transport is mock", () => {
+  it("TopBar labels recorded showcase mode", () => {
     const html = renderToStaticMarkup(
       createElement(TopBar, {
         transportMode: "mock",
@@ -70,7 +70,7 @@ describe("components markup", () => {
         },
       }),
     );
-    expect(html).toContain("MOCK");
+    expect(html).toContain("Recorded showcase");
   });
 
   it("UrgentStrip uses callsign and alert role", () => {
@@ -109,6 +109,7 @@ describe("components markup", () => {
       pickHint: null,
       delivery: null,
       disabled: false,
+      onDraftDirection: () => {},
       onSend: () => {},
       onCancelDraft: () => {},
       open: true,
@@ -119,13 +120,14 @@ describe("components markup", () => {
     it("offers a close button while open", () => {
       const html = renderToStaticMarkup(createElement(MapCommandPanel, props));
       expect(html).toContain("map-command-panel__close");
-      expect(html).toContain("Pick destination on map");
+      expect(html).toContain("Pick a direction for Crew 1");
+      expect(html).toContain("Choose a direction without the map");
     });
 
     it("collapses to a reopen control when closed", () => {
       const html = renderToStaticMarkup(createElement(MapCommandPanel, { ...props, open: false }));
       expect(html).toContain("map-command-panel__reopen");
-      expect(html).not.toContain("Pick destination on map");
+      expect(html).not.toContain("Pick a direction");
     });
   });
 });

@@ -1,5 +1,5 @@
 import type { CoordinatorReportEntry, CoordinatorView } from "@ember/domain";
-import type { ServerWireMessage, WireAudioCue, WireReceipt, WireTranscript } from "../net/serverWireParse.js";
+import type { ServerWireMessage, WireAudioCue, WireNotice, WireReceipt, WireTranscript } from "../net/serverWireParse.js";
 import { routineReports } from "../format/reports.js";
 
 export type TranscriptLineKind =
@@ -20,27 +20,55 @@ export interface TranscriptLine {
   readonly urgent: boolean;
 }
 
-export interface WireSidebandState {
-  readonly transcripts: readonly WireTranscript[];
-  readonly receipts: readonly WireReceipt[];
-  readonly audioCues: readonly WireAudioCue[];
+/** A receipt plus the incident time at which it arrived, fixed once so later snapshots never move it. */
+export interface SidebandReceipt extends WireReceipt {
+  readonly arrivalSimTimeMs: number;
 }
 
-export const EMPTY_SIDEBAND: WireSidebandState = { transcripts: [], receipts: [], audioCues: [] };
+export interface SidebandNotice extends WireNotice {
+  readonly arrivalSimTimeMs: number;
+}
 
-export function appendSideband(current: WireSidebandState, message: ServerWireMessage): WireSidebandState {
+export interface WireSidebandState {
+  readonly transcripts: readonly WireTranscript[];
+  readonly receipts: readonly SidebandReceipt[];
+  readonly audioCues: readonly WireAudioCue[];
+  readonly notices: readonly SidebandNotice[];
+  /**
+   * Every report seen in any view of this run, ascending by sequence. The server only projects its
+   * most recent reports, so older ones would otherwise vanish from the conversation.
+   */
+  readonly reports: readonly CoordinatorReportEntry[];
+}
+
+export const EMPTY_SIDEBAND: WireSidebandState = { transcripts: [], receipts: [], audioCues: [], notices: [], reports: [] };
+
+export function appendSideband(
+  current: WireSidebandState,
+  message: ServerWireMessage,
+  arrivalSimTimeMs = 0,
+): WireSidebandState {
   switch (message.type) {
     case "view":
-      return current;
+      return retainReports(current, message.view);
     case "transcript":
       return { ...current, transcripts: [...current.transcripts, message] };
     case "receipt":
-      return { ...current, receipts: [...current.receipts, message] };
+      return { ...current, receipts: [...current.receipts, { ...message, arrivalSimTimeMs }] };
     case "audio":
       return { ...current, audioCues: [...current.audioCues, message] };
-    default:
-      return current;
+    case "notice":
+      return { ...current, notices: [...current.notices, { ...message, arrivalSimTimeMs }] };
   }
+}
+
+/** Adds reports from `view` not yet retained. Identity is the report sequence, never its text. */
+export function retainReports(current: WireSidebandState, view: CoordinatorView): WireSidebandState {
+  const known = new Set(current.reports.map((report) => report.sequence as number));
+  const fresh = view.recentReports.filter((report) => !known.has(report.sequence as number));
+  if (fresh.length === 0) return current;
+  const reports = [...current.reports, ...fresh].sort((a, b) => a.sequence - b.sequence);
+  return { ...current, reports };
 }
 
 function outcomeKind(receipt: WireReceipt["receipt"]): TranscriptLineKind {
@@ -92,11 +120,11 @@ function wireTranscriptLine(message: WireTranscript, view: CoordinatorView | nul
   };
 }
 
-function receiptLine(receipt: WireReceipt, index: number, fallbackSimTimeMs: number): TranscriptLine {
+function receiptLine(receipt: SidebandReceipt, index: number): TranscriptLine {
   return {
     id: `receipt:${receipt.receipt.commandId as string}:${index}`,
     kind: outcomeKind(receipt.receipt),
-    simTimeMs: (receipt.receipt.appliedTick as number | null) ?? fallbackSimTimeMs,
+    simTimeMs: (receipt.receipt.appliedTick as number | null) ?? receipt.arrivalSimTimeMs,
     speaker: "Control",
     text: receipt.reply || receipt.receipt.explanation,
     urgent: false,
@@ -112,13 +140,14 @@ export function buildConversationTranscript(
     view?.agents.find((agent) => agent.id === agentId)?.callsign ?? agentId;
 
   const lines: TranscriptLine[] = [];
-  if (view) {
-    for (const report of routineReports(view)) {
-      lines.push(reportLine(report, callsignFor));
-    }
+  const seenReports = new Set<number>();
+  const retained = sideband.reports.filter((report) => !report.urgent);
+  for (const report of [...retained, ...(view ? routineReports(view) : [])]) {
+    if (seenReports.has(report.sequence as number)) continue;
+    seenReports.add(report.sequence as number);
+    lines.push(reportLine(report, callsignFor));
   }
-  const fallbackSimTimeMs = view ? (view.simTimeMs as number) : 0;
-  const receiptLines = sideband.receipts.map((receipt, index) => receiptLine(receipt, index, fallbackSimTimeMs));
+  const receiptLines = sideband.receipts.map((receipt, index) => receiptLine(receipt, index));
   const receiptTexts = new Set(receiptLines.map((line) => line.text));
   for (const [sequence, message] of sideband.transcripts.entries()) {
     // Routine agent lines repeat the agent's report (the view already carries it), and a control

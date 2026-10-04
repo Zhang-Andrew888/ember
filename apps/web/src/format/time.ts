@@ -31,7 +31,10 @@ export function formatRemainingWallTime(wallElapsedMs: number): string {
   return formatMmSs(Math.max(0, INCIDENT_WALL_LIMIT_MS - wallElapsedMs));
 }
 
-/** Real time elapsed, built strictly from wallElapsedMs (end overlay). */
+/**
+ * Real time elapsed, built strictly from wallElapsedMs (end overlay). Rounded to the nearest
+ * second, so a run that stopped at 299.8 s reads as the 5:00 limit it reached.
+ */
 export function formatElapsedWallTime(wallElapsedMs: number): string {
-  return formatMmSs(wallElapsedMs);
+  return formatMmSs(Math.round(Math.max(0, wallElapsedMs) / 1000) * 1000);
 }

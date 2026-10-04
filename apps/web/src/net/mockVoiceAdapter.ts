@@ -25,6 +25,8 @@ export interface MockVoiceAdapterOptions {
 
 export interface MockVoiceAdapter {
   readonly state: CaptureState;
+  /** The canned line the next successful commit will return. */
+  peekTranscript(): string;
   /** Begins capture. No-op if already recording. */
   start(): void;
   /** Release-to-commit: returns a mock transcript, or null if there was nothing to commit (not recording, or held too briefly). */
@@ -51,6 +53,9 @@ export function createMockVoiceAdapter(options: MockVoiceAdapterOptions = {}): M
   return {
     get state() {
       return state;
+    },
+    peekTranscript() {
+      return transcripts[nextTranscriptIndex % transcripts.length]!;
     },
     start() {
       if (state === "recording") return;

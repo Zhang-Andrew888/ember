@@ -7,17 +7,36 @@ import { scenarioMap } from "../map/activeScenario.js";
 import { SceneView } from "./scene/SceneView.js";
 import { AgentRail } from "./AgentRail.js";
 import { UrgentStrip } from "./UrgentStrip.js";
-import { formatIncidentClock } from "../format/time.js";
+import { formatElapsedWallTime, formatIncidentClock } from "../format/time.js";
 import { useReducedMotion } from "../state/useReducedMotion.js";
 import { latestUrgentReport } from "../format/reports.js";
 
 export type ReplaySource = "incident" | "illustrative";
 
-export interface ReplayViewProps {
-  readonly onExit: () => void;
-  readonly source: ReplaySource;
-  /** Required when `source` is `incident` (this run's server export). */
-  readonly recording?: ReplayRecording;
+/** `incident` always carries this run's validated export; the illustrative sample never does. */
+export type ReplayViewProps = { readonly onExit: () => void } & (
+  | { readonly source: "illustrative"; readonly recording?: undefined }
+  | { readonly source: "incident"; readonly recording: ReplayRecording }
+);
+
+export interface UrgentMarker {
+  readonly index: number;
+  readonly simTimeMs: number;
+  readonly agentId: string;
+  readonly text: string;
+}
+
+/** Recorded events where a new urgent report first appears. */
+export function urgentMarkers(log: ReplayRecording["coordinatorLog"]): UrgentMarker[] {
+  const markers: UrgentMarker[] = [];
+  let lastSequence: number | null = null;
+  log.forEach((view, index) => {
+    const urgent = latestUrgentReport(view);
+    if (urgent === null || (urgent.sequence as number) === lastSequence) return;
+    lastSequence = urgent.sequence as number;
+    markers.push({ index, simTimeMs: urgent.simTimeMs as number, agentId: urgent.agentId as string, text: urgent.text });
+  });
+  return markers;
 }
 
 /**
@@ -31,8 +50,9 @@ export interface ReplayViewProps {
  * the toggle on. The truth comes from the recording's separate truthFrames
  * channel (replay/recording.ts), never from the coordinator log itself.
  */
-export function ReplayView({ onExit, source, recording }: ReplayViewProps) {
-  const bundle = source === "illustrative" ? mockRecording : recording!;
+export function ReplayView(props: ReplayViewProps) {
+  const { onExit, source } = props;
+  const bundle = props.source === "illustrative" ? mockRecording : props.recording;
   const [index, setIndex] = useState(0);
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [showFullFire, setShowFullFire] = useState(false);
@@ -50,6 +70,9 @@ export function ReplayView({ onExit, source, recording }: ReplayViewProps) {
 
   const replayLog = bundle.coordinatorLog;
   const view = replayLog[index]!;
+  const markers = useMemo(() => urgentMarkers(replayLog), [replayLog]);
+  const callsignFor = (agentId: string) =>
+    view.agents.find((agent) => agent.id === agentId)?.callsign ?? agentId;
   const baseEntities = useMemo(() => buildSceneEntities(view, scenarioMap, { phase: "replay" }), [view]);
   const truth = truthForDisplay({
     phase: "replay",
@@ -82,7 +105,7 @@ export function ReplayView({ onExit, source, recording }: ReplayViewProps) {
         {source === "illustrative" ? (
           <span className="replay-banner__notice">Illustrative recording, not from this run.</span>
         ) : (
-          <span className="replay-banner__notice">This run.</span>
+          <span className="replay-banner__notice">Recorded from this run.</span>
         )}
         <span>
           Commands disabled.{" "}
@@ -116,11 +139,19 @@ export function ReplayView({ onExit, source, recording }: ReplayViewProps) {
 
       <UrgentStrip
         report={latestUrgentReport(view)}
-        callsign={null}
+        callsign={(() => {
+          const urgent = latestUrgentReport(view);
+          return urgent === null ? null : callsignFor(urgent.agentId as string);
+        })()}
         audioState="idle"
         queuedUrgent={false}
       />
-      <AgentRail agents={view.agents} selectedAgentId={selectedAgentId} onSelectAgent={setSelectedAgentId} />
+      <AgentRail
+        agents={view.agents}
+        plans={view.agentPlans}
+        selectedAgentId={selectedAgentId}
+        onSelectAgent={setSelectedAgentId}
+      />
 
       <div className="replay-controls">
         <button type="button" onClick={() => setIndex((i) => Math.max(0, i - 1))} disabled={index === 0}>
@@ -136,7 +167,7 @@ export function ReplayView({ onExit, source, recording }: ReplayViewProps) {
           max={replayLog.length - 1}
           value={index}
           onChange={(event) => setIndex(Number(event.target.value))}
-          aria-valuetext={`${formatIncidentClock(view.simTimeMs)}, event ${index + 1} of ${replayLog.length}`}
+          aria-valuetext={`Event ${index + 1} of ${replayLog.length}, ${formatIncidentClock(view.simTimeMs)} incident time`}
         />
         <button
           type="button"
@@ -146,8 +177,26 @@ export function ReplayView({ onExit, source, recording }: ReplayViewProps) {
           Next event ▶
         </button>
         <span className="replay-controls__time">
-          {formatIncidentClock(view.simTimeMs)} ({index + 1} / {replayLog.length})
+          Event {index + 1} of {replayLog.length} · {formatIncidentClock(view.simTimeMs)} incident time ·{" "}
+          {formatElapsedWallTime(view.wallElapsedMs as number)} real time
         </span>
+        <p className="replay-controls__hint">
+          Steps move between recorded events, which are not evenly spaced in time.
+        </p>
+        {markers.length > 0 ? (
+          <details className="replay-controls__markers">
+            <summary>Urgent reports in this recording ({markers.length})</summary>
+            <ul>
+              {markers.map((marker) => (
+                <li key={marker.index}>
+                  <button type="button" onClick={() => setIndex(marker.index)} aria-current={marker.index === index || undefined}>
+                    {formatIncidentClock(marker.simTimeMs)} {callsignFor(marker.agentId)}: {marker.text}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </details>
+        ) : null}
       </div>
     </div>
   );
