@@ -86,7 +86,6 @@ export class Reach {
       const prev = this.from[at]!;
       const opt = this.options[prev]![this.via[at]!]!;
       out.push({
-        kind: "road",
         edgeId: opt.edge.id,
         direction: opt.direction,
         departMs: SimTimeMs.parse(this.nowMs + this.fromK[at]! * this.config.bucketMs),
@@ -202,7 +201,7 @@ export function startsFromPosition(
   config: NavConfig,
 ): SearchStart[] {
   if (position.kind === "node") return [{ nodeId: position.nodeId, k: 0, prefix: [] }];
-  if (position.kind === "off_road") return [];
+  if (position.kind === "offroad") return [];
   const road: RoadIndex = hm.road;
   const edge = road.mustEdge(position.edgeId);
   const dist = position.distanceAlongPolyline;
@@ -219,7 +218,6 @@ export function startsFromPosition(
       k,
       prefix: [
         {
-          kind: "road",
           edgeId: edge.id,
           direction,
           departMs: SimTimeMs.parse(nowMs),
@@ -320,7 +318,6 @@ export class ReturnTable {
       if (how < 0) throw new Error("no return from here");
       const o = this.options[ni]![how - 2]!;
       legs.push({
-        kind: "road",
         edgeId: o.edge.id,
         direction: o.direction,
         departMs: SimTimeMs.parse(this.nowMs + layer * this.config.bucketMs),

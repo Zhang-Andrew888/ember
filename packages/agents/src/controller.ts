@@ -330,11 +330,6 @@ export class CrewController implements AgentController {
     if (closed.size === 0) return false;
     for (let i = legIndex; i < plan.timedLegs.length; i++) {
       const leg = plan.timedLegs[i]!;
-      if (leg.kind === "off_road") {
-        // Direct closure is edge-based; off-road exposure is handled by certifyPlan.
-        continue;
-      }
-      if (leg.kind !== "road") continue;
       const edge = this.road.mustEdge(leg.edgeId);
       let lo = 0;
       let hi = edge.length;
@@ -468,7 +463,7 @@ export class CrewController implements AgentController {
         ? proj.position.nodeId
         : proj.position.kind === "edge"
           ? proj.position.edgeId
-          : this.map.refuges[0]!.nodeId);
+          : NodeId.parse("offroad-halt"));
     const plan = MissionPlan.parse({
       id: `halt-${this.agentId}-${proj.simTimeMs}`,
       recipientId: this.agentId,
@@ -645,7 +640,7 @@ export class CrewController implements AgentController {
         this.objective = obj;
         this.holding = false;
         this.evalDirty = true;
-        if (this.active !== null && this.active.plan.timedLegs.some((l) => l.kind === "road" && l.edgeId === obj.targetId)) {
+        if (this.active !== null && this.active.plan.timedLegs.some((l) => l.edgeId === obj.targetId)) {
           return reject("active_plan_uses_corridor");
         }
         this.decide(out, proj, "mission_update", "objective_accepted", `avoiding corridor ${obj.targetId}`);

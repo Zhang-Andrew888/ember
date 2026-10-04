@@ -19,7 +19,7 @@ function randomPlan(rng: Rng, road: RoadIndex, inc: Incident, agentId: string) {
     startEdge = proj.position.edgeId;
     heading = rng.next() < 0.5 ? proj.position.direction : proj.position.direction === "forward" ? "reverse" : "forward";
     const e = road.mustEdge(startEdge);
-    legs.push({ kind: "road", edgeId: startEdge, direction: heading, departMs: SimTimeMs.parse(now), arriveMs: SimTimeMs.parse(now + legTravelMs(e.length)) });
+    legs.push({ edgeId: startEdge, direction: heading, departMs: SimTimeMs.parse(now), arriveMs: SimTimeMs.parse(now + legTravelMs(e.length)) });
     at = heading === "forward" ? e.to : e.from;
     t = now + legTravelMs(e.length);
   }
@@ -29,7 +29,7 @@ function randomPlan(rng: Rng, road: RoadIndex, inc: Incident, agentId: string) {
     if (options.length === 0) break;
     const adj = options[rng.int(0, options.length - 1)]!;
     const e = road.mustEdge(adj.edgeId);
-    legs.push({ kind: "road", edgeId: adj.edgeId, direction: adj.direction, departMs: SimTimeMs.parse(t), arriveMs: SimTimeMs.parse(t + legTravelMs(e.length)) });
+    legs.push({ edgeId: adj.edgeId, direction: adj.direction, departMs: SimTimeMs.parse(t), arriveMs: SimTimeMs.parse(t + legTravelMs(e.length)) });
     t += legTravelMs(e.length) + rng.int(0, 3) * 5000;
     at = adj.toNode;
   }

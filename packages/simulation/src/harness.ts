@@ -41,7 +41,7 @@ export function authoredCommit(m: AuthoredMission): Extract<SimInput, { kind: "c
       const direction = edge.from === at ? "forward" : "reverse";
       if (direction === "reverse" && edge.to !== at) throw new Error(`edge ${id} does not touch ${at}`);
       const arrive = t + legTravelMs(edge.length);
-      legs.push({ kind: "road", edgeId: edge.id, direction, departMs: SimTimeMs.parse(t), arriveMs: SimTimeMs.parse(arrive) });
+      legs.push({ edgeId: edge.id, direction, departMs: SimTimeMs.parse(t), arriveMs: SimTimeMs.parse(arrive) });
       at = direction === "forward" ? edge.to : edge.from;
       t = arrive;
     }

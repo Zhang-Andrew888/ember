@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
   AgentId,
   CommandId,
+  EdgeId,
   MissionPlanId,
   NodeId,
   ObjectiveId,
@@ -10,10 +11,7 @@ import {
   SiteId,
 } from "./ids.js";
 import { Meters, SequenceNumber, SimTimeMs, WallTimeMs, WorkUnits } from "./units.js";
-import { AgentPosition } from "./position.js";
-import { TimedLeg } from "./legs.js";
-
-export { TimedLeg, RoadTimedLeg, OffRoadTimedLeg, isRoadLeg, isOffRoadLeg } from "./legs.js";
+import { AgentPosition, MapPoint } from "./position.js";
 
 export const AgentRole = z.enum(["protection_crew", "scout"]);
 export type AgentRole = z.infer<typeof AgentRole>;
@@ -210,11 +208,38 @@ export type Objective = z.infer<typeof Objective>;
 
 // ---------- MissionPlan ----------
 
+export const TimedLeg = z.object({
+  edgeId: EdgeId,
+  direction: z.enum(["forward", "reverse"]),
+  departMs: SimTimeMs,
+  arriveMs: SimTimeMs,
+});
+export type TimedLeg = z.infer<typeof TimedLeg>;
+
+/** Off-road travel uses half of the road speed. Coordinates are in map meters. */
+export const OffroadTimedLeg = z.object({
+  kind: z.literal("offroad"),
+  start: MapPoint,
+  end: MapPoint,
+  departMs: SimTimeMs,
+  arriveMs: SimTimeMs,
+  speedFactor: z.literal(0.5).default(0.5),
+}).refine((leg) => leg.arriveMs > leg.departMs, {
+  message: "Off-road arrival must follow departure",
+  path: ["arriveMs"],
+}).refine((leg) => leg.start.x !== leg.end.x || leg.start.y !== leg.end.y, {
+  message: "Off-road leg must have a destination distinct from its start",
+  path: ["end"],
+});
+export type OffroadTimedLeg = z.infer<typeof OffroadTimedLeg>;
+
 export const MissionPlan = z.object({
   id: MissionPlanId,
   recipientId: AgentId,
   knowledgeRevision: SequenceNumber,
   timedLegs: z.array(TimedLeg),
+  /** Future off-road movement legs; road legs remain unchanged. */
+  offroadLegs: z.array(OffroadTimedLeg).optional(),
   /** Sim-time window for on-scene work; length is the committed duration for structure or containment work. */
   workInterval: z.object({ startMs: SimTimeMs, endMs: SimTimeMs }),
   /**

@@ -1,4 +1,4 @@
-import { isRoadLeg, type AgentId, type EdgeId, type MissionPlan } from "@ember/domain";
+import type { AgentId, EdgeId, MissionPlan } from "@ember/domain";
 import type { RoadIndex } from "@ember/simulation/model";
 import type { ReservationOracle } from "./types.js";
 
@@ -86,7 +86,6 @@ export class ReservationService {
   windowsOfPlan(plan: MissionPlan): Window[] {
     const out: Window[] = [];
     for (const leg of plan.timedLegs) {
-      if (!isRoadLeg(leg)) continue;
       if (!this.road.mustEdge(leg.edgeId).singleCapacity) continue;
       out.push({ edgeId: leg.edgeId, direction: leg.direction, enterMs: leg.departMs, exitMs: leg.arriveMs });
     }

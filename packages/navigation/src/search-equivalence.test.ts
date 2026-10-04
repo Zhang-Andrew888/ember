@@ -74,7 +74,6 @@ function referenceSearch(hm: HazardModel, nowMs: number, starts: readonly Search
         continue;
       }
       out.push({
-        kind: "road",
         edgeId: parent.edge,
         direction: parent.direction,
         departMs: SimTimeMs.parse(nowMs + parent.fromK * config.bucketMs),

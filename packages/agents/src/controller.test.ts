@@ -199,8 +199,8 @@ describe("autonomous withdrawal and survival", () => {
     if (order?.kind === "commit_plan") {
       expect(order.mode).toBe("withdrawing");
       // Home by the south-east road instead: the corridor cell is observed burning.
-      expect(order.plan.timedLegs.filter((l) => l.kind === "road").map((l) => l.edgeId)).toContain("e-rs-sc");
-      expect(order.plan.timedLegs.filter((l) => l.kind === "road").map((l) => l.edgeId)).not.toContain("e-s-h");
+      expect(order.plan.timedLegs.map((l) => l.edgeId)).toContain("e-rs-sc");
+      expect(order.plan.timedLegs.map((l) => l.edgeId)).not.toContain("e-s-h");
     }
     expect(out.reports[0]?.urgent).toBe(true);
     expect(out.reports[0]?.text).toMatch(/Crew 1 is withdrawing/);
@@ -499,8 +499,6 @@ describe("mid-edge replanning against the simulator", () => {
     expect(order?.kind).toBe("commit_plan");
     if (order?.kind !== "commit_plan") return;
     const first = order.plan.timedLegs[0]!;
-    expect(first.kind).toBe("road");
-    if (first.kind !== "road") return;
     expect(first.edgeId).toBe("e-s-h");
     expect(first.direction).toBe("reverse");
     // The simulator accepts it from the actual position and starts the turnaround at once.

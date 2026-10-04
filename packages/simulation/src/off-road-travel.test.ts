@@ -8,23 +8,19 @@ import {
 } from "./index.js";
 import { RoadIndex, SIM_DEFAULTS, cellIndexOf } from "./model/index.js";
 
-const BUCKET_MS = 5000;
-
-function offRoadTravelMs(distanceM: number): number {
-  const speed = SIM_DEFAULTS.agentSpeedMps * SIM_DEFAULTS.offRoadSpeedFactor;
-  const exact = (distanceM / speed) * 1000;
-  return Math.ceil(exact / BUCKET_MS) * BUCKET_MS;
-}
-
 const noWindShift = { windShiftMs: 10_000_000, spreadMultiplier: 1, initialWindRad: 0 };
 
 function farFireScenario() {
   return buildSyntheticScenario({ agents: ["crew-3"], sites: [] });
 }
 
-describe("off-road travel (#120)", () => {
-  const distanceM = 360.555; // n-s (700,600) → n-h (1000,800)
+function offRoadTravelMs(distanceM: number): number {
+  const speed = SIM_DEFAULTS.agentSpeedMps * SIM_DEFAULTS.offRoadSpeedFactor;
+  const exact = (distanceM / speed) * 1000;
+  return Math.ceil(exact / 5000) * 5000;
+}
 
+describe("off-road travel (#120, #137 contract)", () => {
   it("rejects a plan whose first leg references an unknown road edge", () => {
     const scenario = farFireScenario();
     const inc = new Incident({
@@ -39,7 +35,7 @@ describe("off-road travel (#120)", () => {
       knowledgeRevision: SequenceNumber.parse(inc.agentRevision(crew)),
       timedLegs: [
         {
-          edgeId: "e-not-real",
+          edgeId: "e-not-real" as EdgeId,
           direction: "forward",
           departMs: SimTimeMs.parse(0),
           arriveMs: SimTimeMs.parse(5000),
@@ -55,7 +51,7 @@ describe("off-road travel (#120)", () => {
     expect(inc.notices.some((n) => n.kind === "plan_rejected" && n.reason === "unknown_edge")).toBe(true);
   });
 
-  it("traverses a valid off-road leg, finishes on the end node, and projects off_road while moving", () => {
+  it("traverses an offroadLeg, projects offroad progress, and finishes on a road node", () => {
     const scenario = farFireScenario();
     const inc = new Incident({
       scenario: { ...scenario, map: { ...scenario.map, initialFireCells: [cellIndexOf(30, 1500)!] } },
@@ -79,23 +75,22 @@ describe("off-road travel (#120)", () => {
       }),
     );
     const rsEdge = road.mustEdge("e-rs-s" as EdgeId);
-    const approachMs = legTravelMs(rsEdge.length);
-    inc.advanceTo(approachMs);
+    inc.advanceTo(legTravelMs(rsEdge.length));
     expect(inc.projectAgent(crew).position).toEqual({ kind: "node", nodeId: "n-s" });
 
-    const travelMs = offRoadTravelMs(distanceM);
+    const start = { x: 700, y: 600 };
+    const end = { x: 1000, y: 800 };
+    const travelMs = offRoadTravelMs(Math.hypot(end.x - start.x, end.y - start.y));
     const offPlan = MissionPlan.parse({
       id: MissionPlanId.parse("off-s-h"),
       recipientId: crew,
       knowledgeRevision: SequenceNumber.parse(inc.agentRevision(crew)),
-      timedLegs: [
+      timedLegs: [],
+      offroadLegs: [
         {
-          kind: "off_road",
-          fromX: 700,
-          fromY: 600,
-          toX: 1000,
-          toY: 800,
-          endNodeId: NodeId.parse("n-h"),
+          kind: "offroad",
+          start,
+          end,
           departMs: SimTimeMs.parse(0),
           arriveMs: SimTimeMs.parse(travelMs),
         },
@@ -110,10 +105,9 @@ describe("off-road travel (#120)", () => {
 
     inc.advanceTo(inc.truth().timeMs + 1);
     const mid = inc.projectAgent(crew).position;
-    expect(mid.kind === "off_road" || mid.kind === "node").toBe(true);
-    if (mid.kind === "off_road") {
-      expect(mid.x).toBeGreaterThan(700);
-      expect(mid.y).toBeGreaterThan(600);
+    expect(mid.kind === "offroad" || mid.kind === "node").toBe(true);
+    if (mid.kind === "offroad") {
+      expect(mid.progress).toBeGreaterThan(0);
     }
 
     inc.advanceTo(inc.truth().timeMs + travelMs + 5000);
