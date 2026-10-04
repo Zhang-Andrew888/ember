@@ -5,6 +5,7 @@ import type { Camera } from "three";
 import { SceneCanvas } from "./SceneCanvas.js";
 import { SceneLabelLayer, type LabelDescriptor } from "./SceneLabelLayer.js";
 import { SceneLegend } from "./SceneLegend.js";
+import { SceneCompass } from "./SceneCompass.js";
 import type { CameraControlsHandle } from "./CameraControls.js";
 import { polylineMidpoint } from "./sceneLayers.js";
 import { listRefugeNodes, type FireCellMarker, type SceneEntities } from "./sceneEntities.js";
@@ -41,8 +42,9 @@ export function SceneView({
   const [inspectedCell, setInspectedCell] = useState<FireCellMarker | null>(null);
   const controlsRef = useRef<CameraControlsHandle>(null);
   const legendRef = useRef<HTMLDivElement>(null);
+  const compassRef = useRef<HTMLDivElement>(null);
   const cellPanelRef = useRef<HTMLDivElement>(null);
-  const reservedElementRefs = useMemo(() => [legendRef, cellPanelRef], []);
+  const reservedElementRefs = useMemo(() => [legendRef, compassRef, cellPanelRef], []);
 
   const handleReady = useCallback((state: RootState) => {
     setRenderContext({ camera: state.camera, canvasElement: state.gl.domElement });
@@ -139,6 +141,7 @@ export function SceneView({
         labels={labels}
         reservedElementRefs={reservedElementRefs}
       />
+      {renderContext ? <SceneCompass ref={compassRef} camera={renderContext.camera} /> : null}
       <SceneLegend
         ref={legendRef}
         showFireCells={showFireCells}
