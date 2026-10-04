@@ -249,20 +249,43 @@ select {
 @media (max-width: 1023px) {
   .app-layout__main {
     flex-direction: column;
-    min-height: 34rem;
+    min-height: auto;
   }
 
+  /* The canvas's last drawn height must not become the scene's minimum, or the stack never shrinks. */
   .app-layout__main .scene-view {
     flex: 1 1 50%;
-    min-height: 260px;
+    min-height: 220px;
+    contain: size;
   }
 
+  /*
+   * min-height: auto keeps the panel at least as tall as its controls (the transcript scrolls), so
+   * on a short window the page scrolls rather than clipping the composer.
+   */
   .app-layout__main .conversation-panel {
     flex: 1 1 50%;
     min-width: 0;
-    min-height: 16rem;
+    min-height: auto;
     border-left: none;
     border-top: 1px solid var(--color-border);
+  }
+
+  .app-layout__main .conversation-panel__history {
+    min-height: 3.5rem;
+  }
+
+  .app-layout__main .conversation-panel__transcript {
+    contain: size;
+  }
+
+  /* The stacked panel is full width, so the input shares its row with the buttons. */
+  .app-layout__main .conversation-panel__composer input[type="text"] {
+    flex: 1 1 16rem;
+  }
+
+  .app-layout__main .conversation-panel__composer > :is(p, span, div) {
+    order: 1;
   }
 }
 
@@ -502,7 +525,8 @@ select {
 
 .map-command-panel__status--sent,
 .map-command-panel__status--interpreting,
-.map-command-panel__status--received {
+.map-command-panel__status--received,
+.map-command-panel__status--replied {
   color: var(--color-muted);
 }
 
