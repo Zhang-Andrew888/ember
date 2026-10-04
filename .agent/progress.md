@@ -4,9 +4,9 @@ Queue: 110 → 111 → 119 → 120 → 121 → 124. This file lives on `agent/is
 
 | Issue | Status | Branch | PR URL | Root cause | Open questions |
 | --- | --- | --- | --- | --- | --- |
-| #110 | PR-open | `fix/issue-110-directional-objective` | https://github.com/Zhang-Andrew888/ember/pull/132 | `ObjectiveKind` lacked movement; PR defines eight directions, a 250 m default, 500 m cap, and safe road-node stopping. | Await review and CI. |
-| #111 | diagnosing | `fix/issue-111-directional-crew-movement` | — | The interpreter and objective pipeline cannot express a directional command. | Implement against #110's branch and retarget after it merges. |
-| #119 | todo | — | — | `AgentPosition` and mission legs represent only nodes and road edges. | Design bounded coordinates and 50% off-road speed. |
+| #110 | PR-open | `fix/issue-110-directional-objective` | https://github.com/Zhang-Andrew888/ember/pull/132 | `ObjectiveKind` lacked movement; PR defines eight directions, a 600 m default, 1,200 m cap, and safe road-node stopping. | Await review and CI. |
+| #111 | PR-open | `fix/issue-111-directional-crew-movement` | https://github.com/Zhang-Andrew888/ember/pull/135 | Interpreter, gateway, navigation, and controller lacked a directional command path. | Stacked on #110; retarget to `main` after #132 merges. |
+| #119 | diagnosing | `fix/issue-119-offroad-contract` | — | `AgentPosition` and mission legs represent only nodes and road edges. | Design bounded coordinates and 50% off-road speed. |
 | #120 | todo | — | — | Planning and simulation only admit road edges. | Depends on #119's position and leg contract. |
 | #121 | todo | — | — | The map supports inspection but no crew destination command flow. | Depends on #111's supported command and crew decision. |
 | #124 | PR-open | `fix/issue-124-camera-compass` | https://github.com/Zhang-Andrew888/ember/pull/128 | The scene had no orientation overlay or camera rotation binding. | PR #128 has been merged to `main`. |
