@@ -1,5 +1,5 @@
 import type { MapPoint, NodeId } from "@ember/domain";
-import { SIM_DEFAULTS, firelineId, reachableFirelineCells } from "@ember/simulation/model";
+import { SIM_DEFAULTS, firelineCells, firelineId, gameLineApproachMaxM, reachableFirelineCells } from "@ember/simulation/model";
 import type { RoadIndex } from "@ember/simulation/model";
 import { workOptions } from "./mission.js";
 import { DEFAULT_NAV_CONFIG, type MissionTarget, type NavConfig } from "./types.js";
@@ -43,12 +43,16 @@ export function firelineTarget(
   end: MapPoint,
   workRate: number = SIM_DEFAULTS.lineWorkRate,
   config: NavConfig = DEFAULT_NAV_CONFIG,
+  gameChanges = false,
 ): FirelineTargetResult {
   const refused: FirelineTargetResult = { ok: false, reason: "no_road_near_line_end" };
-  const workNode = nearestRoadNodeWithin(road, start);
+  // Game-changes crews drive off-road to their end and cut the whole line on foot, so the road
+  // node only needs to be within off-road driving range, and walking along the line costs time.
+  const workNode = nearestRoadNodeWithin(road, start, gameChanges ? gameLineApproachMaxM() : SIM_DEFAULTS.lineReachM);
   if (workNode === null) return refused;
-  const cells = reachableFirelineCells(road, workNode, start, end);
-  const required = cells.length * SIM_DEFAULTS.lineWorkPerCell;
+  const cells = gameChanges ? firelineCells(start, end) : reachableFirelineCells(road, workNode, start, end);
+  const walkSec = gameChanges ? Math.hypot(end.x - start.x, end.y - start.y) / SIM_DEFAULTS.agentSpeedMps : 0;
+  const required = cells.length * SIM_DEFAULTS.lineWorkPerCell + walkSec * workRate;
   const options = workOptions(required, workRate, config.minWorkMs, config.workStepMs);
   if (options.length === 0) return refused;
   return {

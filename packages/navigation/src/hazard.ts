@@ -1,5 +1,5 @@
 import type { EdgeId, NodeId } from "@ember/domain";
-import { earliestIgnitionMs } from "@ember/forecast";
+import { earliestIgnitionMs, rankedIgnitionMs } from "@ember/forecast";
 import type { ForecastEnsemble, ForecastMember } from "@ember/forecast";
 import { GAME_CHANGES, SIM_DEFAULTS, cellIndexOf, type RoadEdge, type RoadIndex } from "@ember/simulation/model";
 import { DEFAULT_NAV_CONFIG, type NavConfig, type PlanningContext } from "./types.js";
@@ -22,9 +22,16 @@ export class HazardModel {
     readonly closed: ReadonlySet<number>,
     readonly config: NavConfig,
     members: readonly ForecastMember[] = ensemble.members,
+    /** Plan against each cell's `memberRank`-th earliest ignition across the ensemble instead of the earliest. */
+    memberRank = 1,
   ) {
     this.horizonEndMs = ensemble.horizonEndMs;
-    this.earliest = members === ensemble.members ? earliestIgnitionMs(ensemble) : minIgnition(members);
+    this.earliest =
+      members !== ensemble.members
+        ? minIgnition(members)
+        : memberRank > 1
+          ? rankedIgnitionMs(ensemble, memberRank)
+          : earliestIgnitionMs(ensemble);
   }
 
   cellIgnMs(cell: number): number {
@@ -136,7 +143,15 @@ export function planningHazardModel(ctx: PlanningContext, fireFirst: boolean): H
     const ensemble = extendForecastHorizon(ctx.ensemble, ctx.nowMs);
     return new ObservedOnlyHazardModel(ctx.road, ensemble, ctx.closedCells, navConfigFireFirst(config));
   }
-  return new HazardModel(ctx.road, ctx.ensemble, ctx.closedCells, config);
+  return new HazardModel(ctx.road, ctx.ensemble, ctx.closedCells, config, ctx.ensemble.members, ctx.forecastMemberRank ?? 1);
+}
+
+/** Fire-line orders plan against the 6th earliest of 24 members; other ensemble sizes scale that rank. */
+export const LINE_FORECAST_MEMBER_RANK = { rank: 6, ofMembers: 24 } as const;
+
+export function lineForecastMemberRank(memberCount: number): number {
+  const { rank, ofMembers } = LINE_FORECAST_MEMBER_RANK;
+  return Math.max(1, Math.min(memberCount, Math.round((rank * memberCount) / ofMembers)));
 }
 
 function minIgnition(members: readonly ForecastMember[]): Float64Array {

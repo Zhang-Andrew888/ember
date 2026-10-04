@@ -13,7 +13,7 @@ import {
   createWarnGeometry,
   createWorkGlyphGeometry,
 } from "./models/crewModels.js";
-import { HoseMist } from "./models/HoseMist.js";
+import { HOSE_REACH_M, HoseMist } from "./models/HoseMist.js";
 
 /** Models sit on the ground; the base of each is y = 0 in its own frame. */
 const MODEL_LIFT = 1.5;
@@ -25,9 +25,11 @@ const CREW_COLORS = ["#4FA7E0", "#E0A04A", "#8BBF6B", "#C97BC2", "#D9D26A"];
 const MUTED = "#6c7476";
 const MUTED_STALE = "#c3cdcf";
 
+/** A spraying crew turns to face its hose; otherwise it faces the way it travels. */
 function headingRotationY(agent: AgentMarker): number {
-  if (!agent.heading) return 0;
-  return -Math.atan2(agent.heading.dz, agent.heading.dx);
+  const facing = agent.hoseAim ?? agent.heading;
+  if (!facing) return 0;
+  return -Math.atan2(facing.dz, facing.dx);
 }
 
 /** Memoised geometry that is disposed when the component unmounts. */
@@ -174,7 +176,7 @@ function AgentModel({
         <primitive object={material} attach="material" />
       </mesh>
       <GlyphMeshes glyph={cue.glyph} />
-      {agent.state === "working" ? <HoseMist headingRad={headingRotationY(agent)} /> : null}
+      {agent.hoseAim !== null ? <HoseMist reach={HOSE_REACH_M / MODEL_SCALE} /> : null}
       {selected ? (
         <mesh position={[0, 0.6, 0]} rotation={[-Math.PI / 2, 0, 0]}>
           <ringGeometry args={[27, 30, 40]} />

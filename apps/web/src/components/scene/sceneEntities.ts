@@ -22,6 +22,8 @@ export interface AgentMarker {
   readonly state: AgentDisplayState;
   readonly position: SceneVector;
   readonly heading: SceneHeading | null;
+  /** Where the crew's hose faces while it is hitting fire; null when it is not spraying. */
+  readonly hoseAim: SceneHeading | null;
   /** Sim ms since the coordinator last heard from this agent (its position is that old). */
   readonly ageMs: number | null;
 }
@@ -206,6 +208,7 @@ function resolveAgents(view: CoordinatorView, map: ScenarioMap): AgentMarker[] {
       state: displayState(agent.state, view.agentPlans.find((plan) => plan.agentId === agent.id)?.phase),
       position,
       heading,
+      hoseAim: agent.hose === undefined ? null : { dx: agent.hose.dx, dz: agent.hose.dy },
       ageMs: ageOf(view.simTimeMs as number, agent.reportedAt as number),
     });
   }

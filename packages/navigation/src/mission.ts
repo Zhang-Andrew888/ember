@@ -1,7 +1,7 @@
 import { MissionPlan, MissionPlanId, NodeId, SequenceNumber, SimTimeMs, type EdgeId } from "@ember/domain";
 import { admitsProtection } from "@ember/forecast";
 import { hashValue } from "@ember/knowledge";
-import { GAME_CHANGES, cellCenter, gameHoseRadiusM } from "@ember/simulation/model";
+import { GAME_CHANGES, SIM_DEFAULTS, cellCenter, gameHoseRadiusM } from "@ember/simulation/model";
 import { offRoadTravelMs } from "./travel.js";
 import { enumerateApproachRoutes, routeIdOf } from "./approach-routes.js";
 import { HazardModel, navConfigFireFirst, planningHazardModel } from "./hazard.js";
@@ -89,7 +89,10 @@ export function planWithHazard(ctx: PlanningContext, hm: HazardModel, targets: r
         const skipReturn =
           gc &&
           GAME_CHANGES.skipReturnLegAfterSuppress &&
-          (target.kind === "contain" || (GAME_CHANGES.allowOffroadDirectional && target.kind === "observe"));
+          (target.kind === "contain" ||
+            target.kind === "line" ||
+            target.kind === "protect" ||
+            (GAME_CHANGES.allowOffroadDirectional && target.kind === "observe"));
         let offroadLegs: MissionPlan["offroadLegs"];
         let workStartMs = arriveMs;
         let workEndMs = endMs;
@@ -114,6 +117,25 @@ export function planWithHazard(ctx: PlanningContext, hm: HazardModel, targets: r
           } else {
             workStartMs = arriveMs;
             workEndMs = arriveMs + w;
+          }
+        }
+        if (gc && target.kind === "line" && target.line !== undefined) {
+          const from = ctx.road.nodePoint(target.nodeId);
+          const to = target.line.start;
+          const offM = Math.hypot(to.x - from.x, to.y - from.y);
+          if (offM > SIM_DEFAULTS.cellMeters) {
+            workStartMs = arriveMs + offRoadTravelMs(offM, config);
+            workEndMs = workStartMs + w;
+            offroadLegs = [
+              {
+                kind: "offroad" as const,
+                start: { x: from.x, y: from.y },
+                end: { x: to.x, y: to.y },
+                departMs: SimTimeMs.parse(arriveMs),
+                arriveMs: SimTimeMs.parse(workStartMs),
+                speedFactor: 0.5 as const,
+              },
+            ];
           }
         }
         if (!(workEndMs < nodeSafeLimit) || !(workEndMs + config.bufferMs < hm.horizonEndMs)) break;
@@ -202,12 +224,19 @@ export function planMissions(ctx: PlanningContext, targets: readonly MissionTarg
     limitingMemberIds: limiting,
   });
   const gc = ctx.gameChanges === true;
-  const fireOnly = targets.length > 0 && targets.every((t) => t.kind === "contain") && gc;
-  const directionalOnly = targets.length > 0 && targets.every((t) => t.kind === "observe") && gc;
-  if (!admitsProtection(ctx.ensemble) && !fireOnly && !directionalOnly) return reject("forecast_unreliable");
+  // Game-changes: fighting fire, cutting line and saving buildings outrank the forecast margin.
+  const fireFirst = gc && GAME_CHANGES.ignoreForecastSpreadForFire && targets.length > 0;
+  if (!admitsProtection(ctx.ensemble) && !fireFirst) return reject("forecast_unreliable");
   if (targets.length === 0) return reject("no_unresolved_target");
 
-  const fireFirst = gc && GAME_CHANGES.ignoreForecastSpreadForFire && (fireOnly || directionalOnly);
+  // A ranked line order keeps its forecast plan when one exists; otherwise the crew goes anyway.
+  const ranked =
+    fireFirst && admitsProtection(ctx.ensemble) && (ctx.forecastMemberRank ?? 1) > 1 && targets.every((t) => t.kind === "line")
+      ? planWithHazard(ctx, planningHazardModel(ctx, false), targets)
+      : [];
+  if (ranked[0] !== undefined) {
+    return { feasible: true, best: ranked[0], candidates: ranked, plan: ranked[0].plan, limitingReason: ranked[0].plan.limitingReason, limitingMemberIds: [] };
+  }
   const planCtx: PlanningContext =
     fireFirst ? { ...ctx, config: navConfigFireFirst(config) } : ctx;
   const hm = planningHazardModel(planCtx, fireFirst);

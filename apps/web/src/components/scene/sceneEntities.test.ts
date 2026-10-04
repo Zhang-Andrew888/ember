@@ -32,6 +32,16 @@ describe("components/scene/sceneEntities - buildSceneEntities", () => {
     expect(crew2?.heading).toBeNull();
   });
 
+  it("passes a spraying crew's hose heading through and leaves other crews without one", () => {
+    const view = {
+      ...fixtureCoordinatorView,
+      agents: fixtureCoordinatorView.agents.map((a) => (a.id === "crew-2" ? { ...a, hose: { dx: 0, dy: -1 } } : a)),
+    };
+    const agents = buildSceneEntities(view, scenarioMap).agents;
+    expect(agents.find((a) => a.id === "crew-2")?.hoseAim).toEqual({ dx: 0, dz: -1 });
+    expect(agents.find((a) => a.id === "crew-1")?.hoseAim).toBeNull();
+  });
+
   it("resolves all three fixture sites", () => {
     expect(entities.sites).toHaveLength(3);
     expect(entities.sites.every((s) => s.protectionStatus === "unobserved")).toBe(true);

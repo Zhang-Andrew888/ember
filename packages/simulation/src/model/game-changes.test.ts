@@ -7,6 +7,7 @@ import {
   gameHoseOnSceneRadiusM,
   gameHoseRadiusM,
   gameHoseStandoffTargetM,
+  turnToward,
 } from "./game-changes.js";
 import { SIM_DEFAULTS } from "./constants.js";
 
@@ -18,7 +19,22 @@ describe("game-changes hose radii", () => {
     expect(gameHoseDangerRadiusM()).toBe(GAME_CHANGES.hoseDangerRadiusTiles * SIM_DEFAULTS.cellMeters);
     expect(gameHoseStandoffTargetM()).toBe(GAME_CHANGES.hoseStandoffTargetTiles * SIM_DEFAULTS.cellMeters);
     expect(gameHoseOnSceneRadiusM()).toBeLessThanOrEqual(gameHoseRadiusM());
+    // A 180° spray: 90° either side of where the crew faces.
     expect(gameHoseConeMinDot()).toBeCloseTo(0, 10);
+  });
+});
+
+describe("game-changes hose turning", () => {
+  it("turns toward the fire by at most the step's turn and snaps on when close enough", () => {
+    const east = { x: 1, y: 0 };
+    const north = { x: 0, y: 1 };
+    const quarter = Math.PI / 4;
+    const partial = turnToward(east, north, quarter);
+    expect(partial.x).toBeCloseTo(Math.SQRT1_2, 10);
+    expect(partial.y).toBeCloseTo(Math.SQRT1_2, 10);
+    expect(turnToward(east, north, Math.PI)).toEqual(north);
+    const south = turnToward(east, { x: 0, y: -1 }, quarter);
+    expect(south.y).toBeCloseTo(-Math.SQRT1_2, 10);
   });
 });
 

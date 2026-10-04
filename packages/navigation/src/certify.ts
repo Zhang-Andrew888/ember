@@ -46,6 +46,8 @@ export interface CertifyInput {
   readonly ignoreReliability?: boolean;
   /** Game-changes: certify against observed fire only, not forecast spread. */
   readonly fireFirst?: boolean;
+  /** Certify against each cell's n-th earliest forecast ignition (the rank the plan was made with). */
+  readonly forecastMemberRank?: number;
 }
 
 function endNodeOfScheduleEntry(
@@ -74,7 +76,7 @@ export function certifyPlan(input: CertifyInput): CertifyResult {
   const ensemble = fireFirst ? extendForecastHorizon(input.ensemble, input.nowMs) : input.ensemble;
   const hm = fireFirst
     ? new ObservedOnlyHazardModel(input.road, ensemble, input.closedCells, config)
-    : new HazardModel(input.road, ensemble, input.closedCells, config);
+    : new HazardModel(input.road, ensemble, input.closedCells, config, ensemble.members, input.forecastMemberRank ?? 1);
   const legs = scheduledLegs(input.plan);
   const fail = (failure: CertifyFailure): CertifyResult => ({ ok: false, failure });
 

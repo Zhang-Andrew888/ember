@@ -1928,6 +1928,27 @@ select {
   color: var(--color-muted);
 }
 
+.scene-legend--collapsed {
+  min-height: 0;
+  padding: 0.35rem;
+  align-self: flex-start;
+}
+
+.scene-legend__panel-toggle {
+  align-self: flex-start;
+  font-weight: 600;
+}
+
+.scene-legend__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.scene-legend__body[hidden] {
+  display: none;
+}
+
 .scene-legend__keybox summary {
   cursor: pointer;
   font-weight: 600;

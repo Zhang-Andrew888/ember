@@ -25,10 +25,12 @@ import {
   planDirectionalMove,
   containmentTargets,
   firelineTarget,
+  lineForecastMemberRank,
   mergeBurnCellLists,
   planMissions,
   pathClearanceM,
   planHoseInPlace,
+  planLineFromField,
   planRejoinRoad,
   planRetreat,
   planReturn,
@@ -370,6 +372,7 @@ export class CrewController implements AgentController {
       nowMs: proj.simTimeMs,
       ...(this.cfg.nav === undefined ? {} : { config: this.cfg.nav }),
       ...(fireFirst ? { fireFirst: true, ignoreReliability: true } : {}),
+      ...(active.plan.work?.kind === "build_line" ? { forecastMemberRank: lineForecastMemberRank(ctx.ensemble.members.length) } : {}),
     });
     if (!certified.ok) {
       this.withdrawPer(this.continuation(active, proj, ctx, false, reasonOf(certified.failure)), proj, ctx, out);
@@ -526,11 +529,16 @@ export class CrewController implements AgentController {
     });
   }
 
-  /** Game-changes: suppress / toward-fire plans ignore forecast margin; observed fire still blocks. */
+  /**
+   * Game-changes: stopping fire and saving buildings come before the forecast margin, so hose,
+   * structure, fire-line and toward-fire plans ignore forecast spread; observed fire still blocks.
+   */
   private commitsFireFirst(plan: MissionPlanT): boolean {
     if (!this.gameChanges) return false;
-    if (plan.work?.kind === "suppress_fire") return true;
-    if (this.objective?.kind === "move_direction" || this.objective?.kind === "contain_fire") return true;
+    if (plan.work !== undefined) return true;
+    if (this.active?.plan.id === plan.id && this.active.workSiteId !== null) return true;
+    const kind = this.objective?.kind;
+    if (kind === "move_direction" || kind === "contain_fire" || kind === "protect_site" || kind === "build_line") return true;
     const targetId = this.active?.plan.id === plan.id ? this.active.targetId : null;
     return targetId !== null && isExploreTargetId(targetId);
   }
@@ -746,6 +754,15 @@ export class CrewController implements AgentController {
     return [...known, line.anchorCell];
   }
 
+  /**
+   * Game-changes: a coordinator's contain order names fire the crew may not have seen yet, so the
+   * order itself is the report. Fire this crew has seen burn out stays out.
+   */
+  private withOrderedCell(burning: readonly number[], cell: number | undefined): readonly number[] {
+    if (!this.gameChanges || cell === undefined || burning.includes(cell) || this.evidence.seenBurnedOut(cell)) return burning;
+    return [...burning, cell];
+  }
+
   /** Sites that need structure work under game-changes (fire at the building or known damage). */
   private threatenedSiteFilter(nowMs: number): ReadonlySet<string> | null {
     if (!this.gameChanges || !GAME_CHANGES.protectSitesOnlyWhenThreatened) return null;
@@ -771,10 +788,11 @@ export class CrewController implements AgentController {
     const rate = this.cfg.nav?.crewWorkRate ?? this.capabilities.workRate;
     const nav = this.cfg.nav;
     const line = this.lineToJoin(ctx.position);
-    const burning = this.fireCellsKnownTo(ctx.position, ctx.nowMs);
+    const burning = this.withOrderedCell(this.fireCellsKnownTo(ctx.position, ctx.nowMs), containCellIndex);
     const siteThreatened = this.threatenedSiteFilter(ctx.nowMs);
     let siteAllowed = allowedSites;
-    if (siteThreatened !== null) {
+    // A coordinator order to protect a building stands even before this crew sees fire near it.
+    if (siteThreatened !== null && !(this.gameChanges && allowedSites !== null)) {
       if (siteAllowed !== null) {
         siteAllowed = new Set([...siteAllowed].filter((id) => siteThreatened.has(id)));
       } else {
@@ -932,8 +950,9 @@ export class CrewController implements AgentController {
       this.objective?.kind === "protect_site" && this.objective.targetId !== null ? new Set([this.objective.targetId]) : null;
     const containCell = objectiveContainCell(this.objective);
     const burning = this.burnCellsForPlanning(now);
+    const ordered = allowed !== null || containCell !== undefined;
     const result: MissionSearchResult | null =
-      admitsProtection(ctx.ensemble) || burning.length > 0 ? this.candidateSearch(ctx, allowed, containCell) : null;
+      admitsProtection(ctx.ensemble) || burning.length > 0 || ordered ? this.candidateSearch(ctx, allowed, containCell) : null;
     const chosen = result !== null && result.best !== null ? this.commitFirst(proj, result, out) : null;
     if (chosen !== null) {
       this.stranded = false;
@@ -943,7 +962,7 @@ export class CrewController implements AgentController {
       this.report(out, explain(this.callsign, { type: "mission_start", reasonCode: "mission_admitted", actualAction: this.missionVerb(t.id) }), false);
       return;
     }
-    if ((allowed !== null || containCell !== undefined) && this.objective !== null) {
+    if (ordered && this.objective !== null) {
       const reason = result?.limitingReason ?? "forecast_unreliable";
       this.decide(out, proj, "objective_rejected", reason, `objective ${this.objective.id} cannot be satisfied`);
       this.report(out, explain(this.callsign, { type: "objective_rejected", reasonCode: reason, actualAction: "" }, `(${reason})`), true);
@@ -977,6 +996,25 @@ export class CrewController implements AgentController {
     this.stranded = false;
     this.lastIdleReason = null;
     this.decide(out, proj, "mission_start", "hose_in_place", `hosing ${this.missionVerb(chosen.target.id)} from where the crew stands`);
+    return true;
+  }
+
+  /**
+   * Game-changes: road planning cannot start off-road, so a crew out there takes a site or fire
+   * order by driving back to the road first; the order is planned from there.
+   */
+  private acceptViaRoad(obj: Objective, proj: AgentProjection, ctx: PlanningContext, out: TickOutput): boolean {
+    if (!this.gameChanges || proj.position.kind !== "offroad") return false;
+    const previous = { objective: this.objective, holding: this.holding };
+    this.objective = obj;
+    this.holding = false;
+    if (!this.tryRejoinRoad(proj, ctx, out)) {
+      this.objective = previous.objective;
+      this.holding = previous.holding;
+      return false;
+    }
+    const goal = obj.kind === "protect_site" ? "protect the site" : "reach the fire";
+    this.decide(out, proj, "mission_update", "objective_accepted", `getting back on the road to ${goal} on coordinator objective`);
     return true;
   }
 
@@ -1119,6 +1157,7 @@ export class CrewController implements AgentController {
         if (site === undefined) return reject("unknown_site");
         if (site.knownResolved) return reject("target_resolved");
         const result = this.candidateSearch(ctx, new Set([obj.targetId]));
+        if (result.best === null && this.acceptViaRoad(obj, proj, ctx, out)) return;
         const verdict = decideOrder(this.callsign, {
           kind: obj.kind,
           forecastReliable: this.gameChanges || ctx.ensemble.reliability !== "unreliable",
@@ -1141,6 +1180,7 @@ export class CrewController implements AgentController {
         const cell = objectiveContainCell(obj);
         if (cell === undefined) return reject("missing_target");
         const result = this.candidateSearch(ctx, null, cell);
+        if (result.best === null && this.acceptViaRoad(obj, proj, ctx, out)) return;
         const verdict = decideOrder(this.callsign, {
           kind: obj.kind,
           forecastReliable: this.gameChanges || ctx.ensemble.reliability !== "unreliable",
@@ -1165,7 +1205,7 @@ export class CrewController implements AgentController {
         if (typeof result === "string") return reject(result);
         const verdict = decideOrder(this.callsign, {
           kind: obj.kind,
-          forecastReliable: ctx.ensemble.reliability !== "unreliable",
+          forecastReliable: this.gameChanges || ctx.ensemble.reliability !== "unreliable",
           feasible: result.best !== null,
           limitingReason: result.limitingReason,
         });
@@ -1231,9 +1271,11 @@ export class CrewController implements AgentController {
   private lineSearch(ctx: PlanningContext, obj: Objective): MissionSearchResult | FirelineRefusal | null {
     const line = obj.constraints.line;
     if (line === undefined) return null;
-    const planned = firelineTarget(this.road, line.start, line.end, this.capabilities.workRate, this.cfg.nav ?? DEFAULT_NAV_CONFIG);
+    const planned = firelineTarget(this.road, line.start, line.end, this.capabilities.workRate, this.cfg.nav ?? DEFAULT_NAV_CONFIG, this.gameChanges);
     if (!planned.ok) return planned.reason;
-    const result = planMissions(ctx, [planned.target]);
+    const lineCtx = { ...ctx, forecastMemberRank: lineForecastMemberRank(ctx.ensemble.members.length) };
+    const result =
+      this.gameChanges && ctx.position.kind === "offroad" ? planLineFromField(lineCtx, planned.target) : planMissions(lineCtx, [planned.target]);
     const candidates = [...result.candidates].sort((a, b) => b.workMs - a.workMs || b.score - a.score);
     return { ...result, candidates, best: candidates[0] ?? null };
   }
@@ -1329,7 +1371,7 @@ export class CrewController implements AgentController {
   /** Commit the first admissible candidate whose reservations can be granted. */
   protected commitFirst(proj: AgentProjection, result: MissionSearchResult, out: TickOutput): RankedMissionT | null {
     const peer = this.lastEnv.peerSuppressCells ?? new Set<number>();
-    const burning = this.fireCellsKnownTo(proj.position, proj.simTimeMs);
+    const burning = this.withOrderedCell(this.fireCellsKnownTo(proj.position, proj.simTimeMs), objectiveContainCell(this.objective));
     const pool =
       this.gameChanges &&
       burning.length >= GAME_CHANGES.brigadeSplitMinBurnCells &&

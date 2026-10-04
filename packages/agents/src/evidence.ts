@@ -96,6 +96,11 @@ export class EvidenceTracker {
     return seen !== undefined && seen.state !== "burning";
   }
 
+  /** True when this crew's latest sighting of the cell showed it burned out. */
+  seenBurnedOut(cell: number): boolean {
+    return this.cellBurnLatest.get(cell)?.state === "burned";
+  }
+
   private noteCellBurn(cell: number, state: "unburned" | "burning" | "burned", at: number): void {
     const prev = this.cellBurnLatest.get(cell);
     if (prev !== undefined && at < prev.at) return;

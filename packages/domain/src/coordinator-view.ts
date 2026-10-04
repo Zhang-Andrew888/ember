@@ -13,6 +13,14 @@ export const CoordinatorAgentView = z.object({
   position: AgentPosition,
   state: AgentState,
   reportedAt: SimTimeMs,
+  /**
+   * Present only while the crew's hose is on fire that is still burning: the unit map-frame direction it faces
+   * (east = +dx, north = +dy). The spray covers 180° around it out to hose reach.
+   */
+  hose: z
+    .object({ dx: z.number().min(-1).max(1), dy: z.number().min(-1).max(1) })
+    .refine((h) => Math.abs(Math.hypot(h.dx, h.dy) - 1) < 1e-6, { message: "hose heading must be a unit vector" })
+    .optional(),
 });
 export type CoordinatorAgentView = z.infer<typeof CoordinatorAgentView>;
 

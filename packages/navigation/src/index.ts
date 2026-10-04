@@ -2,7 +2,7 @@
 // Must not: issue unchecked movement commands
 export * from "./types.js";
 export { enumerateApproachRoutes, routeIdOf, edgeKeys, type ApproachDiscover, type ApproachRoute } from "./approach-routes.js";
-export { HazardModel } from "./hazard.js";
+export { HazardModel, LINE_FORECAST_MEMBER_RANK, lineForecastMemberRank } from "./hazard.js";
 export { Reach, ReturnTable, startsFromPosition, timeExpandedSearch, type SearchStart } from "./search.js";
 export { bucketTravelMs, offRoadSpeedMps, offRoadTravelMs } from "./travel.js";
 export { planMissions, planWithHazard, protectionTargets, workOptions } from "./mission.js";
@@ -23,6 +23,7 @@ export {
   type LineStandoffOptions,
 } from "./containment-standoff.js";
 export { firelineTarget, nearestRoadNodeWithin } from "./firelines.js";
+export { planLineFromField } from "./line-from-field.js";
 export type { FirelineRefusal, FirelineTargetResult } from "./firelines.js";
 export { certifyPlan, type CertifyFailure, type CertifyInput, type CertifyResult } from "./certify.js";
 export { planRetreat, planReturn, type ReturnPlan } from "./retreat.js";

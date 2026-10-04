@@ -70,9 +70,11 @@ export const SceneLegend = forwardRef<HTMLDivElement, SceneLegendProps>(function
   },
   ref,
 ) {
-  // The key is collapsed on narrower viewports so it never hides routes or forecast.
   const unseenCount = fireCells.filter((cell) => cell.unseen === true).length;
-  const [keyOpen, setKeyOpen] = useState(() => typeof window !== "undefined" && window.innerWidth >= 1700);
+  // The whole panel starts minimized so it never hides the map; the key is open once it is shown.
+  const [panelOpen, setPanelOpen] = useState(false);
+  const panelBodyId = useId();
+  const [keyOpen, setKeyOpen] = useState(true);
   const gridSize = scenarioMap.terrain?.gridSize ?? GRID_SIZE;
   const rowInputId = useId();
   const columnInputId = useId();
@@ -97,13 +99,28 @@ export const SceneLegend = forwardRef<HTMLDivElement, SceneLegendProps>(function
     if (result.ok) onInspectMapTile(result.index);
   };
   return (
-    <div ref={ref} className="scene-legend" role="group" aria-label="Map layers and camera">
+    <div
+      ref={ref}
+      className={`scene-legend${panelOpen ? "" : " scene-legend--collapsed"}`}
+      role="group"
+      aria-label="Map layers and camera"
+    >
+      <button
+        type="button"
+        className="scene-legend__panel-toggle"
+        aria-expanded={panelOpen}
+        aria-controls={panelBodyId}
+        onClick={() => setPanelOpen((open) => !open)}
+      >
+        {panelOpen ? "Hide legend" : "Legend"}
+      </button>
+      <div id={panelBodyId} className="scene-legend__body" hidden={!panelOpen}>
       <details
         className="scene-legend__keybox"
         open={keyOpen}
         onToggle={(event) => setKeyOpen(event.currentTarget.open)}
       >
-      <summary>Legend</summary>
+      <summary>Key</summary>
       <ul className="scene-legend__key">
         {currentFire ? (
           <>
@@ -309,6 +326,7 @@ export const SceneLegend = forwardRef<HTMLDivElement, SceneLegendProps>(function
           </ul>
         </details>
       ) : null}
+      </div>
     </div>
   );
 });

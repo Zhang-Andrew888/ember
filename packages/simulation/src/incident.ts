@@ -437,6 +437,7 @@ export class Incident {
         position: this.world.toAgentPosition(a),
         state: a.state,
         reportedAt: now,
+        ...(a.spraying && a.hoseAim !== null ? { hose: { dx: a.hoseAim.x, dy: a.hoseAim.y } } : {}),
       })),
       sites: this.world.sites.map((s) => {
         const belief = this.coordinator.siteBelief(s.id);
@@ -555,7 +556,9 @@ export class Incident {
   /** Whether a crew is visibly spraying its hose right now (session brigade lines only). */
   crewSpraying(agentId: AgentId): boolean {
     const agent = this.world.agent(agentId);
-    return agent.state !== "lost" && agent.working && agent.commitment?.plan.work?.kind === "suppress_fire";
+    if (agent.state === "lost") return false;
+    if (this.world.gameChanges) return agent.spraying;
+    return agent.working && agent.commitment?.plan.work?.kind === "suppress_fire";
   }
 
   /** Where a crew is, as other crews nearby could see it; null once lost (session brigade lines only). */

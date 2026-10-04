@@ -22,12 +22,15 @@ import {
   GAME_CHANGES,
   gameCollaborationBonus,
   gameContainmentWorkRequired,
+  gameLineApproachMaxM,
+  gameLineCutReachM,
   gameHoseConeMinDot,
   gameHoseDangerRadiusM,
   gameHoseOnSceneRadiusM,
   gameHoseRadiusM,
   gameHoseStandoffTargetM,
   scenarioUsesGameChanges,
+  turnToward,
   type FireParams,
   type RoadEdge,
 } from "./model/index.js";
@@ -93,6 +96,10 @@ export interface TruthAgent {
   objectiveRevision: number;
   planRevision: number;
   lostAtMs: number | null;
+  /** Game-changes: the way the crew faces while fire is within hose reach (unit vector); null otherwise. */
+  hoseAim: { x: number; y: number } | null;
+  /** Game-changes: the crew's spray hit burning fire this step. */
+  spraying: boolean;
 }
 
 export interface TruthSite {
@@ -185,6 +192,8 @@ export class World {
         objectiveRevision: 0,
         planRevision: 0,
         lostAtMs: null,
+        hoseAim: null,
+        spraying: false,
       });
     }
     for (const site of scenario.map.sites) {
@@ -282,7 +291,8 @@ export class World {
           suppress !== undefined && this.distanceToCellM(leg.end.x, leg.end.y, suppress.gridCellIndex) <= 2;
         const endsAtFieldHalt =
           this.gameChanges && !hasWork && suppress === undefined && offRoadSegmentTraversable(leg.start.x, leg.start.y, leg.end.x, leg.end.y);
-        if (endNode === null && !endsAtSuppressCell && !endsAtFieldHalt) return reject("offroad_end_not_at_node");
+        const endsAtLine = this.endsAtGameLine(plan, leg.end);
+        if (endNode === null && !endsAtSuppressCell && !endsAtFieldHalt && !endsAtLine) return reject("offroad_end_not_at_node");
         if (i === 0) {
           const p = this.agentPoint(agent);
           if (!near(p.x, p.y, leg.start.x, leg.start.y)) return reject("offroad_not_connected");
@@ -324,11 +334,27 @@ export class World {
       if (line.start.x === line.end.x && line.start.y === line.end.y) return reject("fireline_needs_two_points");
       if (firelineCells(line.start, line.end).length === 0) return reject("fireline_off_map");
       // `start` is this crew's end of the line; its work node must be within reach of it (plan 2.5).
+      // Game-changes crews drive off-road from that node and cut the line on foot from its end.
       const workPoint = this.road.nodePoint(line.workNodeId);
-      if (Math.hypot(workPoint.x - line.start.x, workPoint.y - line.start.y) > SIM_DEFAULTS.lineReachM) {
+      const reachM = this.gameChanges ? gameLineApproachMaxM() : SIM_DEFAULTS.lineReachM;
+      if (Math.hypot(workPoint.x - line.start.x, workPoint.y - line.start.y) > reachM) {
         return reject("fireline_end_out_of_reach");
       }
-      if (hasWork) {
+      if (hasWork && this.gameChanges) {
+        const off = plan.offroadLegs ?? [];
+        const lastOff = approachCount > 0 ? schedule[approachCount - 1] : undefined;
+        const at =
+          lastOff?.kind === "offroad"
+            ? lastOff.leg.end
+            : approachEndNode !== null
+              ? this.road.nodePoint(approachEndNode)
+              : approachCount === 0 && off.length === 0
+                ? this.agentPoint(agent)
+                : null;
+        if (at === null || Math.hypot(at.x - line.start.x, at.y - line.start.y) > 2 * SIM_DEFAULTS.cellMeters) {
+          return reject("fireline_work_not_at_line_end");
+        }
+      } else if (hasWork) {
         const endNode = approachEndNode ?? (agent.pos.kind === "node" && approachCount === 0 ? agent.pos.nodeId : null);
         if (endNode !== line.workNodeId) return reject("fireline_work_not_at_work_node");
       }
@@ -441,7 +467,7 @@ export class World {
     agent.working = false;
     const c = agent.commitment;
 
-    if (this.gameChanges && this.suppressMission(agent)) {
+    if (this.gameChanges && (this.suppressMission(agent) || this.cuttingGameLine(agent))) {
       this.applyFireStandoff(agent);
     }
 
@@ -664,7 +690,7 @@ export class World {
     const endsAtFieldHalt = this.gameChanges && !hasWork && suppress === undefined;
     if (nodeId !== null) {
       agent.pos = { kind: "node", nodeId };
-    } else if (endsAtSuppressCell || endsAtFieldHalt) {
+    } else if (endsAtSuppressCell || endsAtFieldHalt || this.endsAtGameLine(c.plan, entry.leg.end)) {
       agent.pos = {
         kind: "offroad",
         start: { x: entry.leg.start.x, y: entry.leg.start.y },
@@ -708,6 +734,47 @@ export class World {
     }
   }
 
+  /** Game-changes: an off-road leg may end at this crew's end of its fire line. */
+  private endsAtGameLine(plan: MissionPlan, end: { readonly x: number; readonly y: number }): boolean {
+    const work = plan.work;
+    return this.gameChanges && work?.kind === "build_line" && Math.hypot(end.x - work.start.x, end.y - work.start.y) <= 2;
+  }
+
+  /** Game-changes line crew on its shift (approach finished): it backs off fire like a hose crew. */
+  private cuttingGameLine(agent: TruthAgent): boolean {
+    const c = agent.commitment;
+    return this.gameChanges && c !== null && c.plan.work?.kind === "build_line" && c.legIndex >= c.approachCount;
+  }
+
+  /**
+   * Game-changes line work: the crew clears the first unburned line cell (from its own end) that is
+   * not inside the fire danger radius, if it is within cutting reach; otherwise it walks there. With
+   * no unburned cell left on the line the shift is over.
+   */
+  private cutGameLine(agent: TruthAgent, work: Extract<NonNullable<MissionPlan["work"]>, { kind: "build_line" }>, fraction: number): void {
+    const cells = firelineCells(work.start, work.end);
+    if (!cells.some((c) => this.fire.state[c] === CELL_UNBURNED)) {
+      this.notices.push({ tick: this.timeMs + STEP, kind: "plan_complete", agentId: agent.id, planId: agent.commitment!.plan.id });
+      agent.commitment = null;
+      agent.working = false;
+      return;
+    }
+    const danger = gameHoseDangerRadiusM();
+    const next = cells.find((c) => {
+      if (this.fire.state[c] !== CELL_UNBURNED) return false;
+      const p = cellCenter(c);
+      return this.nearestBurningCellDistM(p.x, p.y) >= danger;
+    });
+    if (next === undefined) return;
+    const p = this.agentPointXY(agent);
+    const target = cellCenter(next);
+    if (Math.hypot(target.x - p.x, target.y - p.y) <= gameLineCutReachM()) {
+      if (this.fire.applyClearance(next, fraction) === "completed") this.builtFirebreaks.add(next);
+    } else if (offRoadSegmentTraversable(p.x, p.y, target.x, target.y)) {
+      agent.pos = { kind: "offroad", start: { x: p.x, y: p.y }, end: { x: target.x, y: target.y }, progress: 0 };
+    }
+  }
+
   private registerFireline(start: MapPoint, end: MapPoint): void {
     const id = firelineId(start, end);
     if (this.firelines.has(id)) return;
@@ -725,6 +792,10 @@ export class World {
       if (agent.state === "lost" || agent.role !== "protection_crew" || !agent.working) continue;
       const work = agent.commitment?.plan.work;
       if (work?.kind !== "build_line") continue;
+      if (this.gameChanges) {
+        this.cutGameLine(agent, work, fraction);
+        continue;
+      }
       const next = reachableFirelineCells(this.road, work.workNodeId, work.start, work.end).find((c) => this.fire.state[c] === CELL_UNBURNED);
       if (next === undefined) continue;
       if (this.fire.applyClearance(next, fraction) === "completed") this.builtFirebreaks.add(next);
@@ -748,17 +819,48 @@ export class World {
     return Math.hypot(x - c.x, y - c.y);
   }
 
-  /** True when the crew's firehose can reach at least one actively burning cell in the forward cone. */
-  private crewCanHoseFrom(agent: TruthAgent, x: number, y: number): boolean {
+  /** True when actively burning fire is within hose reach; the crew turns to face it, so any side counts. */
+  private crewCanHoseFrom(_agent: TruthAgent, x: number, y: number): boolean {
+    return this.nearestBurningCellDistM(x, y) <= gameHoseRadiusM();
+  }
+
+  /**
+   * Game-changes: the burning cell a crew turns its spray toward: its committed cell when that is
+   * in reach, else the nearest burning cell in reach; null when no fire is within reach.
+   */
+  private hoseTargetCell(agent: TruthAgent, x: number, y: number): number | null {
     const r = gameHoseRadiusM();
-    const heading = this.agentHoseHeadingXY(agent);
-    if (heading === null) return false;
-    const minDot = gameHoseConeMinDot();
-    for (const cell of this.fire.burningCells) {
-      const c = cellCenter(cell);
-      if (hoseCellInCone(x, y, heading.hx, heading.hy, c.x, c.y, r, minDot)) return true;
+    const work = agent.commitment?.plan.work;
+    if (work?.kind === "suppress_fire" && this.fire.state[work.gridCellIndex] === CELL_BURNING) {
+      if (this.distanceToCellM(x, y, work.gridCellIndex) <= r) return work.gridCellIndex;
     }
-    return false;
+    let best: number | null = null;
+    let bestD = r;
+    for (const cell of this.fire.burningCells) {
+      const d = this.distanceToCellM(x, y, cell);
+      if (d < bestD || (d === bestD && best !== null && cell < best)) {
+        best = cell;
+        bestD = d;
+      }
+    }
+    return best;
+  }
+
+  /** Turn the crew's spray toward the fire in reach, at most the turn rate per step. */
+  private turnHose(agent: TruthAgent, dt: number): void {
+    const p = this.agentPointXY(agent);
+    const cell = this.hoseTargetCell(agent, p.x, p.y);
+    if (cell === null) {
+      agent.hoseAim = null;
+      return;
+    }
+    const c = cellCenter(cell);
+    const len = Math.hypot(c.x - p.x, c.y - p.y);
+    if (len < 1e-6) return;
+    const want = { x: (c.x - p.x) / len, y: (c.y - p.y) / len };
+    const travel = this.travelHeadingXY(agent);
+    const from = agent.hoseAim ?? (travel === null ? want : { x: travel.hx, y: travel.hy });
+    agent.hoseAim = turnToward(from, want, ((GAME_CHANGES.hoseTurnRateDegPerSec * Math.PI) / 180) * dt);
   }
 
   private cellInAgentHoseCone(agent: TruthAgent, x: number, y: number, gridCellIndex: number): boolean {
@@ -768,8 +870,14 @@ export class World {
     return hoseCellInCone(x, y, heading.hx, heading.hy, cc.x, cc.y, gameHoseRadiusM(), gameHoseConeMinDot());
   }
 
-  /** Unit vector in the direction the crew is moving (or facing while working). */
+  /** The way the crew's spray faces: turned toward fire in reach, else the way it travels. */
   private agentHoseHeadingXY(agent: TruthAgent): { hx: number; hy: number } | null {
+    if (this.gameChanges && agent.hoseAim !== null) return { hx: agent.hoseAim.x, hy: agent.hoseAim.y };
+    return this.travelHeadingXY(agent);
+  }
+
+  /** Unit vector in the direction the crew is moving (or facing its committed cell while working). */
+  private travelHeadingXY(agent: TruthAgent): { hx: number; hy: number } | null {
     const c = agent.commitment;
     if (agent.pos.kind === "edge") {
       const pos = agent.pos;
@@ -841,7 +949,7 @@ export class World {
     }
     const target = c.plan.work.gridCellIndex;
     if (this.fire.state[target] === CELL_BURNING) {
-      return this.cellInAgentHoseCone(agent, p.x, p.y, target);
+      return this.distanceToCellM(p.x, p.y, target) <= gameHoseRadiusM();
     }
     return this.crewCanHoseFrom(agent, p.x, p.y);
   }
@@ -985,9 +1093,7 @@ export class World {
     const selfHeading = this.agentHoseHeadingXY(self);
     let bonus = 0;
     for (const other of this.agents) {
-      if (other.id === selfId || other.state === "lost" || other.role !== "protection_crew" || !other.working) continue;
-      const c = other.commitment;
-      if (c === null || c.plan.work?.kind !== "suppress_fire" || !this.gameHoseSceneReady(other, c)) continue;
+      if (other.id === selfId || other.state === "lost" || other.role !== "protection_crew" || !other.spraying) continue;
       const p = this.agentPointXY(other);
       if (!this.cellInAgentHoseCone(other, p.x, p.y, cell)) continue;
       bonus += gameCollaborationBonus(selfHeading, this.agentHoseHeadingXY(other));
@@ -1011,19 +1117,20 @@ export class World {
     const dt = STEP / 1000;
     this.applyLineWork(dt);
     if (this.gameChanges) {
+      // Any crew with fire in hose reach turns to face it and sprays its 180° cone, whatever its job.
       for (const agent of this.agents) {
-        if (agent.state === "lost" || agent.role !== "protection_crew" || !agent.working) continue;
-        const c = agent.commitment;
-        if (c === null || c.workSiteId !== null) continue;
-        const suppressWork = c.plan.work;
-        if (suppressWork?.kind !== "suppress_fire") continue;
-        if (!this.gameHoseSceneReady(agent, c)) continue;
-        const p = this.agentPointXY(agent);
-        for (const cell of this.fire.burningCells) {
-          if (!this.cellInAgentHoseCone(agent, p.x, p.y, cell)) continue;
-          const focus = suppressWork.gridCellIndex === cell;
-          this.applyHoseToCell(agent.id, cell, dt, focus ? 1.25 : 1);
+        if (agent.state === "lost" || agent.role !== "protection_crew") {
+          agent.hoseAim = null;
+          agent.spraying = false;
+          continue;
         }
+        this.turnHose(agent, dt);
+        const work = agent.commitment?.plan.work;
+        const focusCell = work?.kind === "suppress_fire" ? work.gridCellIndex : null;
+        const p = this.agentPointXY(agent);
+        const hit = agent.hoseAim === null ? [] : [...this.fire.burningCells].filter((cell) => this.cellInAgentHoseCone(agent, p.x, p.y, cell));
+        for (const cell of hit) this.applyHoseToCell(agent.id, cell, dt, cell === focusCell ? 1.25 : 1);
+        agent.spraying = hit.some((cell) => this.fire.state[cell] === CELL_BURNING);
       }
     } else {
       for (const agent of this.agents) {
