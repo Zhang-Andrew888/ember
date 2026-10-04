@@ -18,6 +18,10 @@ export function explain(callsign: string, decision: Pick<DecisionEvent, "type" |
       return `${callsign} cannot do that and return with the required margin.${detail === "" ? "" : ` ${detail}`}`;
     case "idle":
       return `${callsign} is holding. ${why}`;
+    case "containment_succeeded":
+      return `${callsign} reports containment holding. ${decision.actualAction}`;
+    case "containment_failed":
+      return `${callsign} could not hold containment. ${why || decision.actualAction}`;
   }
 }
 

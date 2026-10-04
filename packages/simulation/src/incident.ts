@@ -370,6 +370,7 @@ export class Incident {
         planId: c.plan.id,
         legs: c.plan.timedLegs.map((leg) => ({ edgeId: leg.edgeId, direction: leg.direction })),
         workInterval: c.plan.workInterval,
+        ...(c.plan.work === undefined ? {} : { work: c.plan.work }),
         refugeId: c.plan.refugeId,
         phase,
         limitingReason: c.plan.limitingReason,

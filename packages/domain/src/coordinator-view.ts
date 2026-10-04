@@ -2,7 +2,7 @@ import { z } from "zod";
 import { AgentId, EdgeId, MissionPlanId, NodeId, SiteId } from "./ids.js";
 import { SequenceNumber, SimTimeMs, WallTimeMs, WorkUnits } from "./units.js";
 import { AgentPosition } from "./position.js";
-import { AgentRole, AgentState, IncidentEnd } from "./records.js";
+import { AgentRole, AgentState, ContainmentWorkResult, IncidentEnd, MissionWork } from "./records.js";
 import { WIRE_PROTOCOL_VERSION } from "./wire-protocol.js";
 
 /** Agent fields the coordinator serializer is allowed to send. */
@@ -31,6 +31,8 @@ export const CoordinatorAgentPlanView = z.object({
   planId: MissionPlanId,
   legs: z.array(CoordinatorPlanLegView),
   workInterval: z.object({ startMs: SimTimeMs, endMs: SimTimeMs }),
+  /** When present, distinguishes structure protection from fire suppression on the map. */
+  work: MissionWork.optional(),
   refugeId: NodeId,
   phase: z.enum(["approach", "work", "return"]),
   limitingReason: z.string().nullable(),
@@ -110,6 +112,8 @@ export const CoordinatorView = z.object({
   /** Coordinator forecast envelope for the map; null before the first build. */
   coordinatorForecast: CoordinatorForecastView.nullable(),
   recentReports: z.array(CoordinatorReportEntry),
+  /** Latest containment completions visible to the coordinator (not structure protection). */
+  recentContainmentResults: z.array(ContainmentWorkResult).optional(),
   incidentEnd: IncidentEnd.nullable(),
 });
 export type CoordinatorView = z.infer<typeof CoordinatorView>;
