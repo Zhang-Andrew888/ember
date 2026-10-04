@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { BufferGeometry } from "three";
-import { createChevronGeometry, createCrewGeometry, createCrossGeometry, createScoutGeometry, createWarnGeometry, createWorkGlyphGeometry } from "./crewModels.js";
+import { createChevronGeometry, createCrewGeometry, createCrossGeometry, createWarnGeometry, createWorkGlyphGeometry } from "./crewModels.js";
 import { createFenceRingGeometry, createRubbleGeometry, createSiteGeometry } from "./siteModels.js";
 import { prism } from "./geometry.js";
 
@@ -14,7 +14,7 @@ function finite(geometry: BufferGeometry): boolean {
   return !Array.from(geometry.getAttribute("position").array).some(Number.isNaN);
 }
 
-describe("crew and scout models", () => {
+describe("crew models", () => {
   it("a crew truck is long, low, sits on the ground and has a colour attribute", () => {
     const truck = createCrewGeometry(1);
     const s = size(truck);
@@ -29,13 +29,6 @@ describe("crew and scout models", () => {
     const counts = [1, 2, 3].map((n) => createCrewGeometry(n).getAttribute("position").count);
     expect(counts[1]).toBeGreaterThan(counts[0]!);
     expect(counts[2]).toBeGreaterThan(counts[1]!);
-  });
-
-  it("the scout is a different outline from any crew: tall and narrow in x, binocular-wide in z", () => {
-    const scout = size(createScoutGeometry());
-    const truck = size(createCrewGeometry(1));
-    expect(scout.x).toBeLessThan(truck.x);
-    expect(scout.y).toBeGreaterThan(truck.y);
   });
 
   it("all glyphs build finite geometry", () => {
