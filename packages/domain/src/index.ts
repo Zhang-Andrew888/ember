@@ -6,3 +6,4 @@ export { scheduledLegs, scheduledLegCount, approachLegCount, type ScheduledLeg }
 export * from "./coordinator-view.js";
 export * from "./simulation-api.js";
 export * from "./wire-protocol.js";
+export * from "./scenario-briefing.js";

@@ -5,6 +5,7 @@ import type { IncomingMessage } from "node:http";
 import { WIRE_PROTOCOL_VERSION } from "@ember/domain";
 import { IncidentRegistry } from "./incident-registry.js";
 import { stopReplayWorker } from "./replay-offloop.js";
+import { publicScenarioBriefing } from "./scenario-briefing.js";
 import { grokVoiceEnabled } from "./xai/env.js";
 import { serverIntegrationStatus } from "./xai/integration-status.js";
 import { transcribeAudio } from "./xai/stt.js";
@@ -97,6 +98,12 @@ export async function startHttpApp(options: { port?: number; clock?: MonotonicCl
     ...serverIntegrationStatus(),
   }));
 
+  // Public, unauthenticated like /health: lets the briefing draw the map the server will run before Start.
+  fastify.get("/scenario", async () => ({
+    protocolVersion: WIRE_PROTOCOL_VERSION,
+    scenario: publicScenarioBriefing(registry.defaultScenario()),
+  }));
+
   fastify.post("/incidents", async () => {
     const record = registry.create({}, clock);
     const view = registry.briefingView(record);
@@ -105,6 +112,7 @@ export async function startHttpApp(options: { port?: number; clock?: MonotonicCl
       token: record.token,
       protocolVersion: WIRE_PROTOCOL_VERSION,
       briefing: view,
+      scenario: publicScenarioBriefing(record.scenario),
       websocket: {
         events: `/incidents/${record.id}/events?token=${record.token}`,
         voice: `/incidents/${record.id}/voice?token=${record.token}`,
