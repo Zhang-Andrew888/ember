@@ -291,9 +291,14 @@ export class World {
       if (!this.road.nodes.has(line.workNodeId)) return reject("fireline_unknown_node");
       if (line.start.x === line.end.x && line.start.y === line.end.y) return reject("fireline_needs_two_points");
       if (firelineCells(line.start, line.end).length === 0) return reject("fireline_off_map");
+      // `start` is this crew's end of the line; its work node must be within reach of it (plan 2.5).
+      const workPoint = this.road.nodePoint(line.workNodeId);
+      if (Math.hypot(workPoint.x - line.start.x, workPoint.y - line.start.y) > SIM_DEFAULTS.lineReachM) {
+        return reject("fireline_end_out_of_reach");
+      }
       if (hasWork) {
         const endNode = approachEndNode ?? (agent.pos.kind === "node" && approachCount === 0 ? agent.pos.nodeId : null);
-        if (endNode !== line.workNodeId) return reject("fireline_work_not_at_start_node");
+        if (endNode !== line.workNodeId) return reject("fireline_work_not_at_work_node");
       }
     }
     if (hasWork && workSiteId !== null) {
