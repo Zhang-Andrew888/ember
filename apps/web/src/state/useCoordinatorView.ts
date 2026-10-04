@@ -1,10 +1,11 @@
 import { useSyncExternalStore } from "react";
 import type { CoordinatorViewClient, CoordinatorViewClientState } from "../net/CoordinatorViewClient.js";
+import { EMPTY_SIDEBAND } from "../conversation/transcript.js";
 
 const INITIAL_STATE: CoordinatorViewClientState = {
   status: "connecting",
   view: null,
-  sideband: { transcripts: [], receipts: [], audioCues: [] },
+  sideband: EMPTY_SIDEBAND,
 };
 
 /**

@@ -5,7 +5,7 @@ import { scenarioMap } from "../../map/activeScenario.js";
 import type { CurrentFireLayer, FireCellMarker } from "./sceneEntities.js";
 import { formatIncidentClock } from "../../format/time.js";
 import { GRID_SIZE } from "../../map/positions.js";
-import { gridCellIndexFromRowColumn, isValidGridCellIndex } from "./tileInspection.js";
+import { parseGridIndexInput, parseGridRowColumnInput } from "./tileInspection.js";
 
 export interface SceneLegendProps {
   readonly showFireCells: boolean;
@@ -71,15 +71,21 @@ export const SceneLegend = forwardRef<HTMLDivElement, SceneLegendProps>(function
   const [pickRow, setPickRow] = useState("0");
   const [pickColumn, setPickColumn] = useState("0");
   const [pickIndex, setPickIndex] = useState("0");
+  const [rowColumnError, setRowColumnError] = useState<string | null>(null);
+  const [indexError, setIndexError] = useState<string | null>(null);
+  const rowColumnErrorId = useId();
+  const indexErrorId = useId();
 
   const inspectFromRowColumn = () => {
-    const index = gridCellIndexFromRowColumn(Number(pickRow), Number(pickColumn));
-    if (index !== null) onInspectMapTile(index);
+    const result = parseGridRowColumnInput(pickRow, pickColumn);
+    setRowColumnError(result.ok ? null : result.error);
+    if (result.ok) onInspectMapTile(result.index);
   };
 
   const inspectFromIndex = () => {
-    const index = Number(pickIndex);
-    if (isValidGridCellIndex(index)) onInspectMapTile(index);
+    const result = parseGridIndexInput(pickIndex);
+    setIndexError(result.ok ? null : result.error);
+    if (result.ok) onInspectMapTile(result.index);
   };
   return (
     <div ref={ref} className="scene-legend" role="group" aria-label="Map layers and camera">
@@ -155,7 +161,7 @@ export const SceneLegend = forwardRef<HTMLDivElement, SceneLegendProps>(function
           Show fire observations
         </label>
         {currentFire ? (
-          <p className="scene-legend__currentfire" role="status">
+          <p className="scene-legend__currentfire">
             Current fire at {formatIncidentClock(currentFire.simTimeMs)} incident time: {currentFire.burningCount} burning,{" "}
             {currentFire.burnedCount} burned
           </p>
@@ -204,6 +210,8 @@ export const SceneLegend = forwardRef<HTMLDivElement, SceneLegendProps>(function
               min={0}
               max={gridSize - 1}
               value={pickRow}
+              aria-invalid={rowColumnError !== null || undefined}
+              aria-describedby={rowColumnError === null ? undefined : rowColumnErrorId}
               onChange={(event) => setPickRow(event.target.value)}
             />
           </label>
@@ -215,10 +223,17 @@ export const SceneLegend = forwardRef<HTMLDivElement, SceneLegendProps>(function
               min={0}
               max={gridSize - 1}
               value={pickColumn}
+              aria-invalid={rowColumnError !== null || undefined}
+              aria-describedby={rowColumnError === null ? undefined : rowColumnErrorId}
               onChange={(event) => setPickColumn(event.target.value)}
             />
           </label>
           <button type="submit">Inspect tile</button>
+          {rowColumnError !== null ? (
+            <p id={rowColumnErrorId} className="scene-legend__tile-error" role="alert">
+              {rowColumnError}
+            </p>
+          ) : null}
         </form>
         <form
           className="scene-legend__tile-form"
@@ -235,10 +250,17 @@ export const SceneLegend = forwardRef<HTMLDivElement, SceneLegendProps>(function
               min={0}
               max={gridSize * gridSize - 1}
               value={pickIndex}
+              aria-invalid={indexError !== null || undefined}
+              aria-describedby={indexError === null ? undefined : indexErrorId}
               onChange={(event) => setPickIndex(event.target.value)}
             />
           </label>
           <button type="submit">Inspect by index</button>
+          {indexError !== null ? (
+            <p id={indexErrorId} className="scene-legend__tile-error" role="alert">
+              {indexError}
+            </p>
+          ) : null}
         </form>
       </details>
       {fireCells.length > 0 ? (

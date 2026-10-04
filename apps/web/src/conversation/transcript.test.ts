@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { fixtureCoordinatorView } from "../../../../tests/fixtures/coordinator-view.fixture.js";
-import { buildConversationTranscript, appendSideband, EMPTY_SIDEBAND } from "./transcript.js";
+import { buildConversationTranscript, appendSideband, EMPTY_SIDEBAND, retainReports } from "./transcript.js";
 
 describe("conversation/transcript", () => {
   it("includes routine agent reports with callsigns", () => {
@@ -87,5 +87,46 @@ describe("conversation/transcript", () => {
     const lines = buildConversationTranscript(fixtureCoordinatorView, sideband).filter((line) => line.kind !== "agent_report");
     expect(lines.map((line) => line.speaker)).toEqual(["You", "Control"]);
     expect(lines.filter((line) => line.text === reply)).toHaveLength(1);
+  });
+
+  it("keeps reports that later views no longer project, without duplicates", () => {
+    let sideband = retainReports(EMPTY_SIDEBAND, fixtureCoordinatorView);
+    const later = { ...fixtureCoordinatorView, recentReports: fixtureCoordinatorView.recentReports.slice(-1) };
+    sideband = retainReports(sideband, later);
+    sideband = appendSideband(sideband, { type: "view", view: later });
+    const reportLines = buildConversationTranscript(later, sideband).filter((line) => line.kind === "agent_report");
+    const routine = fixtureCoordinatorView.recentReports.filter((report) => !report.urgent);
+    expect(reportLines).toHaveLength(routine.length);
+    expect(new Set(reportLines.map((line) => line.id)).size).toBe(reportLines.length);
+  });
+
+  it("keeps a receipt's time at its arrival even as later views advance", () => {
+    const sideband = appendSideband(
+      EMPTY_SIDEBAND,
+      {
+        type: "receipt",
+        receipt: {
+          commandId: "cmd-9" as never,
+          status: "received",
+          recipientId: null,
+          appliedTick: null,
+          explanation: "",
+          planRevision: null,
+        },
+        reply: "Copy, working on it.",
+      },
+      40_000,
+    );
+    const atArrival = buildConversationTranscript(fixtureCoordinatorView, sideband).find((line) => line.text === "Copy, working on it.");
+    const later = buildConversationTranscript({ ...fixtureCoordinatorView, simTimeMs: 200_000 as never }, sideband).find(
+      (line) => line.text === "Copy, working on it.",
+    );
+    expect(atArrival?.simTimeMs).toBe(40_000);
+    expect(later?.simTimeMs).toBe(40_000);
+  });
+
+  it("records notices with their arrival time", () => {
+    const sideband = appendSideband(EMPTY_SIDEBAND, { type: "notice", kind: "technical_failure", detail: "x" }, 12_000);
+    expect(sideband.notices).toEqual([{ type: "notice", kind: "technical_failure", detail: "x", arrivalSimTimeMs: 12_000 }]);
   });
 });

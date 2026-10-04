@@ -5,16 +5,24 @@ export interface TransportModeBadgeProps {
   readonly briefing?: boolean;
 }
 
-/** Always-visible LIVE vs MOCK so a stale mock dev server is obvious at a glance. */
+/** What the coordinator is driving: always a simulation, either served live or replayed from a recording. */
+export function transportModeLabel(mode: TransportMode): string {
+  return mode === "live" ? "Simulation · live server" : "Recorded showcase · sample replies";
+}
+
+/** Always-visible live vs recorded mode so a stale mock dev server is obvious at a glance. */
 export function TransportModeBadge({ mode, briefing = false }: TransportModeBadgeProps) {
-  const label = briefing ? (mode === "live" ? "Live connection" : "Demo data") : (mode === "live" ? "LIVE" : "MOCK");
   return (
     <span
       className={`transport-mode transport-mode--${mode}`}
-      role="status"
-      aria-label={briefing ? undefined : mode === "live" ? "Live server transport" : "In-browser mock transport"}
+      title={
+        mode === "live"
+          ? "A server runs this simulated incident and interprets your messages."
+          : "A recorded incident plays back. Messages get sample replies and do not change what the crews do."
+      }
+      data-briefing={briefing || undefined}
     >
-      {label}
+      {transportModeLabel(mode)}
     </span>
   );
 }

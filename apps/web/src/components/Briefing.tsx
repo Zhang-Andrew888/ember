@@ -13,6 +13,15 @@ export interface BriefingProps {
   readonly content: BriefingContent;
   readonly demoMode: boolean;
   readonly transportMode: TransportMode;
+  /** "server": held speech is sent for recognition. "sample": holding plays a recorded sample line. */
+  readonly voiceMode?: "server" | "sample";
+}
+
+/** A first message built from the briefing's own team and highest-value site. */
+export function briefingExample(content: BriefingContent): string | null {
+  const crew = content.callsigns[0];
+  const site = [...content.sites].sort((a, b) => b.value - a.value)[0]?.name;
+  return crew !== undefined && site !== undefined ? `\u201c${crew}, protect ${site}.\u201d` : null;
 }
 
 const numberFormat = new Intl.NumberFormat();
@@ -22,6 +31,7 @@ function BriefingFacts({ content }: { readonly content: BriefingContent }) {
     <div className="briefing__facts">
       <section aria-labelledby="briefing-sites-heading">
         <h2 id="briefing-sites-heading">Sites to protect</h2>
+        <p className="briefing__note">Relative value compares sites with each other; it is not a dollar amount.</p>
         <div className="briefing__site-heading" aria-hidden="true"><span>Site</span><span>Relative value</span></div>
         {content.sites.length ? (
           <ul className="briefing__sites">
@@ -45,9 +55,18 @@ function BriefingFacts({ content }: { readonly content: BriefingContent }) {
   );
 }
 
-export function Briefing({ onStart, starting, content, demoMode, transportMode, error = null }: BriefingProps) {
+export function Briefing({
+  onStart,
+  starting,
+  content,
+  demoMode,
+  transportMode,
+  voiceMode = "sample",
+  error = null,
+}: BriefingProps) {
   const probeMic = useCallback(() => createVoiceCapture({ preferMicrophone: true }).probeMicrophone(), []);
   const errorRef = useRef<HTMLParagraphElement>(null);
+  const example = briefingExample(content);
   useEffect(() => { if (error) errorRef.current?.focus(); }, [error]);
 
   return (
@@ -63,6 +82,12 @@ export function Briefing({ onStart, starting, content, demoMode, transportMode, 
             <div className="briefing__intro">
               <h1>Guide the crews. Keep a way out.</h1>
               <p>You have five minutes to protect {content.sites.length} sites. Send updates by text or voice; crews choose their routes and may turn back as conditions change.</p>
+              {example !== null ? (
+                <p className="briefing__example">
+                  Start each message with the crew's name, for example: <q className="briefing__example-text">{example.slice(1, -1)}</q>
+                </p>
+              ) : null}
+              <p className="briefing__fiction">A fictional training simulation. No real crews or places are involved.</p>
             </div>
             {content.preview ? <PublicIncidentPreview preview={content.preview} /> : null}
           </div>
@@ -76,9 +101,12 @@ export function Briefing({ onStart, starting, content, demoMode, transportMode, 
               <div className="briefing__voice">
                 <p className="briefing__voice-note">
                   Voice is optional. Text works throughout the incident.
-                  {demoMode ? " Demo voice uses simulated speech." : null}
+                  {voiceMode === "server"
+                    ? " Hold to talk sends your speech to the server for recognition. The check only asks for microphone permission; it does not test recognition."
+                    : " In this mode, holding to talk sends a recorded sample line instead of your speech, the microphone is not used, and no reply audio is played."}
+                  {voiceMode === "sample" && demoMode ? " Demo mode uses a scripted set of sample lines." : null}
                 </p>
-                <MicCheck onProbe={probeMic} />
+                {voiceMode === "server" ? <MicCheck onProbe={probeMic} /> : null}
               </div>
             </div>
           </div>

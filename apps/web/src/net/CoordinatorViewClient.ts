@@ -1,5 +1,5 @@
 import type { CoordinatorView } from "@ember/domain";
-import { EMPTY_SIDEBAND, appendSideband, type WireSidebandState } from "../conversation/transcript.js";
+import { EMPTY_SIDEBAND, appendSideband, retainReports, type WireSidebandState } from "../conversation/transcript.js";
 import { applyIncomingView } from "../state/viewReducer.js";
 import { parseCoordinatorViewFrame } from "./wireProtocol.js";
 import { parseServerWireMessage } from "./serverWireParse.js";
@@ -86,21 +86,26 @@ export function createCoordinatorViewClient(
       if (wire === null) {
         const incoming = parseIncomingMessage(event.data);
         if (!incoming) return;
-        setState({ status: "open", view: applyIncomingView(state.view, incoming), sideband: state.sideband });
+        setState({
+          status: "open",
+          view: applyIncomingView(state.view, incoming),
+          sideband: retainReports(state.sideband, incoming),
+        });
         return;
       }
       if (wire.type === "view") {
         setState({
           status: "open",
           view: applyIncomingView(state.view, wire.view),
-          sideband: state.sideband,
+          sideband: retainReports(state.sideband, wire.view),
         });
         return;
       }
+      const arrivalSimTimeMs = state.view === null ? 0 : (state.view.simTimeMs as number);
       setState({
         status: "open",
         view: state.view,
-        sideband: appendSideband(state.sideband, wire),
+        sideband: appendSideband(state.sideband, wire, arrivalSimTimeMs),
       });
     };
 
