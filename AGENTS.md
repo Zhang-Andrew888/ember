@@ -13,8 +13,8 @@ Two agent lanes run in parallel against their own branch.
 | sim | `lane/sim` | `packages/simulation`, `packages/knowledge`, `packages/forecast`, `packages/navigation`, `packages/agents`, `packages/communication`, `packages/replay`, `apps/server` |
 | web | `lane/web` | `apps/web` |
 
-The `packages/domain` package is **shared read-only** infrastructure.
-Neither lane may edit it - see "Contract changes" below.
+`packages/domain` is shared infrastructure. Either lane may update its schemas and interfaces
+when needed for work in that lane; include the contract change in the same feature PR.
 
 ## Forbidden paths
 
@@ -22,21 +22,23 @@ Neither lane may edit it - see "Contract changes" below.
 |------|---------------|
 | sim | `apps/web/**` |
 | web | `packages/simulation/**`, `packages/knowledge/**`, `packages/forecast/**`, `packages/navigation/**`, `packages/agents/**`, `packages/communication/**`, `packages/replay/**`, `apps/server/**` |
-| both | `packages/domain/**` (read-only; changes require a contract-change issue) |
 | both | `CHANGELOG.md`, `docs/**` (documentation is human-authored) |
 | both | `.github/workflows/**` (CI is human-authored) |
 
-## Contract changes
+## Shared contract changes
 
 `packages/domain` contains the Zod schemas and TypeScript interfaces that both lanes compile against.
-If your implementation reveals that a schema is wrong or missing:
+When a feature needs a contract change:
 
-1. **Do not edit `packages/domain` directly.**
-2. Open a GitHub issue titled "Contract change: <description>" and label it `contract`.
-3. Describe the needed change and why the current schema is insufficient.
-4. Andrew reviews and applies the change to `main`; both lanes rebase.
+1. Update `packages/domain` in the feature branch, with tests for the changed contract.
+2. Update the owning lane's implementation and fixtures in that PR. If the other lane has a
+   consumer to update, coordinate a separate PR in that lane.
+3. Run typecheck, lint, and tests across the workspace before merging into the lane branch.
+4. If both lanes change the same contract, coordinate the change and rebase the later PR on
+   the merged version instead of overwriting either lane's work.
 
-This protects both lanes from racing on the same domain file and breaking each other's builds overnight.
+Agents may implement contract changes without a separate issue or Andrew applying the schema
+change to `main`. The existing review and merge rules for lane branches and `main` still apply.
 
 ## Commit rhythm
 
@@ -85,4 +87,6 @@ Each merged increment should:
 - Pass all three CI checks (typecheck, lint, test).
 - Add or update Vitest tests for new behavior.
 - Leave the fixture in `tests/fixtures/coordinator-view.fixture.ts` valid (web lane depends on it).
-- Not expose private world state through any API or WebSocket message.
+- Keep private world parameters and future fire truth out of APIs and WebSocket messages.
+  Current fire may be shown to the authorized coordinator when a feature explicitly requires it;
+  crew projections and planning inputs must still contain only crew-available knowledge.

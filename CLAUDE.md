@@ -1,12 +1,12 @@
 # Claude Code - Ember Line
 
 Read AGENTS.md before starting any work.
-It defines lane ownership, forbidden paths, commit rules, and the contract-change process.
+It defines lane ownership, forbidden paths, commit rules, and shared-contract changes.
 
 ## Quick reference
 
 - **Your lane branch:** check which branch you are on (`git branch --show-current`).
-- **Forbidden:** editing `packages/domain` - open a contract-change issue instead.
+- **Shared contracts:** either lane may update `packages/domain` for its feature; follow AGENTS.md.
 - **Forbidden:** pushing to main or the other lane's branch.
 - **Required:** all three CI checks pass before merging to your lane branch.
 
