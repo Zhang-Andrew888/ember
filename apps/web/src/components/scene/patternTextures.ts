@@ -18,7 +18,7 @@ function makeTexture(size: [number, number], draw: (ctx: CanvasRenderingContext2
   return texture;
 }
 
-/** Diagonal amber hatching, translucent between lines. */
+/** Diagonal hatching, translucent between lines (forecast uses colors.forecastEnvelope). */
 export function createHatchTexture(color: string, lineAlpha = 0.95, fillAlpha = 0.16): CanvasTexture {
   return makeTexture([64, 64], (ctx) => {
     ctx.fillStyle = color;
