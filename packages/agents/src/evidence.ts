@@ -74,6 +74,33 @@ export class EvidenceTracker {
     return out;
   }
 
+  /**
+   * Initial fire cells from the public briefing, minus any the crew has since seen fully burned out.
+   * Used for suppression planning before direct sightings arrive.
+   */
+  briefingFireCells(nowMs: number): readonly number[] {
+    const horizon = SIM_DEFAULTS.cellBurnMs;
+    const out: number[] = [];
+    for (const cell of this.map.initialFireCells) {
+      const seen = this.cellBurnLatest.get(cell);
+      if (seen?.state === "burned") continue;
+      if (seen?.state === "burning" && nowMs > seen.at + horizon) continue;
+      if (seen === undefined || seen.state === "burning") out.push(cell);
+    }
+    return out;
+  }
+
+  /** True when this crew's latest sighting of the cell showed it not burning. */
+  seenNotBurning(cell: number): boolean {
+    const seen = this.cellBurnLatest.get(cell);
+    return seen !== undefined && seen.state !== "burning";
+  }
+
+  /** True when this crew's latest sighting of the cell showed it burned out. */
+  seenBurnedOut(cell: number): boolean {
+    return this.cellBurnLatest.get(cell)?.state === "burned";
+  }
+
   private noteCellBurn(cell: number, state: "unburned" | "burning" | "burned", at: number): void {
     const prev = this.cellBurnLatest.get(cell);
     if (prev !== undefined && at < prev.at) return;
@@ -83,6 +110,14 @@ export class EvidenceTracker {
   /** Stop planning new containment on a cell after a crew finished or abandoned that assignment. */
   retireContainmentCell(cell: number, at: number): void {
     this.noteCellBurn(cell, "burned", at);
+  }
+
+  /** Known damage or loss: structure work is warranted even without a fresh burn sighting. */
+  siteNeedsProtection(siteId: SiteId): boolean {
+    const seen = this.sites.get(siteId);
+    if (seen === undefined) return false;
+    if (seen.destroyed) return false;
+    return seen.damage > 0;
   }
 
   siteKnowledge(): SiteKnowledge[] {

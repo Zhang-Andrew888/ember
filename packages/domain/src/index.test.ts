@@ -181,6 +181,22 @@ describe("domain/coordinator-view - CoordinatorView", () => {
     expect(() => CoordinatorView.parse(view)).not.toThrow();
   });
 
+  it("carries a spraying crew's hose heading only as a unit vector", () => {
+    const crew = {
+      id: "crew-1",
+      role: "protection_crew",
+      callsign: "Crew 1",
+      position: { kind: "node", nodeId: "refuge-west" },
+      state: "working",
+      reportedAt: 0,
+    };
+    const withHose = (hose: unknown) => ({ ...minimalView, agents: [{ ...crew, hose }] });
+    expect(CoordinatorView.parse(withHose({ dx: 0.6, dy: 0.8 })).agents[0]?.hose).toEqual({ dx: 0.6, dy: 0.8 });
+    expect(CoordinatorView.parse({ ...minimalView, agents: [crew] }).agents[0]?.hose).toBeUndefined();
+    expect(() => CoordinatorView.parse(withHose({ dx: 2, dy: 0 }))).toThrow();
+    expect(() => CoordinatorView.parse(withHose({ dx: 0.1, dy: 0.1 }))).toThrow();
+  });
+
   it("rejects a CoordinatorView with an invalid incidentStatus", () => {
     expect(() =>
       CoordinatorView.parse({ ...minimalView, incidentStatus: "paused" }),

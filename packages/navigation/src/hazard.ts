@@ -1,8 +1,8 @@
 import type { EdgeId, NodeId } from "@ember/domain";
-import { earliestIgnitionMs } from "@ember/forecast";
+import { earliestIgnitionMs, rankedIgnitionMs } from "@ember/forecast";
 import type { ForecastEnsemble, ForecastMember } from "@ember/forecast";
-import { SIM_DEFAULTS, cellIndexOf, type RoadEdge, type RoadIndex } from "@ember/simulation/model";
-import type { NavConfig } from "./types.js";
+import { GAME_CHANGES, SIM_DEFAULTS, cellIndexOf, type RoadEdge, type RoadIndex } from "@ember/simulation/model";
+import { DEFAULT_NAV_CONFIG, type NavConfig, type PlanningContext } from "./types.js";
 
 /**
  * Safety constraints for road cells and nodes: a place occupied until time t is safe only if
@@ -22,9 +22,16 @@ export class HazardModel {
     readonly closed: ReadonlySet<number>,
     readonly config: NavConfig,
     members: readonly ForecastMember[] = ensemble.members,
+    /** Plan against each cell's `memberRank`-th earliest ignition across the ensemble instead of the earliest. */
+    memberRank = 1,
   ) {
     this.horizonEndMs = ensemble.horizonEndMs;
-    this.earliest = members === ensemble.members ? earliestIgnitionMs(ensemble) : minIgnition(members);
+    this.earliest =
+      members !== ensemble.members
+        ? minIgnition(members)
+        : memberRank > 1
+          ? rankedIgnitionMs(ensemble, memberRank)
+          : earliestIgnitionMs(ensemble);
   }
 
   cellIgnMs(cell: number): number {
@@ -109,6 +116,42 @@ export class HazardModel {
     }
     return bound;
   }
+}
+
+/**
+ * Game-changes fire-first: forecasted spread does not close roads; only cells the crew has
+ * directly observed burning or burned block movement.
+ */
+export class ObservedOnlyHazardModel extends HazardModel {
+  override cellIgnMs(cell: number): number {
+    return this.closed.has(cell) ? -Infinity : Infinity;
+  }
+}
+
+export function extendForecastHorizon(ensemble: ForecastEnsemble, nowMs: number, extraMs = 3_600_000): ForecastEnsemble {
+  return { ...ensemble, horizonEndMs: Math.max(ensemble.horizonEndMs, nowMs + extraMs) };
+}
+
+export function navConfigFireFirst(config: NavConfig): NavConfig {
+  return { ...config, bufferMs: 0 };
+}
+
+/** Hazard model for mission search when game-changes crews prioritize reaching fire over forecast margin. */
+export function planningHazardModel(ctx: PlanningContext, fireFirst: boolean): HazardModel {
+  const config = ctx.config ?? DEFAULT_NAV_CONFIG;
+  if (ctx.gameChanges === true && fireFirst && GAME_CHANGES.ignoreForecastSpreadForFire) {
+    const ensemble = extendForecastHorizon(ctx.ensemble, ctx.nowMs);
+    return new ObservedOnlyHazardModel(ctx.road, ensemble, ctx.closedCells, navConfigFireFirst(config));
+  }
+  return new HazardModel(ctx.road, ctx.ensemble, ctx.closedCells, config, ctx.ensemble.members, ctx.forecastMemberRank ?? 1);
+}
+
+/** Fire-line orders plan against the 6th earliest of 24 members; other ensemble sizes scale that rank. */
+export const LINE_FORECAST_MEMBER_RANK = { rank: 6, ofMembers: 24 } as const;
+
+export function lineForecastMemberRank(memberCount: number): number {
+  const { rank, ofMembers } = LINE_FORECAST_MEMBER_RANK;
+  return Math.max(1, Math.min(memberCount, Math.round((rank * memberCount) / ofMembers)));
 }
 
 function minIgnition(members: readonly ForecastMember[]): Float64Array {

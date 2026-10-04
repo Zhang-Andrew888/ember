@@ -1,5 +1,6 @@
 import { scheduledLegs, type AgentPosition, type MissionPlan, type NodeId } from "@ember/domain";
-import { HazardModel } from "./hazard.js";
+import { HazardModel, extendForecastHorizon, navConfigFireFirst, ObservedOnlyHazardModel } from "./hazard.js";
+import { GAME_CHANGES } from "@ember/simulation/model";
 import type { ForecastEnsemble } from "@ember/forecast";
 import { admitsProtection } from "@ember/forecast";
 import type { RoadIndex } from "@ember/simulation/model";
@@ -43,6 +44,10 @@ export interface CertifyInput {
   readonly config?: NavConfig;
   /** Use the ensemble even if it is flagged unreliable (never done for admission). */
   readonly ignoreReliability?: boolean;
+  /** Game-changes: certify against observed fire only, not forecast spread. */
+  readonly fireFirst?: boolean;
+  /** Certify against each cell's n-th earliest forecast ignition (the rank the plan was made with). */
+  readonly forecastMemberRank?: number;
 }
 
 function endNodeOfScheduleEntry(
@@ -62,11 +67,16 @@ function endNodeOfScheduleEntry(
  * plus new direct constraints still certify it.
  */
 export function certifyPlan(input: CertifyInput): CertifyResult {
-  const config = input.config ?? DEFAULT_NAV_CONFIG;
-  if (input.ignoreReliability !== true && !admitsProtection(input.ensemble)) {
+  const baseConfig = input.config ?? DEFAULT_NAV_CONFIG;
+  const fireFirst = input.fireFirst === true && GAME_CHANGES.ignoreForecastSpreadForFire;
+  const config = fireFirst ? navConfigFireFirst(baseConfig) : baseConfig;
+  if (input.ignoreReliability !== true && !fireFirst && !admitsProtection(input.ensemble)) {
     return { ok: false, failure: { kind: "forecast_unreliable" } };
   }
-  const hm = new HazardModel(input.road, input.ensemble, input.closedCells, config);
+  const ensemble = fireFirst ? extendForecastHorizon(input.ensemble, input.nowMs) : input.ensemble;
+  const hm = fireFirst
+    ? new ObservedOnlyHazardModel(input.road, ensemble, input.closedCells, config)
+    : new HazardModel(input.road, ensemble, input.closedCells, config, ensemble.members, input.forecastMemberRank ?? 1);
   const legs = scheduledLegs(input.plan);
   const fail = (failure: CertifyFailure): CertifyResult => ({ ok: false, failure });
 

@@ -10,3 +10,8 @@ import { osmMontclairScenarioJson } from "./osm-montclair-scenario.generated.js"
 export function osmMontclairScenario(): SimScenario {
   return SimScenario.parse(osmMontclairScenarioJson);
 }
+
+/** Montclair with game-changes hose reach, fire-first autonomy, and off-road directional moves. */
+export function osmMontclairGameScenario(): SimScenario {
+  return SimScenario.parse({ ...osmMontclairScenarioJson, gameChanges: true });
+}

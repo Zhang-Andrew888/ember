@@ -162,6 +162,18 @@ export class FireField {
     return before < SIM_DEFAULTS.containmentWorkRequired && after >= SIM_DEFAULTS.containmentWorkRequired;
   }
 
+  /**
+   * Extinguish a burning cell: burned fuel, no spread until/unless ignited again.
+   * Used when crews complete line suppression at the fire edge.
+   */
+  extinguishCell(cell: number): void {
+    if (this.state[cell] !== CELL_BURNING) return;
+    this.state[cell] = CELL_BURNED;
+    this.containmentWork[cell] = SIM_DEFAULTS.containmentWorkRequired;
+    this.burning = this.burning.filter((c) => c !== cell);
+    for (let d = 0; d < 8; d++) this.progress[cell * 8 + d] = 0;
+  }
+
   totalIgnitionsRecorded = 0;
 
   /** Cells that ever ignited (for deterministic spread comparisons in tests). */

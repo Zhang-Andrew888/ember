@@ -16,7 +16,10 @@ export function explain(callsign: string, decision: Pick<DecisionEvent, "type" |
       return `${callsign} is stranded. ${why}`;
     case "objective_rejected":
       if (decision.reasonCode === "no_road_near_line_end") return `${callsign} cannot cut line from that end: no road reaches it. Try the other end.`;
-      return `${callsign} cannot do that and return with the required margin.${detail === "" ? "" : ` ${detail}`}`;
+      if (isMarginReason(decision.reasonCode)) {
+        return `${callsign} cannot do that and return with the required margin.${detail === "" ? "" : ` ${detail}`}`;
+      }
+      return `${callsign} cannot do that.${why === "" ? "" : ` ${why}`}${detail === "" ? "" : ` ${detail}`}`;
     case "idle":
       return `${callsign} is holding. ${why}`;
     case "containment_succeeded":
@@ -31,6 +34,11 @@ export function explainCode(callsign: string, kind: "refusal" | "withdrawal", re
   return kind === "refusal"
     ? explain(callsign, { type: "objective_rejected", reasonCode, actualAction: "" })
     : explain(callsign, { type: "withdrawal_triggered", reasonCode, actualAction: "" });
+}
+
+/** Refusals that really come from the forecast safety margin, not from targets, terrain or seen fire. */
+function isMarginReason(code: string): boolean {
+  return code.startsWith("forecast_") || code === "no_feasible_mission_in_model" || code === "no_normal_return";
 }
 
 function reasonText(code: string): string {
@@ -57,6 +65,12 @@ function reasonText(code: string): string {
       return "No mission with a safe return was found in this model.";
     case "no_unresolved_target":
       return "No unresolved site remains.";
+    case "no_safe_directional_route":
+      return "Known fire or terrain blocks every way in that direction.";
+    case "offroad_not_traversable":
+      return "The ground that way cannot be crossed.";
+    case "reservation_unavailable":
+      return "Another crew holds the road it needs.";
     case "objective_not_supported":
       return "That kind of order is not supported.";
     case "forecast_horizon_insufficient":

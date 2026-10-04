@@ -97,6 +97,16 @@ describe("issue #122 - legend separates forecast from actual fire", () => {
   });
 });
 
+describe("minimized legend", () => {
+  it("starts closed behind a Legend button that controls the hidden panel body", () => {
+    const html = legend();
+    expect(html).toContain("scene-legend--collapsed");
+    expect(html).toMatch(/<button type="button" class="scene-legend__panel-toggle" aria-expanded="false" aria-controls="([^"]+)">Legend<\/button>/);
+    const controls = html.match(/aria-controls="([^"]+)"/)?.[1];
+    expect(html).toContain(`<div id="${controls}" class="scene-legend__body" hidden=""`);
+  });
+});
+
 describe("firebreak legend entry", () => {
   it("appears only when the map has firebreaks, with a pattern swatch and the cell count", () => {
     expect(legend()).not.toContain('data-key="firebreak"');

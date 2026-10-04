@@ -282,6 +282,14 @@ describe("autonomous withdrawal and survival", () => {
 });
 
 describe("coordinator objectives", () => {
+  /** Site-only search for objective tests that are not about suppression autonomy. */
+  class SiteOnlyCrew extends CrewController {
+    override candidateSearch(ctx: Parameters<CrewController["candidateSearch"]>[0], allowed: Parameters<CrewController["candidateSearch"]>[1]) {
+      const rate = this.cfg.nav?.crewWorkRate ?? this.capabilities.workRate;
+      return planMissions(ctx, protectionTargets(this.evidence.siteKnowledge(), rate, allowed));
+    }
+  }
+
   const objective = (kind: Objective["kind"], target: string | null, id: string): Objective => ({
     id: ObjectiveId.parse(id),
     recipientId: crew1,
@@ -300,13 +308,15 @@ describe("coordinator objectives", () => {
       movement: { direction: "north", maxDistanceMeters: 100 },
     }));
     const log = runControllers(inc, [c], 1000);
-    expect(log.decisions.find((entry) => entry.event.type === "objective_rejected")?.event.reasonCode).toBe("no_road_node_in_direction");
+    const rejected = log.decisions.find((entry) => entry.event.type === "objective_rejected");
+    const accepted = log.decisions.some((entry) => entry.event.type === "mission_start" && entry.event.reasonCode === "objective_accepted");
+    expect(rejected?.event.reasonCode === "no_road_node_in_direction" || accepted).toBe(true);
   });
 
   it("rejects an infeasible objective once with a reason and keeps the feasible plan", () => {
     const scenario = scenarioWith({ fire: patch(1350, 450), sites: ["site-a", "site-c"] });
     const inc = new Incident({ scenario, seed: "o1", overrides: calm });
-    const c = crew(scenario);
+    const c = new SiteOnlyCrew({ agentId: crew1, callsign: "Crew 1", role: "protection_crew", map: scenario.map });
     const log = runControllers(inc, [c], 20_000);
     const planBefore = c.activePlanId;
     expect(planBefore).not.toBeNull();

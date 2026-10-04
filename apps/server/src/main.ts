@@ -26,7 +26,7 @@ function scenarioFromEnv(): SimScenario | undefined {
   if (!isFirebreakPreset(raw)) {
     throw new Error(`EMBER_FIREBREAK must be one of ${FIREBREAK_PRESETS.join(", ")}; got "${raw}"`);
   }
-  const base = buildSyntheticScenario();
+  const base = buildSyntheticScenario({ gameChanges: true });
   return withFirebreaks(base, firebreakPresetCells(base, raw));
 }
 

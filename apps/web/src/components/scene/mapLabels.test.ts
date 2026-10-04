@@ -9,6 +9,7 @@ const agent: AgentMarker = {
   state: "idle",
   position: { x: 0, z: 0 },
   heading: null,
+  hoseAim: null,
   ageMs: 45_000,
 };
 

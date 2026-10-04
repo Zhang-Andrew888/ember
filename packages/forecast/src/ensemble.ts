@@ -32,6 +32,31 @@ export function earliestIgnitionMs(ensemble: ForecastEnsemble): Float64Array {
   return out;
 }
 
+const rankedCache = new WeakMap<ForecastEnsemble, Map<number, Float64Array>>();
+
+/**
+ * Per cell, the `rank`-th earliest ignition across retained members (1 = `earliestIgnitionMs`).
+ * A rank above the member count uses the latest member.
+ */
+export function rankedIgnitionMs(ensemble: ForecastEnsemble, rank: number): Float64Array {
+  const k = Math.max(1, Math.min(Math.floor(rank), ensemble.members.length));
+  if (k <= 1) return earliestIgnitionMs(ensemble);
+  let byRank = rankedCache.get(ensemble);
+  const hit = byRank?.get(k);
+  if (hit !== undefined) return hit;
+  const n = SIM_DEFAULTS.gridSize * SIM_DEFAULTS.gridSize;
+  const out = new Float64Array(n);
+  const values = new Float64Array(ensemble.members.length);
+  for (let i = 0; i < n; i++) {
+    for (let m = 0; m < ensemble.members.length; m++) values[m] = ensemble.members[m]!.ignitionMs[i]!;
+    values.sort();
+    out[i] = values[k - 1]!;
+  }
+  if (byRank === undefined) rankedCache.set(ensemble, (byRank = new Map()));
+  byRank.set(k, out);
+  return out;
+}
+
 /**
  * Fraction of retained members with each cell burning or burned at tMs, for uncertainty
  * display. It counts finite design members and is not a validated probability.

@@ -60,7 +60,7 @@ export class IncidentRegistry {
 
   /** The scenario a `create` without an explicit one runs; also what `GET /scenario` briefs before any incident exists. */
   defaultScenario(): SimScenario {
-    return this.operatorScenario ?? buildSyntheticScenario();
+    return this.operatorScenario ?? buildSyntheticScenario({ gameChanges: true });
   }
 
   create(body: CreateIncidentBody = {}, clock: MonotonicClock): IncidentRecord {

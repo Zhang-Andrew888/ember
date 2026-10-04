@@ -1,30 +1,8 @@
-import type { CompassDirection, MovementDirective } from "@ember/domain";
+import type { MovementDirective } from "@ember/domain";
+import { planOffroadDirectionalMove } from "./directional-offroad.js";
+import { currentPoint, VECTORS } from "./directional-shared.js";
 import { planMissions } from "./mission.js";
 import { DEFAULT_NAV_CONFIG, type MissionSearchResult, type MissionTarget, type PlanningContext } from "./types.js";
-
-const DIAGONAL = Math.SQRT1_2;
-const VECTORS: Record<CompassDirection, { x: number; y: number }> = {
-  north: { x: 0, y: 1 },
-  northeast: { x: DIAGONAL, y: DIAGONAL },
-  east: { x: 1, y: 0 },
-  southeast: { x: DIAGONAL, y: -DIAGONAL },
-  south: { x: 0, y: -1 },
-  southwest: { x: -DIAGONAL, y: -DIAGONAL },
-  west: { x: -1, y: 0 },
-  northwest: { x: -DIAGONAL, y: DIAGONAL },
-};
-
-function currentPoint(ctx: PlanningContext): { x: number; y: number } {
-  const position = ctx.position;
-  if (position.kind === "node") return ctx.road.nodePoint(position.nodeId);
-  if (position.kind === "offroad") {
-    return {
-      x: position.start.x + (position.end.x - position.start.x) * position.progress,
-      y: position.start.y + (position.end.y - position.start.y) * position.progress,
-    };
-  }
-  return ctx.road.pointAlong(ctx.road.mustEdge(position.edgeId), position.distanceAlongPolyline);
-}
 
 /** Find road nodes within a 45-degree cone and the requested travel bound. */
 export function directionalTargets(ctx: PlanningContext, movement: MovementDirective): MissionTarget[] {
@@ -37,7 +15,7 @@ export function directionalTargets(ctx: PlanningContext, movement: MovementDirec
     const distance = Math.hypot(dx, dy);
     if (distance < 1 || distance > movement.maxDistanceMeters) continue;
     const progress = dx * heading.x + dy * heading.y;
-    if (progress / distance < DIAGONAL - 1e-9) continue;
+    if (progress / distance < Math.SQRT1_2 - 1e-9) continue;
     targets.push({
       id: `waypoint:${node.id}`,
       kind: "observe",
@@ -54,13 +32,29 @@ export function directionalTargets(ctx: PlanningContext, movement: MovementDirec
 
 /** Reuse full mission admission: every route and its return must pass the crew's own hazard model. */
 export function planDirectionalMove(ctx: PlanningContext, movement: MovementDirective): MissionSearchResult {
+  if (ctx.gameChanges === true) {
+    const offFirst = planOffroadDirectionalMove(ctx, movement);
+    if (offFirst.best !== null) return offFirst;
+  }
   const targets = directionalTargets(ctx, movement);
-  if (targets.length === 0) return {
-    feasible: false, best: null, candidates: [], plan: null,
-    limitingReason: "no_road_node_in_direction", limitingMemberIds: [],
-  };
+  if (targets.length === 0) {
+    if (ctx.gameChanges === true) return planOffroadDirectionalMove(ctx, movement);
+    return {
+      feasible: false,
+      best: null,
+      candidates: [],
+      plan: null,
+      limitingReason: "no_road_node_in_direction",
+      limitingMemberIds: [],
+    };
+  }
   const result = planMissions(ctx, targets);
-  return result.best === null && result.limitingReason !== "forecast_unreliable"
+  if (result.best !== null) return result;
+  if (ctx.gameChanges === true) {
+    const off = planOffroadDirectionalMove(ctx, movement);
+    if (off.best !== null) return off;
+  }
+  return result.limitingReason !== "forecast_unreliable"
     ? { ...result, limitingReason: "no_safe_directional_route" }
     : result;
 }

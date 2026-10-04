@@ -8,7 +8,7 @@ export * from "./clock.js";
 export * from "./inputs.js";
 export * from "./scenario.js";
 export * from "./firebreaks.js";
-export { osmMontclairScenario } from "./scenario-osm.js";
+export { osmMontclairGameScenario, osmMontclairScenario } from "./scenario-osm.js";
 export * from "./harness.js";
 export { Incident, type AgentProjection, type IncidentOptions, type TruthSnapshot } from "./incident.js";
 export {

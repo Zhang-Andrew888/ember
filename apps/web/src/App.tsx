@@ -366,7 +366,7 @@ export function App() {
 
   const mapPreviewTo = useMemo(() => {
     if (mapDraft === null) return null;
-    return worldToScenePoint(mapDraft.cueTo, scenarioMap.worldMeters);
+    return worldToScenePoint(mapDraft.to, scenarioMap.worldMeters);
   }, [mapDraft]);
 
   // A pick started for one crew never lands on another.

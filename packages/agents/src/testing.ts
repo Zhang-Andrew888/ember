@@ -1,5 +1,7 @@
 import type { AgentId, DecisionEvent } from "@ember/domain";
 import type { Incident } from "@ember/simulation";
+import { brigadePeerPicture, pendingSuppressFromPlan, type PendingSuppress } from "./peer-suppress.js";
+import { RoadIndex } from "@ember/simulation/model";
 import type { AgentController, ControllerEnvironment, ControllerState } from "./types.js";
 
 export interface RunLog {
@@ -20,9 +22,26 @@ export function runControllers(
   log: RunLog = { decisions: [], states: new Map(), forecastEvents: [] },
 ): RunLog {
   while (!incident.ended && incident.simTimeMs < untilMs) {
+    const pendingSuppress = new Map<AgentId, PendingSuppress>();
+    const road = new RoadIndex(incident.scenario.map);
     for (const c of controllers) {
-      const out = c.tick(incident.projectAgent(c.agentId), env(c.agentId));
-      for (const order of out.orders) incident.submit(order);
+      const base = env(c.agentId);
+      const brigadePeer =
+        base.brigadePeer ?? brigadePeerPicture(incident, road, c.agentId, pendingSuppress);
+      const out = c.tick(incident.projectAgent(c.agentId), {
+        ...base,
+        peerSuppressCells: brigadePeer.suppressCells,
+        brigadePeer,
+      });
+      for (const order of out.orders) {
+        incident.submit(order);
+        if (order.kind === "commit_plan") {
+          const work = order.plan.work;
+          if (work?.kind === "suppress_fire") {
+            pendingSuppress.set(c.agentId, pendingSuppressFromPlan(road, work.gridCellIndex, undefined, order.plan));
+          }
+        }
+      }
       for (const r of out.reports) incident.submit({ kind: "report", agentId: c.agentId, text: r.text, urgent: r.urgent });
       for (const d of out.decisions) log.decisions.push({ tick: d.tick, event: d, text: r0(out, d) });
       for (const f of out.forecastEvents) log.forecastEvents.push({ tick: f.atMs, agentId: f.agentId, kind: f.kind });

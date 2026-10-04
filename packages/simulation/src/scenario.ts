@@ -16,6 +16,8 @@ export const SimScenario = z.object({
   map: PublicMap,
   agents: z.array(AgentSpec).min(1),
   briefing: z.string(),
+  /** Enables game-changes hose reach, fire-first autonomy, off-road directional fallback, etc. */
+  gameChanges: z.boolean().optional(),
 });
 export type SimScenario = z.infer<typeof SimScenario>;
 
@@ -30,6 +32,7 @@ export interface SyntheticOptions {
   readonly sites?: readonly string[];
   readonly terrainSeed?: string;
   readonly version?: string;
+  readonly gameChanges?: boolean;
 }
 
 const NODES: readonly [string, number, number, string?][] = [
@@ -126,6 +129,7 @@ export function buildSyntheticScenario(options: SyntheticOptions = {}): SimScena
       }),
     ),
     briefing: "Synthetic training scenario: authored roads, sites, refuges and ignition.",
+    ...(options.gameChanges === true ? { gameChanges: true as const } : {}),
   };
   return SimScenario.parse(scenario);
 }

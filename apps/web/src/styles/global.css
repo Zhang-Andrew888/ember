@@ -1833,6 +1833,11 @@ select {
   color: var(--color-text);
 }
 
+.replay-controls__play {
+  min-width: 5.5rem;
+  font-weight: 600;
+}
+
 .replay-controls {
   flex-wrap: wrap;
 }
@@ -1921,6 +1926,27 @@ select {
   margin: 0;
   font-size: 0.7rem;
   color: var(--color-muted);
+}
+
+.scene-legend--collapsed {
+  min-height: 0;
+  padding: 0.35rem;
+  align-self: flex-start;
+}
+
+.scene-legend__panel-toggle {
+  align-self: flex-start;
+  font-weight: 600;
+}
+
+.scene-legend__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.scene-legend__body[hidden] {
+  display: none;
 }
 
 .scene-legend__keybox summary {

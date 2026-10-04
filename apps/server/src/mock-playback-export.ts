@@ -66,8 +66,7 @@ export function thinPlaybackViews(views: readonly CoordinatorView[], everySimMs 
     const keep =
       t >= nextKeep ||
       view.incidentEnd !== null ||
-      view.recentReports.some((r) => r.urgent) ||
-      view.incidentStatus !== out[out.length - 1]!.incidentStatus;
+      (view.recentReports.some((r) => r.urgent) && t >= nextKeep);
     if (keep) {
       out.push(view);
       nextKeep = t + everySimMs;

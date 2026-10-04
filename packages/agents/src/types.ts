@@ -2,6 +2,7 @@ import type { AgentId, DecisionEvent, MissionPlan, Objective } from "@ember/doma
 import type { ForecastConfig, ForecastEvent } from "@ember/forecast";
 import type { NavConfig, PriorityClass, ReservationOracle, ReserveResult } from "@ember/navigation";
 import type { AgentProjection, SimInput } from "@ember/simulation";
+import type { BrigadePeerPicture } from "./peer-suppress.js";
 
 export type ControllerState =
   | "HOLDING"
@@ -62,6 +63,10 @@ export interface ReservationHooks {
 export interface ControllerEnvironment {
   readonly oracle?: ReservationOracle;
   readonly reservations?: ReservationHooks;
+  /** Burn cells other crews are actively suppressing (operational picture for brigade spread). */
+  readonly peerSuppressCells?: ReadonlySet<number>;
+  /** Peer suppress assignments for brigade line deconfliction. */
+  readonly brigadePeer?: BrigadePeerPicture;
 }
 
 /** What an agent can reportably say about itself: only its own knowledge and committed decisions. */
