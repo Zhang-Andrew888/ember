@@ -19,6 +19,12 @@ export const SIM_DEFAULTS = {
   maxDamageReduction: 0.9,
   unprotectedDamageRate: 0.006,
   siteExposureRadiusM: 35,
+  /** Max distance from a road node to a grid cell center for on-road containment work (not off-road travel). */
+  containmentReachM: 300,
+  /** Work-units per second while a crew performs suppress_fire at an reachable node. */
+  containmentWorkRate: 1,
+  /** Accumulated work-units to fully restrain spread from a burning cell (deterministic game param). */
+  containmentWorkRequired: 45,
   baseSpreadRate: 0.5,
   cellBurnMs: 240_000,
   refugeRadiusM: 50,

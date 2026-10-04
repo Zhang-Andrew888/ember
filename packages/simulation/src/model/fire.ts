@@ -100,6 +100,8 @@ export class FireField {
   /** Ignition time per cell in ms; Infinity if the cell has not ignited. */
   readonly ignitedAtMs: Float64Array;
   private readonly progress: Float64Array;
+  /** Accumulated suppression work per cell (structure protection does not touch this). */
+  private readonly containmentWork: Float64Array;
   private burning: number[] = [];
   private readonly terrain: Terrain;
 
@@ -109,7 +111,33 @@ export class FireField {
     this.state = new Uint8Array(n).fill(CELL_UNBURNED);
     this.ignitedAtMs = new Float64Array(n).fill(Infinity);
     this.progress = new Float64Array(n * 8);
+    this.containmentWork = new Float64Array(n);
     for (const cell of nonburnable) this.state[cell] = CELL_NONBURNABLE;
+  }
+
+  /** Fraction in [0,1] of spread rate retained from this burning cell (0 = fully restrained). */
+  spreadFactorFrom(cell: number): number {
+    if (this.state[cell] !== CELL_BURNING) return 1;
+    const required = SIM_DEFAULTS.containmentWorkRequired;
+    const done = this.containmentWork[cell]!;
+    if (done >= required) return 0;
+    return 1 - done / required;
+  }
+
+  /** Apply crew suppression work at a cell that is still burning. Returns true when newly fully restrained. */
+  applyContainmentWork(cell: number, units: number): boolean {
+    if (this.state[cell] !== CELL_BURNING || units <= 0) return false;
+    const before = this.containmentWork[cell]!;
+    const after = Math.min(SIM_DEFAULTS.containmentWorkRequired, before + units);
+    this.containmentWork[cell] = after;
+    return before < SIM_DEFAULTS.containmentWorkRequired && after >= SIM_DEFAULTS.containmentWorkRequired;
+  }
+
+  totalIgnitionsRecorded = 0;
+
+  /** Cells that ever ignited (for deterministic spread comparisons in tests). */
+  ignitionCount(): number {
+    return this.totalIgnitionsRecorded;
   }
 
   get burningCells(): readonly number[] {
@@ -127,6 +155,7 @@ export class FireField {
       this.state[cell] = CELL_BURNING;
       this.ignitedAtMs[cell] = tMs;
       this.burning.push(cell);
+      this.totalIgnitionsRecorded += 1;
     }
     if (initialProgress > 0) {
       for (const cell of cells) {
@@ -161,6 +190,8 @@ export class FireField {
     const reached: number[] = [];
     const seen = new Set<number>();
     for (const cell of this.burning) {
+      const spreadScale = this.spreadFactorFrom(cell);
+      if (spreadScale <= 0) continue;
       const gx = cell % SIZE;
       const gy = (cell - gx) / SIZE;
       for (let d = 0; d < 8; d++) {
@@ -171,7 +202,7 @@ export class FireField {
         const target = ny * SIZE + nx;
         if (this.state[target] !== CELL_UNBURNED) continue;
         const slot = cell * 8 + d;
-        const raw = baseRate * stat[slot]! * windFactor[d]!;
+        const raw = baseRate * stat[slot]! * windFactor[d]! * spreadScale;
         const rate = raw < rateLo ? rateLo : raw > rateHi ? rateHi : raw;
         const next = this.progress[slot]! + rate * dtSec;
         this.progress[slot] = next;
@@ -185,6 +216,7 @@ export class FireField {
       this.state[target] = CELL_BURNING;
       this.ignitedAtMs[target] = toMs;
       this.burning.push(target);
+      this.totalIgnitionsRecorded += 1;
     }
     return reached;
   }
@@ -194,7 +226,9 @@ export class FireField {
     copy.state.set(this.state);
     copy.ignitedAtMs.set(this.ignitedAtMs);
     copy.progress.set(this.progress);
+    copy.containmentWork.set(this.containmentWork);
     copy.burning = [...this.burning];
+    copy.totalIgnitionsRecorded = this.totalIgnitionsRecorded;
     return copy;
   }
 }

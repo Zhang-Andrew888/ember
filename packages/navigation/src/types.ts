@@ -13,6 +13,8 @@ export interface NavConfig {
   readonly crewWorkRate: number;
   readonly reservationGuardMs: number;
   readonly scoutDwellMs: number;
+  readonly containmentReachM: number;
+  readonly containmentWorkRequired: number;
 }
 
 export const DEFAULT_NAV_CONFIG: NavConfig = {
@@ -25,6 +27,8 @@ export const DEFAULT_NAV_CONFIG: NavConfig = {
   crewWorkRate: 1,
   reservationGuardMs: 5000,
   scoutDwellMs: 10_000,
+  containmentReachM: 300,
+  containmentWorkRequired: 45,
 };
 
 /** Timed single-capacity availability, answered without exposing other agents' plans. */
@@ -48,9 +52,11 @@ export interface SiteKnowledge {
 /** One candidate destination for a mission. */
 export interface MissionTarget {
   readonly id: string;
-  readonly kind: "protect" | "observe";
+  readonly kind: "protect" | "observe" | "contain";
   readonly nodeId: NodeId;
   readonly siteId: SiteId | null;
+  /** Set when `kind === "contain"`. */
+  readonly gridCellIndex?: number;
   readonly value: number;
   /** Candidate work/dwell durations in ms, ascending. */
   readonly workOptionsMs: readonly number[];
