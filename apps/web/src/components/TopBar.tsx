@@ -3,9 +3,12 @@ import type { TransportMode } from "../net/transportMode.js";
 import type { SpeechPlaybackSnapshot } from "../state/speechPlaybackStub.js";
 import { TIME_COMPRESSION, formatIncidentClock, formatRemainingWallTime } from "../format/time.js";
 import { TransportModeBadge } from "./TransportModeBadge.js";
+import { GrokIntegrationBadge } from "./GrokIntegrationBadge.js";
+import type { ServerHealthResponse } from "../net/serverHealth.js";
 
 export interface TopBarProps {
   readonly transportMode: TransportMode;
+  readonly serverHealth?: ServerHealthResponse | null;
   readonly simTimeMs: number | null;
   readonly wallElapsedMs: number | null;
   readonly connectionStatus: ConnectionStatus;
@@ -30,11 +33,12 @@ function audioStatusLabel(snapshot: SpeechPlaybackSnapshot): string {
   return "Audio active";
 }
 
-export function TopBar({ transportMode, simTimeMs, wallElapsedMs, connectionStatus, speechSnapshot }: TopBarProps) {
+export function TopBar({ transportMode, serverHealth = null, simTimeMs, wallElapsedMs, connectionStatus, speechSnapshot }: TopBarProps) {
   return (
     <header className="top-bar">
       <span className="top-bar__title">EMBER LINE</span>
       <TransportModeBadge mode={transportMode} />
+      {transportMode === "live" ? <GrokIntegrationBadge health={serverHealth ?? null} /> : null}
       <span
         className="top-bar__clock"
         aria-label="Simulated incident time"

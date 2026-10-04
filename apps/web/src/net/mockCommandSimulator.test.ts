@@ -19,6 +19,12 @@ describe("net/mockCommandSimulator", () => {
     }
   });
 
+  it("accepts directional movement orders after received", () => {
+    const frames = mockWireRepliesForSay("Crew 1, move northeast and stop at the nearest safe road.", 0, "cmd-move");
+    expect(frames.length).toBe(2);
+    expect(frames[1]).toContain("\"accepted\"");
+  });
+
   it("returns rejected for invalid objective phrasing", () => {
     const frames = mockWireRepliesForSay("Crew 2, invalid objective", 10_000, "cmd-c");
     const receipt = parseServerWireMessage(frames[0]!);

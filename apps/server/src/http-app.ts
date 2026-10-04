@@ -5,7 +5,8 @@ import type { IncomingMessage } from "node:http";
 import { WIRE_PROTOCOL_VERSION } from "@ember/domain";
 import { IncidentRegistry } from "./incident-registry.js";
 import { stopReplayWorker } from "./replay-offloop.js";
-import { grokIntentEnabled, grokVoiceEnabled } from "./xai/env.js";
+import { grokVoiceEnabled } from "./xai/env.js";
+import { serverIntegrationStatus } from "./xai/integration-status.js";
 import { transcribeAudio } from "./xai/stt.js";
 import type { MonotonicClock } from "./runner.js";
 import type { ClientId } from "./hub.js";
@@ -93,8 +94,7 @@ export async function startHttpApp(options: { port?: number; clock?: MonotonicCl
   fastify.get("/health", async () => ({
     ok: true as const,
     protocolVersion: WIRE_PROTOCOL_VERSION,
-    grokVoice: grokVoiceEnabled(),
-    grokIntent: grokIntentEnabled(),
+    ...serverIntegrationStatus(),
   }));
 
   fastify.post("/incidents", async () => {

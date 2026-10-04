@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { RefObject } from "react";
+import type { ReactNode, RefObject } from "react";
 import type { RootState } from "@react-three/fiber";
 import type { Camera } from "three";
 import { SceneCanvas } from "./SceneCanvas.js";
@@ -27,6 +27,11 @@ export interface SceneViewProps {
   readonly reducedMotion: boolean;
   /** For the fire-cell inspection panel's age readout; null before the first snapshot. */
   readonly simTimeMs: number | null;
+  readonly mapAssignMode: boolean;
+  readonly mapPreviewFrom: { readonly x: number; readonly z: number } | null;
+  readonly mapPreviewTo: { readonly x: number; readonly z: number } | null;
+  readonly onMapDestinationPick: (sceneX: number, sceneZ: number) => void;
+  readonly mapCommandPanel: ReactNode;
 }
 
 interface RenderContext {
@@ -41,6 +46,11 @@ export function SceneView({
   onInspectAgent,
   reducedMotion,
   simTimeMs,
+  mapAssignMode,
+  mapPreviewFrom,
+  mapPreviewTo,
+  onMapDestinationPick,
+  mapCommandPanel,
 }: SceneViewProps) {
   const [renderContext, setRenderContext] = useState<RenderContext | null>(null);
   const [firstFrameDrawn, setFirstFrameDrawn] = useState(false);
@@ -156,7 +166,7 @@ export function SceneView({
   }, [entities, showRoutes, showForecast, simTimeMs]);
 
   return (
-    <div className="scene-view">
+    <div className={`scene-view${mapAssignMode ? " scene-view--map-assign" : ""}`}>
       <SceneCanvas
         ref={controlsRef}
         entities={entities}
@@ -169,10 +179,15 @@ export function SceneView({
         onUserPan={handleUserPan}
         onInspectAgent={handleInspectAgent}
         onInspectCell={setInspectedCell}
+        mapAssignMode={mapAssignMode}
+        mapPreviewFrom={mapPreviewFrom}
+        mapPreviewTo={mapPreviewTo}
+        onMapDestinationPick={onMapDestinationPick}
         onReady={handleReady}
         onFirstFrame={() => setFirstFrameDrawn(true)}
         reducedMotion={reducedMotion}
       />
+      {mapCommandPanel}
       {firstFrameDrawn ? null : (
         <div className="scene-view__loading" role="status">
           Preparing the map…

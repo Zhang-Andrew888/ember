@@ -14,6 +14,7 @@ import { SiteMarkers, RefugeMarkers } from "./SiteMarkers.js";
 import { RouteLayer } from "./RouteLayer.js";
 import { ForecastLayer } from "./ForecastLayer.js";
 import { AgentMarkers } from "./AgentMarkers.js";
+import { MapDestinationPicker } from "./MapDestinationPicker.js";
 import { CameraControls, type CameraControlsHandle } from "./CameraControls.js";
 import { listRefugeNodes, litFireCells } from "./sceneEntities.js";
 import { scenarioMap } from "../../map/activeScenario.js";
@@ -34,6 +35,10 @@ export interface SceneCanvasProps {
   readonly onUserPan: () => void;
   readonly onInspectAgent: (agentId: string) => void;
   readonly onInspectCell: (cell: FireCellMarker) => void;
+  readonly mapAssignMode: boolean;
+  readonly mapPreviewFrom: { readonly x: number; readonly z: number } | null;
+  readonly mapPreviewTo: { readonly x: number; readonly z: number } | null;
+  readonly onMapDestinationPick: (sceneX: number, sceneZ: number) => void;
   readonly onReady: (state: RootState) => void;
   /** Called once, after the first frame has been drawn (shaders compiled, geometry uploaded). */
   readonly onFirstFrame?: () => void;
@@ -53,7 +58,25 @@ function FirstFrame({ onFirstFrame }: { readonly onFirstFrame: () => void }) {
 }
 
 export const SceneCanvas = forwardRef<CameraControlsHandle, SceneCanvasProps>(function SceneCanvas(
-  { entities, showFireCells, showCurrentFire, showRoutes, showForecast, selectedAgentId, followTarget, onUserPan, onInspectAgent, onInspectCell, onReady, onFirstFrame, reducedMotion },
+  {
+    entities,
+    showFireCells,
+    showCurrentFire,
+    showRoutes,
+    showForecast,
+    selectedAgentId,
+    followTarget,
+    onUserPan,
+    onInspectAgent,
+    onInspectCell,
+    mapAssignMode,
+    mapPreviewFrom,
+    mapPreviewTo,
+    onMapDestinationPick,
+    onReady,
+    onFirstFrame,
+    reducedMotion,
+  },
   controlsRef,
 ) {
   const qualityState = useQualityState();
@@ -131,6 +154,12 @@ export const SceneCanvas = forwardRef<CameraControlsHandle, SceneCanvasProps>(fu
         agents={entities.agents}
         selectedAgentId={selectedAgentId}
         onInspectAgent={onInspectAgent}
+      />
+      <MapDestinationPicker
+        active={mapAssignMode}
+        from={mapPreviewFrom}
+        to={mapPreviewTo}
+        onPickScene={onMapDestinationPick}
       />
       <CameraControls ref={controlsRef} reducedMotion={reducedMotion} followTarget={followTarget} onUserPan={onUserPan} />
       </QualityProvider>

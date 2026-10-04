@@ -9,7 +9,7 @@ export const colors = {
   panel: "#1B272B",
   text: "#F1F4ED",
   observedFire: "#FF6B35",
-  forecastEnvelope: "#FFC98B",
+  forecastEnvelope: "#E85CD0",
   refuge: "#70D6D1",
   rejected: "#C1443B",
   staleOutline: "#5B6A6D",
