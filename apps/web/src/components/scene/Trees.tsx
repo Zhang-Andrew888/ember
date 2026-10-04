@@ -19,14 +19,27 @@ const ROAD_CLEARANCE = 26;
  * char and darken (colour is decoration here: fire status is also carried
  * by the flame cards and the inspection list).
  */
-export function Trees({ fireCells, reducedMotion }: { readonly fireCells: readonly FireCellMarker[]; readonly reducedMotion: boolean }) {
+export function Trees({
+  fireCells,
+  clearedCells,
+  reducedMotion,
+}: {
+  readonly fireCells: readonly FireCellMarker[];
+  /** Cells cleared to bare ground (firebreaks): no trees stand there. */
+  readonly clearedCells?: ReadonlySet<number>;
+  readonly reducedMotion: boolean;
+}) {
   const quality = useQuality();
   const invalidate = useThree((state) => state.invalidate);
 
   const blocked = useMemo(() => createProximityTest(roadSamplePoints(), ROAD_CLEARANCE), []);
-  const trees = useMemo(
+  const placed = useMemo(
     () => placeTrees({ field: sceneTerrain, blocked, waterCells: new Set(waterCells), densityFactor: quality.treeDensity }),
     [blocked, quality.treeDensity],
+  );
+  const trees = useMemo(
+    () => (clearedCells === undefined || clearedCells.size === 0 ? placed : placed.filter((t) => !clearedCells.has(t.cell))),
+    [placed, clearedCells],
   );
   const bySpecies = useMemo(
     () => [trees.filter((t) => t.species === 0), trees.filter((t) => t.species === 1)] as const,

@@ -96,3 +96,22 @@ describe("issue #122 - legend separates forecast from actual fire", () => {
     expect(html).toContain("Grid index");
   });
 });
+
+describe("firebreak legend entry", () => {
+  it("appears only when the map has firebreaks, with a pattern swatch and the cell count", () => {
+    expect(legend()).not.toContain('data-key="firebreak"');
+    const html = legend({ firebreakCount: 40 });
+    expect(html).toMatch(/data-key="firebreak"><span class="scene-legend__swatch scene-legend__swatch--firebreak"/);
+    expect(html).toContain("(40 cells)");
+  });
+});
+
+describe("fire line legend entries", () => {
+  it("explains clearing and ordered cells only when present, by shape as well as colour", () => {
+    expect(legend()).not.toContain('data-key="clearing"');
+    expect(legend()).not.toContain('data-key="planned-line"');
+    const html = legend({ clearingCount: 3, plannedLineCount: 9 });
+    expect(html).toMatch(/data-key="clearing"><span class="scene-legend__swatch scene-legend__swatch--clearing"/);
+    expect(html).toMatch(/data-key="planned-line"><span class="scene-legend__swatch scene-legend__swatch--planned-line"/);
+  });
+});

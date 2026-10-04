@@ -32,6 +32,7 @@ export function describeWork(work: MissionWork | undefined, sites: readonly Coor
     const site = sites.find((candidate) => candidate.id === work.siteId);
     return `structure protection at ${site?.name ?? "a site"}`;
   }
+  if (work.kind === "build_line") return "fire line construction";
   const { row, column } = gridCellRowColumn(work.gridCellIndex);
   return `fire suppression at row ${row}, column ${column}`;
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CoordinatorView } from "@ember/domain";
+import { CoordinatorView, NodeId } from "@ember/domain";
 import { fixtureCoordinatorView } from "../../../../tests/fixtures/coordinator-view.fixture.js";
 import { describeCrew, describeWork } from "./crewDetails.js";
 
@@ -25,6 +25,12 @@ describe("crewDetails", () => {
     const site = view.sites[0]!;
     expect(describeWork({ kind: "protect_structure", siteId: site.id }, view.sites)).toBe(`structure protection at ${site.name}`);
     expect(describeWork({ kind: "suppress_fire", gridCellIndex: 66 }, view.sites)).toBe("fire suppression at row 1, column 2");
+    expect(
+      describeWork(
+        { kind: "build_line", start: { x: 10, y: 20 }, end: { x: 90, y: 20 }, workNodeId: NodeId.parse("n1") },
+        view.sites,
+      ),
+    ).toBe("fire line construction");
     expect(describeWork(undefined, view.sites)).toBe("structure protection");
   });
 });
