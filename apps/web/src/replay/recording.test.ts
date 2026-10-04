@@ -5,7 +5,7 @@ import { scenarioMap } from "../map/activeScenario.js";
 import type { FireCellMarker } from "../components/scene/sceneEntities.js";
 
 function observed(index: number, burnState: FireCellMarker["burnState"], stale = false): FireCellMarker {
-  return { key: `c${index}`, gridCellIndex: index, position: { x: 0, z: 0 }, burnState, stale, lastObservedAt: 1000, ageMs: 0 };
+  return { key: `c${index}`, gridCellIndex: index, position: { x: 0, z: 0 }, burnState, stale, source: "observed", lastObservedAt: 1000, ageMs: 0 };
 }
 
 describe("ReplayRecording schema", () => {

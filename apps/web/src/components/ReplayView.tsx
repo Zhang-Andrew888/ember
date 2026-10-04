@@ -50,14 +50,26 @@ export function ReplayView({ onExit, source, recording }: ReplayViewProps) {
 
   const replayLog = bundle.coordinatorLog;
   const view = replayLog[index]!;
-  const baseEntities = useMemo(() => buildSceneEntities(view, scenarioMap), [view]);
+  const baseEntities = useMemo(() => buildSceneEntities(view, scenarioMap, { phase: "replay" }), [view]);
   const truth = truthForDisplay({
     phase: "replay",
     showFullFire,
     frame: truthFrameAt(bundle.truthFrames, view.simTimeMs as number),
   });
   const entities = useMemo(
-    () => (truth ? { ...baseEntities, fireCells: mergeTruthCells(baseEntities.fireCells, truth, scenarioMap) } : baseEntities),
+    () =>
+      truth
+        ? {
+            ...baseEntities,
+            // Truth cells the recorded view's current-fire layer already draws are not shown again as unseen frames.
+            fireCells: mergeTruthCells(
+              baseEntities.fireCells,
+              truth,
+              scenarioMap,
+              new Set(baseEntities.currentFire?.cells.map((cell) => cell.gridCellIndex)),
+            ),
+          }
+        : baseEntities,
     [baseEntities, truth],
   );
 

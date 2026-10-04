@@ -1,4 +1,4 @@
-import type { CoordinatorAgentView, CoordinatorView } from "@ember/domain";
+import type { CoordinatorAgentView, CoordinatorCurrentFireView, CoordinatorView } from "@ember/domain";
 import type { ScenarioMap, SceneNode } from "../../map/scenarioMap.js";
 import {
   resolveAgentPosition,
@@ -12,6 +12,7 @@ import { buildForecastLayer, buildRouteLines, type ForecastLayer, type RouteLine
 import { ageOf } from "./staleness.js";
 import { displayState, type AgentDisplayState } from "./models/markerCues.js";
 import { siteProtectionStatus, type SiteProtectionStatus } from "../../format/reports.js";
+import { currentFireForDisplay, type AppPhase } from "../../replay/truthGate.js";
 
 export interface AgentMarker {
   readonly id: string;
@@ -35,15 +36,26 @@ export interface SiteMarker {
   readonly ageMs: number | null;
 }
 
+/**
+ * Where a displayed fire cell's state comes from, so inspection can say so and the three kinds stay
+ * visually distinct: the live coordinator feed (`current-fire`), a crew sighting that may be old
+ * (`observed`), or the replay-only full simulated fire (`replay-truth`).
+ */
+export type FireCellSource = "current-fire" | "observed" | "replay-truth";
+
 export interface FireCellMarker {
   readonly key: string;
   readonly gridCellIndex: number;
   readonly position: SceneVector;
   readonly burnState: "unburned" | "burning" | "burned";
   readonly stale: boolean;
-  /** simTimeMs the cell was last observed at - for inspection timestamps (docs/FRONTEND.md). */
+  readonly source: FireCellSource;
+  /**
+   * Sim time this state describes: the observation time for `observed` cells (docs/FRONTEND.md),
+   * `currentFire.simTimeMs` for `current-fire` cells. Always simulation time, never wall time.
+   */
   readonly lastObservedAt: number;
-  /** Sim ms since this cell was last observed. */
+  /** Sim ms since `lastObservedAt` (0 for current-fire cells). */
   readonly ageMs: number;
   /**
    * REPLAY ONLY: this fire is real but the coordinator never observed it. Never set on live
@@ -52,10 +64,22 @@ export interface FireCellMarker {
   readonly unseen?: boolean;
 }
 
+/** The authorized live fire across the full map (#114): every burning and burned cell in the feed. */
+export interface CurrentFireLayer {
+  /** `currentFire.simTimeMs`: the incident time this snapshot describes. */
+  readonly simTimeMs: number;
+  readonly cells: FireCellMarker[];
+  readonly burningCount: number;
+  readonly burnedCount: number;
+}
+
 export interface SceneEntities {
   readonly agents: AgentMarker[];
   readonly sites: SiteMarker[];
+  /** Observed belief (crew sightings), plus replay-only unseen truth cells. Not the current fire. */
   readonly fireCells: FireCellMarker[];
+  /** Live current fire; null when the view carries none (older sender, mock, fixture): nothing is invented. */
+  readonly currentFire: CurrentFireLayer | null;
   /** Reportable plans (route emphasis); selection is applied at render time. */
   readonly routes: RouteLine[];
   /** Coordinator forecast envelope; null before the first build. */
@@ -73,7 +97,11 @@ export function listRefugeNodes(map: ScenarioMap): SceneNode[] {
  * placeholder map) are skipped rather than rendered at a fallback origin -
  * a gap here is a map/data problem, not something to paper over visually.
  */
-export function buildSceneEntities(view: CoordinatorView, map: ScenarioMap): SceneEntities {
+export function buildSceneEntities(
+  view: CoordinatorView,
+  map: ScenarioMap,
+  options: { readonly phase?: AppPhase } = {},
+): SceneEntities {
   const agents = fanOutAtNodes(resolveAgents(view, map), view, map);
 
   const sites: SiteMarker[] = [];
@@ -92,11 +120,16 @@ export function buildSceneEntities(view: CoordinatorView, map: ScenarioMap): Sce
   }
 
   const fireCells = resolveFireCells(view, map);
+  const currentFire = resolveCurrentFire(
+    currentFireForDisplay({ phase: options.phase ?? "live", currentFire: view.currentFire }),
+    map,
+  );
 
   return {
     agents,
     sites,
     fireCells,
+    currentFire,
     routes: buildRouteLines(view, map, null),
     forecast: buildForecastLayer(view, map),
   };
@@ -194,9 +227,55 @@ function resolveFireCells(view: CoordinatorView, map: ScenarioMap): FireCellMark
       position: resolveGridCellPosition(map, cell.gridCellIndex),
       burnState: cell.burnState,
       stale: cell.stale,
+      source: "observed",
       lastObservedAt: cell.lastObservedAt as number,
       ageMs: ageOf(view.simTimeMs as number, cell.lastObservedAt as number) ?? 0,
     });
   }
   return fireCells;
+}
+
+/**
+ * Scene cells for every burning and burned cell in the authorized live feed. They are independent
+ * of `observedCells`, so fire outside crew sightings is drawn (#114). Unburned and nonburnable cells
+ * are implied by absence and produce no marker.
+ */
+function resolveCurrentFire(fire: CoordinatorCurrentFireView | null, map: ScenarioMap): CurrentFireLayer | null {
+  if (fire === null) return null;
+  const simTimeMs = fire.simTimeMs as number;
+  const toMarker = (gridCellIndex: number, burnState: "burning" | "burned"): FireCellMarker => ({
+    key: `current-${gridCellIndex}`,
+    gridCellIndex,
+    position: resolveGridCellPosition(map, gridCellIndex),
+    burnState,
+    stale: false,
+    source: "current-fire",
+    lastObservedAt: simTimeMs,
+    ageMs: 0,
+  });
+  return {
+    simTimeMs,
+    cells: [
+      ...fire.burningCells.map((index) => toMarker(index, "burning")),
+      ...fire.burnedCells.map((index) => toMarker(index, "burned")),
+    ],
+    burningCount: fire.burningCells.length,
+    burnedCount: fire.burnedCells.length,
+  };
+}
+
+/**
+ * Cells that drive flames, ground light, char and trees. With a current-fire layer the actual fire
+ * is that layer (plus replay-only unseen cells); observed beliefs are then only outlined, never lit.
+ * Without one (older sender) the observed cells are lit as before.
+ */
+export function litFireCells(
+  entities: Pick<SceneEntities, "fireCells" | "currentFire">,
+  show: { readonly currentFire: boolean; readonly observed: boolean },
+): FireCellMarker[] {
+  if (entities.currentFire === null) return show.observed ? entities.fireCells : [];
+  return [
+    ...(show.currentFire ? entities.currentFire.cells : []),
+    ...(show.observed ? entities.fireCells.filter((cell) => cell.source === "replay-truth") : []),
+  ];
 }
