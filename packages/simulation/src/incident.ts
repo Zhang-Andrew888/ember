@@ -2,6 +2,7 @@ import {
   AgentId,
   CoordinatorReportEntry,
   CoordinatorView,
+  ContainmentWorkResult,
   IncidentEnd,
   IncidentId,
   Observation,
@@ -92,6 +93,7 @@ export class Incident {
   private readonly events: DomainEvent[] = [];
   private readonly truthNotices: SimNotice[] = [];
   private readonly reports: CoordinatorView["recentReports"] = [];
+  private readonly containmentResults: ContainmentWorkResult[] = [];
   private activeRecipient: AgentId | null = null;
   private readonly sensorFaultUntil = new Map<AgentId, number>();
   private ordinal = 0;
@@ -239,7 +241,21 @@ export class Incident {
     const to = this.world.timeMs + SIM_DEFAULTS.stepMs;
     this.drainInputs(to);
     this.world.step();
-    this.truthNotices.push(...this.world.notices.splice(0, this.world.notices.length));
+    const notices = this.world.notices.splice(0, this.world.notices.length);
+    this.truthNotices.push(...notices);
+    for (const n of notices) {
+      if (n.kind !== "containment_completed") continue;
+      this.containmentResults.push(
+        ContainmentWorkResult.parse({
+          agentId: n.agentId,
+          gridCellIndex: n.gridCellIndex,
+          outcome: n.outcome,
+          reasonCode: n.reasonCode,
+          reportedAt: SimTimeMs.parse(n.tick),
+        }),
+      );
+      if (this.containmentResults.length > 20) this.containmentResults.shift();
+    }
     for (const agent of this.world.agents) {
       if (agent.state !== "lost") this.sample(agent.id, to);
     }
@@ -302,6 +318,14 @@ export class Incident {
     for (const store of this.agentStores.values()) store.ingest(observation);
   }
 
+  private maybeReportCell(memory: SensorMemory, fields: Observation["observedFields"], cell: number): void {
+    const state = this.world.burnStateAt(cell);
+    const code = state === "unburned" ? 1 : state === "burning" ? 2 : 3;
+    if (memory.cells[cell] === code) return;
+    memory.cells[cell] = code;
+    fields.push({ kind: "cell", gridCellIndex: cell, burnState: state });
+  }
+
   private sample(agentId: AgentId, atMs: number): void {
     const agent = this.world.agent(agentId);
     const memory = this.sensors.get(agentId);
@@ -312,11 +336,11 @@ export class Incident {
     const radius = SIM_DEFAULTS.observationRadiusM;
     const fields: Observation["observedFields"] = [];
     for (const cell of cellsWithin(p.x, p.y, radius)) {
-      const state = this.world.burnStateAt(cell);
-      const code = state === "unburned" ? 1 : state === "burning" ? 2 : 3;
-      if (memory.cells[cell] === code) continue;
-      memory.cells[cell] = code;
-      fields.push({ kind: "cell", gridCellIndex: cell, burnState: state });
+      this.maybeReportCell(memory, fields, cell);
+    }
+    const suppress = agent.commitment?.plan.work;
+    if (suppress?.kind === "suppress_fire") {
+      this.maybeReportCell(memory, fields, suppress.gridCellIndex);
     }
     for (const site of this.world.sites) {
       const sp = this.world.road.nodePoint(site.nodeId);
@@ -417,6 +441,7 @@ export class Incident {
       agentPlans,
       coordinatorForecast: options.coordinatorForecast ?? null,
       recentReports: this.reports.slice(-20),
+      ...(this.containmentResults.length === 0 ? {} : { recentContainmentResults: [...this.containmentResults] }),
       incidentEnd: this.endRecord,
     };
     return CoordinatorView.parse(view);

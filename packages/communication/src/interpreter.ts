@@ -72,6 +72,9 @@ export class ScriptedInterpreter implements Interpreter {
     const site = req.directory.sites.find((s) => tokensOverlap(lower, s.name));
     if (/\b(status|where are you|what are you doing|how long|when will|explain|your plan|what'?s your plan|why are you)\b/.test(lower) && !/\bprotect\b/.test(lower)) {
       envelope.kind = "status";
+    } else if (/\b(contain|suppress|hold the line)\b/.test(lower)) {
+      const location = req.directory.locations.find((l) => lower.includes(l.name.toLowerCase()));
+      envelope.objective = { kind: "contain", ...(location === undefined ? {} : { targetName: location.name }) };
     } else if (/\b(protect|save|defend|work on|go to)\b/.test(lower)) {
       envelope.objective = { kind: "protect", ...(site === undefined ? targetGuess(lower) : { targetName: site.name }) };
     } else if (/\b(scout|observe|check|look at)\b/.test(lower) && !usesReport) {

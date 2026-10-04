@@ -11,7 +11,7 @@ export const IntentEnvelope = z.object({
   kind: z.enum(["objective", "relay", "status", "clarification_answer"]),
   objective: z
     .object({
-      kind: z.enum(["protect", "observe", "return", "hold", "avoid", "resume"]),
+      kind: z.enum(["protect", "contain", "observe", "return", "hold", "avoid", "resume"]),
       targetName: z.string().optional(),
     })
     .optional(),

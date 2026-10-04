@@ -81,11 +81,22 @@ interface Pending {
 }
 
 const STILL_INTERPRETING_MS = 5000;
+
+/** Matches authoritative sim grid (64×25 m); communication must not depend on @ember/simulation. */
+function gridCellIndexFromMeters(x: number, y: number): number | null {
+  const cellMeters = 25;
+  const gridSize = 64;
+  const gx = Math.floor(x / cellMeters);
+  const gy = Math.floor(y / cellMeters);
+  if (gx < 0 || gy < 0 || gx >= gridSize || gy >= gridSize) return null;
+  return gy * gridSize + gx;
+}
 /** Wall-clock bound for one interpretation. Provider calls must abort on this same deadline. */
 export const INTERPRETATION_DEADLINE_MS = 10_000;
 
 const KIND_OF: Record<string, ObjectiveKind | undefined> = {
   protect: "protect_site",
+  contain: "contain_fire",
   observe: "scout_location",
   return: "return_to_refuge",
   hold: "hold",
@@ -296,19 +307,27 @@ export class CommandGateway {
         const kind = KIND_OF[o.kind]!;
         let targetId: string | null = null;
         let targetLabel = "";
-        if (o.kind === "protect" || o.kind === "observe" || o.kind === "avoid") {
+        if (o.kind === "protect" || o.kind === "observe" || o.kind === "avoid" || o.kind === "contain") {
           const pool =
             o.kind === "protect"
               ? this.env.directory.sites.map((s) => ({ id: s.id, name: s.name }))
               : o.kind === "observe"
                 ? this.env.directory.scoutPoints.map((s) => ({ id: s.id, name: s.name }))
-                : this.env.directory.corridors.map((s) => ({ id: s.id, name: s.name }));
+                : o.kind === "contain"
+                  ? this.env.directory.locations.map((l) => ({ id: String(l.name), name: l.name }))
+                  : this.env.directory.corridors.map((s) => ({ id: s.id, name: s.name }));
           if (o.targetName === undefined) {
             return this.ask(
               message,
               seq,
               env,
-              o.kind === "protect" ? "Which site should it protect?" : o.kind === "observe" ? "Which point should it observe?" : "Which corridor should it avoid?",
+              o.kind === "protect"
+                ? "Which site should it protect?"
+                : o.kind === "observe"
+                  ? "Which point should it observe?"
+                  : o.kind === "contain"
+                    ? "Which fire location should it contain?"
+                    : "Which corridor should it avoid?",
               actions,
             );
           }
@@ -320,26 +339,46 @@ export class CommandGateway {
               env,
               m.kind === "ambiguous"
                 ? `Which one: ${m.ids.join(" or ")}?`
-                : `I don't know a ${o.kind === "protect" ? "site" : o.kind === "observe" ? "point" : "corridor"} called ${o.targetName}.`,
+                : `I don't know a ${o.kind === "protect" ? "site" : o.kind === "observe" ? "point" : o.kind === "contain" ? "location" : "corridor"} called ${o.targetName}.`,
               actions,
             );
           }
-          targetId = m.id;
-          targetLabel = pool.find((p) => p.id === m.id)!.name;
+          if (o.kind === "contain") {
+            const loc = this.env.directory.locations.find((l) => l.name === m.id);
+            if (loc === undefined) {
+              return this.ask(message, seq, env, `I don't know a location called ${o.targetName}.`, actions);
+            }
+            const cell = gridCellIndexFromMeters(loc.x, loc.y);
+            if (cell === null) {
+              return this.ask(message, seq, env, "That location is not on the fire grid.", actions);
+            }
+            targetId = String(cell);
+            targetLabel = loc.name;
+          } else {
+            targetId = m.id;
+            targetLabel = pool.find((p) => p.id === m.id)!.name;
+          }
         }
         if (o.kind === "protect" && agent.role !== "protection_crew") {
           rejectedObjective = `${agent.callsign} does not do protection work.`;
+        } else if (o.kind === "contain" && agent.role !== "protection_crew") {
+          rejectedObjective = `${agent.callsign} does not perform containment work.`;
         } else if (o.kind === "observe" && agent.role !== "scout") {
           rejectedObjective = `${agent.callsign} is not a scout.`;
         } else if (o.kind === "avoid" && agent.role !== "protection_crew") {
           rejectedObjective = `${agent.callsign} cannot take corridor-avoidance orders.`;
         } else {
+          let constraints: Objective["constraints"] = {};
+          if (o.kind === "contain" && targetId !== null) {
+            const cell = Number.parseInt(targetId, 10);
+            if (Number.isFinite(cell)) constraints = { gridCellIndex: cell };
+          }
           const objective = Objective.parse({
             id: ObjectiveId.parse(`obj-${seq}`),
             recipientId,
             kind,
             targetId,
-            constraints: {},
+            constraints,
             issueSequence: SequenceNumber.parse(seq),
           });
           actions.push({ kind: "objective", objective });
