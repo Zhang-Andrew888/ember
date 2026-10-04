@@ -49,12 +49,26 @@ export function directoryFor(scenario: SimScenario): Directory {
       corridor === undefined
         ? []
         : [{ id: corridor.id as string, name: "east corridor" }],
-    places: [
-      ...scenario.map.sites.map((s) => ({ id: s.nodeId as string, name: s.name, ...point(s.nodeId) })),
-      ...scenario.map.refuges.map((r) => ({ id: r.nodeId as string, name: r.name, ...point(r.nodeId) })),
-      ...scenario.map.nodes.flatMap((n) => (n.name === undefined ? [] : [{ id: n.id as string, name: n.name, x: n.x, y: n.y }])),
-    ],
+    places: placesFor(scenario),
   };
+}
+
+/**
+ * Where a fire line can be anchored or tied in: sites, refuges and named junctions, each with its
+ * map position. A node that is both a site and a named junction is listed once, under the site name.
+ */
+function placesFor(scenario: SimScenario): NonNullable<Directory["places"]> {
+  const nodes = new Map(scenario.map.nodes.map((n) => [n.id as string, n]));
+  const places = new Map<string, { id: string; name: string; x: number; y: number }>();
+  const add = (nodeId: string, name: string | undefined): void => {
+    const node = nodes.get(nodeId);
+    if (node === undefined || name === undefined || places.has(nodeId)) return;
+    places.set(nodeId, { id: nodeId, name, x: node.x, y: node.y });
+  };
+  for (const s of scenario.map.sites) add(s.nodeId, s.name);
+  for (const r of scenario.map.refuges) add(r.nodeId, r.name);
+  for (const n of scenario.map.nodes) add(n.id, n.name);
+  return [...places.values()];
 }
 
 export interface TranscriptEntry {
