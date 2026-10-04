@@ -1,6 +1,5 @@
 import { forwardRef, useState } from "react";
 import { colors } from "../../styles/colors.js";
-import { formatIncidentClock } from "../../format/time.js";
 import type { ForecastLayer } from "./sceneLayers.js";
 import { scenarioMap } from "../../map/activeScenario.js";
 import type { FireCellMarker } from "./sceneEntities.js";
@@ -52,7 +51,7 @@ export const SceneLegend = forwardRef<HTMLDivElement, SceneLegendProps>(function
         </li>
         <li>
           <span className="scene-legend__swatch scene-legend__swatch--stale" />
-          Stale: faded, hatched, age shown
+          Stale: faded, hatched; inspect for exact time
         </li>
         <li>
           <span className="scene-legend__swatch scene-legend__swatch--hatch" />
@@ -121,9 +120,7 @@ export const SceneLegend = forwardRef<HTMLDivElement, SceneLegendProps>(function
               <li key={cell.key}>
                 <button type="button" onClick={() => onInspectCell(cell)}>
                   Cell {cell.gridCellIndex}: {cell.burnState}
-                  {cell.unseen
-                    ? ", not observed by the coordinator"
-                    : `${cell.stale ? ", stale" : ""}, last observed ${formatIncidentClock(cell.lastObservedAt)}`}
+                  {cell.unseen ? ", not observed by the coordinator" : cell.stale ? ", stale" : ""}
                 </button>
               </li>
             ))}

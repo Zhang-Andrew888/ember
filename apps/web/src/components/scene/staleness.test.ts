@@ -1,9 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { ageOf, freshness, FULL_FADE_MS, MIN_OPACITY, STALE_AFTER_MS } from "./staleness.js";
+import {
+  ageOf,
+  formatObservationInspection,
+  freshness,
+  FULL_FADE_MS,
+  MIN_OPACITY,
+  STALE_AFTER_MS,
+  staleObservationTooltip,
+} from "./staleness.js";
 
 describe("freshness", () => {
   it("fresh information is fully opaque with no age label", () => {
-    expect(freshness(0)).toEqual({ stale: false, opacity: 1, ageLabel: null });
+    expect(freshness(0)).toEqual({ stale: false, opacity: 1, detailAgeLabel: null });
     expect(freshness(STALE_AFTER_MS)).toMatchObject({ stale: false, opacity: 1 });
   });
 
@@ -12,7 +20,7 @@ describe("freshness", () => {
     expect(f.stale).toBe(true);
     expect(f.opacity).toBeLessThan(1);
     expect(f.opacity).toBeGreaterThan(0.95);
-    expect(f.ageLabel).toBe("last seen 0:31 ago");
+    expect(f.detailAgeLabel).toBe("last seen 0:31 ago");
   });
 
   it("fades monotonically with age and bottoms out at MIN_OPACITY", () => {
@@ -23,7 +31,7 @@ describe("freshness", () => {
   });
 
   it("never observed is treated as stale, not fresh", () => {
-    expect(freshness(null)).toMatchObject({ stale: true, opacity: MIN_OPACITY, ageLabel: "never observed" });
+    expect(freshness(null)).toMatchObject({ stale: true, opacity: MIN_OPACITY, detailAgeLabel: "never observed" });
   });
 
   it("honours a server stale flag even when the age looks recent", () => {
@@ -32,6 +40,25 @@ describe("freshness", () => {
 
   it("negative ages (clock skew) read as fresh, not NaN", () => {
     expect(freshness(-500)).toMatchObject({ stale: false, opacity: 1 });
+  });
+});
+
+describe("staleObservationTooltip", () => {
+  it("returns undefined when information is still fresh", () => {
+    expect(staleObservationTooltip(60_000, 10_000)).toBeUndefined();
+  });
+
+  it("includes the incident clock and detail age phrase when stale", () => {
+    const tip = staleObservationTooltip(90_000, 45_000);
+    expect(tip).toMatch(/Last observed at 0:45/);
+    expect(tip).toMatch(/last seen 0:45 ago/);
+  });
+});
+
+describe("formatObservationInspection", () => {
+  it("formats a single precise line for the inspection panel", () => {
+    expect(formatObservationInspection(45_000, 90_000, true)).toBe("0:45 incident time (45s ago), stale");
+    expect(formatObservationInspection(85_000, 90_000, false)).toBe("1:25 incident time (5s ago)");
   });
 });
 

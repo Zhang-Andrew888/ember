@@ -837,7 +837,7 @@ input {
   flex-basis: 100%;
 }
 
-/* Stale information: dashed, dimmed - the label text also states the age. */
+/* Stale information: dashed, dimmed; hover title / inspection panel carry exact time. */
 .scene-label--stale {
   border-style: dashed;
   opacity: 0.78;
