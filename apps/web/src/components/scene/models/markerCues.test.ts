@@ -41,7 +41,7 @@ describe("agent cues", () => {
 
   it("the label always spells the state", () => {
     expect(agentLabelText("Crew 1", "working")).toBe("Crew 1 · working");
-    expect(agentLabelText("Scout", "lost")).toBe("Scout · lost");
+    expect(agentLabelText("Crew 4", "lost")).toBe("Crew 4 · lost");
   });
 });
 
