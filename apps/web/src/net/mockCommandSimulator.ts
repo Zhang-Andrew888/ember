@@ -39,18 +39,18 @@ export function mockWireRepliesForSay(text: string, simTimeMs: number, commandId
   if (/^\s*status\b/.test(lower) || lower.includes("status report")) {
     return [
       coordinatorTranscript(
-        "Crew 1 approaching Ridge Cabins; Crew 2 idle at Refuge West; Scout on north sector road.",
+        "Crew 1 approaching Ridge Cabins; Crew 2 idle at Refuge West.",
         simTimeMs,
       ),
       receipt("accepted", "Status relayed.", "Status query answered from current coordinator view.", commandId),
     ];
   }
 
-  if (!/(crew|scout)\s*[12]?/i.test(trimmed)) {
+  if (!/crew\s*[12]?/i.test(trimmed)) {
     return [
       receipt(
         "clarification_required",
-        "Which crew or scout should receive this?",
+        "Which crew should receive this?",
         "Named recipient required.",
         commandId,
       ),

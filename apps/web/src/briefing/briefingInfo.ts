@@ -5,6 +5,8 @@
  * the mock/fixture scenario in net/mockIncidentSocket.ts exactly, so the
  * briefing never promises an agent or site the live demo doesn't have.
  */
+import { omitScoutCallsigns } from "../format/omitScout.js";
+
 export interface BriefingSite {
   readonly name: string;
   readonly value: number;
@@ -16,7 +18,7 @@ export const briefingSites: BriefingSite[] = [
   { name: "Community Lodge", value: 2 },
 ];
 
-export const briefingCallsigns: string[] = ["Crew 1", "Crew 2", "Scout"];
+export const briefingCallsigns: string[] = ["Crew 1", "Crew 2"];
 
 export interface BriefingContent {
   readonly sites: readonly BriefingSite[];
@@ -36,7 +38,9 @@ export function briefingContent(
   mock: boolean,
 ): BriefingContent {
   if (mock) return mockBriefing;
-  const { sites, callsigns } = scenario.briefing;
+  const { sites } = scenario.briefing;
+  // The demo presents crews only (#118), even if a scenario file's roster still lists a scout.
+  const callsigns = omitScoutCallsigns(scenario.briefing.callsigns);
   return {
     sites: sites.length > 0 ? sites : briefingSites,
     callsigns: callsigns.length > 0 ? callsigns : briefingCallsigns,
