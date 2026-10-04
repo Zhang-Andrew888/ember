@@ -109,6 +109,40 @@ describe("wire protocol and information boundary", () => {
     expect(trueBurning).toBeGreaterThan(seenBurning);
   });
 
+  it("streams the authorized current fire to the coordinator at live-view cadence", () => {
+    const { session, hub, clock, live } = setup();
+    const id = hub.connect();
+    live.start();
+    const views = [...hub.drain(id)];
+    for (let i = 0; i < 40; i++) {
+      clock.t += 1000;
+      live.pump();
+      views.push(...hub.drain(id));
+    }
+    const parsed = views.map((m) => parseServerWire(m)).filter((m) => m?.type === "view");
+    expect(parsed.length).toBeGreaterThan(10);
+    for (const m of parsed) {
+      if (m?.type !== "view") continue;
+      const fire = m.view.currentFire;
+      expect(fire, "every live view carries currentFire").toBeDefined();
+      expect(fire?.simTimeMs).toBe(m.view.simTimeMs);
+      expect(Object.keys(fire!).sort()).toEqual(["burnedCells", "burningCells", "simTimeMs"]);
+    }
+    // The latest streamed view matches the authoritative field for the tick it describes.
+    const last = parsed[parsed.length - 1];
+    if (last?.type !== "view") throw new Error("expected a view message");
+    const incident = session.incident;
+    if (last.view.simTimeMs === incident.projectCoordinator().simTimeMs) {
+      const burning: number[] = [];
+      incident.truth().cellState.forEach((state, cell) => {
+        if (state === 2) burning.push(cell);
+      });
+      expect(last.view.currentFire?.burningCells).toEqual(burning);
+    }
+    // Crew-facing state stays free of the coordinator-only field.
+    expect(JSON.stringify(incident.projectAgent(incident.projectCoordinator().agents[0]!.id))).not.toContain("currentFire");
+  });
+
   it("rejects malformed or unknown client messages without touching the incident", () => {
     const { hub, session } = setup();
     const id = hub.connect();

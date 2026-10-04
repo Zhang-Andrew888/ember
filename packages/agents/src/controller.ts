@@ -458,7 +458,8 @@ export class CrewController implements AgentController {
    * must not later walk a leg it was told to abandon. A mid-edge emergency stop is allowed only here.
    */
   private halt(proj: AgentProjection, out: TickOutput): void {
-    const refuge = this.map.refuges[0]?.nodeId ?? (proj.position.kind === "node" ? proj.position.nodeId : proj.position.edgeId);
+    const refuge = this.map.refuges[0]?.nodeId
+      ?? (proj.position.kind === "node" ? proj.position.nodeId : proj.position.kind === "edge" ? proj.position.edgeId : "offroad-halt");
     const plan = MissionPlan.parse({
       id: `halt-${this.agentId}-${proj.simTimeMs}`,
       recipientId: this.agentId,
