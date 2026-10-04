@@ -164,10 +164,10 @@ export const CompassDirection = z.preprocess(
 );
 export type CompassDirection = z.infer<typeof CompassDirection>;
 
-/** An order is bounded by 500 m; omission means at most 250 m, ending at a safe road node. */
+/** An order is bounded by 1,200 m; omission means at most 600 m, ending at a safe road node. */
 export const MovementDirective = z.object({
   direction: CompassDirection,
-  maxDistanceMeters: z.number().positive().max(500).default(250),
+  maxDistanceMeters: z.number().positive().max(1200).default(600),
   stopRule: z.literal("safe_road_node").default("safe_road_node"),
 });
 export type MovementDirective = z.infer<typeof MovementDirective>;

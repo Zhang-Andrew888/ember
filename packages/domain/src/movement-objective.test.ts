@@ -15,7 +15,7 @@ describe("directional movement objective", () => {
     "parses %s with a bounded default and explicit stop rule",
     (direction) => {
       const objective = Objective.parse({ ...base, movement: { direction } });
-      expect(objective.movement).toEqual({ direction, maxDistanceMeters: 250, stopRule: "safe_road_node" });
+      expect(objective.movement).toEqual({ direction, maxDistanceMeters: 600, stopRule: "safe_road_node" });
       expect(Objective.parse(JSON.parse(JSON.stringify(objective)))).toEqual(objective);
     },
   );
@@ -34,7 +34,7 @@ describe("directional movement objective", () => {
     expect(Objective.safeParse({ ...base, movement: { direction: "north or east" } }).success).toBe(false);
     expect(Objective.safeParse({ ...base, movement: { direction: "up" } }).success).toBe(false);
     expect(Objective.safeParse({ ...base, movement: { direction: "north", maxDistanceMeters: 0 } }).success).toBe(false);
-    expect(Objective.safeParse({ ...base, movement: { direction: "north", maxDistanceMeters: 501 } }).success).toBe(false);
+    expect(Objective.safeParse({ ...base, movement: { direction: "north", maxDistanceMeters: 1201 } }).success).toBe(false);
     expect(Objective.safeParse({ ...base, targetId: "site-a", movement: { direction: "north" } }).success).toBe(false);
   });
 
