@@ -7,6 +7,7 @@ import {
   type AgentId,
   type AgentPosition,
   type AgentRole,
+  type MapPoint,
   type DecisionType,
   EdgeId,
   type MissionPlan as MissionPlanT,
@@ -26,6 +27,7 @@ import {
   planReturn,
   protectionTargets,
   type CertifyFailure,
+  type FirelineRefusal,
   type PlanningContext,
   type MissionSearchResult,
   type PriorityClass,
@@ -38,6 +40,7 @@ import { decideContinuation, decideOrder } from "./autonomy.js";
 import { EvidenceTracker } from "./evidence.js";
 import { applyStyle, type CommStyle } from "./style.js";
 import { explain } from "./explain.js";
+import { lineEndWords } from "./line-words.js";
 import {
   DEFAULT_CONTROLLER_CONFIG,
   type AgentController,
@@ -48,6 +51,9 @@ import {
   type ReportableStatus,
   type TickOutput,
 } from "./types.js";
+
+/** A line end counts as "at" a named place when it lies within this distance of it. */
+const NAMED_PLACE_REACH_M = 150;
 
 type PlanKind = "mission" | "return" | "emergency" | "halt";
 
@@ -535,7 +541,7 @@ export class CrewController implements AgentController {
       return;
     }
     const line = this.objective?.kind === "build_line" ? this.lineSearch(ctx, this.objective) : null;
-    const result = line ?? this.candidateSearch(ctx, allowed, containCell);
+    const result = line !== null && typeof line !== "string" ? line : this.candidateSearch(ctx, allowed, containCell);
     const chosen = result.best !== null ? this.commitFirst(proj, result, out) : null;
     if (chosen !== null) {
       this.lastIdleReason = null;
@@ -655,6 +661,7 @@ export class CrewController implements AgentController {
       case "build_line": {
         const result = this.lineSearch(ctx, obj);
         if (result === null) return reject("missing_target");
+        if (typeof result === "string") return reject(result);
         const verdict = decideOrder(this.callsign, {
           kind: obj.kind,
           forecastReliable: ctx.ensemble.reliability !== "unreliable",
@@ -711,52 +718,60 @@ export class CrewController implements AgentController {
   protected missionVerb(id: string): string {
     if (id.startsWith("cell-")) return `containing fire near ${id.slice(5)}`;
     const line = id.startsWith("line:") ? this.objective?.constraints.line : undefined;
-    if (line !== undefined) return `cutting a fire line from ${this.pointName(line.start)} toward ${this.pointName(line.end)}`;
+    if (line !== undefined) return `cutting ${this.lineWords(line)}`;
     return `heading to ${this.siteName(id)}`;
   }
 
-  /** Missions for one fire-line objective, or null when it names no line. */
-  private lineSearch(ctx: PlanningContext, obj: Objective): MissionSearchResult | null {
+  /**
+   * Missions for one fire-line objective: null when it names no line, or the refusal reason when the
+   * crew's end has no road in reach. A line order wants the longest shift the forecast admits, not the
+   * best work-per-second ratio.
+   */
+  private lineSearch(ctx: PlanningContext, obj: Objective): MissionSearchResult | FirelineRefusal | null {
     const line = obj.constraints.line;
     if (line === undefined) return null;
-    const workNode = this.nearestNode(line.start);
-    if (workNode === null) return null;
-    const target = firelineTarget(this.road, workNode, line.start, line.end, this.capabilities.workRate, this.cfg.nav ?? DEFAULT_NAV_CONFIG);
-    if (target === null) return null;
-    // A line order wants the longest shift the forecast admits, not the best work-per-second ratio.
-    const result = planMissions(ctx, [target]);
+    const planned = firelineTarget(this.road, line.start, line.end, this.capabilities.workRate, this.cfg.nav ?? DEFAULT_NAV_CONFIG);
+    if (!planned.ok) return planned.reason;
+    const result = planMissions(ctx, [planned.target]);
     const candidates = [...result.candidates].sort((a, b) => b.workMs - a.workMs || b.score - a.score);
     return { ...result, candidates, best: candidates[0] ?? null };
   }
 
-  /** The road node nearest a map point, or null on a map without nodes. */
-  private nearestNode(p: { x: number; y: number }): NodeId | null {
-    let best: NodeId | null = null;
-    let bestDist = Infinity;
+  /** "line from the north end toward East Junction": the crew's end by compass, the far end by place. */
+  private lineWords(line: { start: MapPoint; end: MapPoint }): string {
+    const words = lineEndWords(line.start, line.end, this.namedPlaceNear(line.end, NAMED_PLACE_REACH_M));
+    return `line from ${words.own} toward ${words.far}`;
+  }
+
+  /** Name of the nearest named place (refuge, site, named junction) within `withinM` of a point, if any. */
+  private namedPlaceNear(p: MapPoint, withinM: number): string | null {
+    let best: string | null = null;
+    let bestDist = withinM;
     for (const id of this.road.nodes.keys()) {
+      const name = this.placeName(id);
+      if (name === null) continue;
       const q = this.road.nodePoint(id);
       const d = Math.hypot(q.x - p.x, q.y - p.y);
-      if (d < bestDist) {
-        best = id;
+      if (d <= bestDist) {
+        best = name;
         bestDist = d;
       }
     }
     return best;
   }
 
-  /** Player-facing name of the node nearest a map point; line ends are node coordinates for now. */
-  private pointName(p: { x: number; y: number }): string {
-    const id = this.nearestNode(p);
-    return id === null ? "an unnamed point" : this.nodeName(id);
-  }
-
   /** Player-facing name for a map node: refuge or site; the raw id is never shown. */
   protected nodeName(nodeId: string): string {
+    return this.placeName(nodeId) ?? "a waypoint";
+  }
+
+  /** The name of a refuge, site or named junction at a node, or null for an unnamed node. */
+  protected placeName(nodeId: string): string | null {
     const refuge = this.map.refuges.find((r) => r.nodeId === nodeId);
     if (refuge !== undefined) return refuge.name;
     const site = this.map.sites.find((x) => x.nodeId === nodeId);
     if (site !== undefined) return site.name;
-    return this.map.nodes.find((n) => n.id === nodeId)?.name ?? "a waypoint";
+    return this.map.nodes.find((n) => n.id === nodeId)?.name ?? null;
   }
 
   protected siteName(id: string): string {
@@ -883,7 +898,7 @@ export class CrewController implements AgentController {
     if (o === null) return null;
     if (o.kind === "move_direction" && o.movement !== undefined) return `move ${o.movement.direction} up to ${o.movement.maxDistanceMeters} m`;
     if (o.kind === "build_line" && o.constraints.line !== undefined) {
-      return `cut a fire line from ${this.pointName(o.constraints.line.start)} toward ${this.pointName(o.constraints.line.end)}`;
+      return `cut ${this.lineWords(o.constraints.line)}`;
     }
     return `${o.kind.replaceAll("_", " ")}${o.targetId === null ? "" : ` ${this.siteName(o.targetId)}`}`;
   }

@@ -15,6 +15,7 @@ export function explain(callsign: string, decision: Pick<DecisionEvent, "type" |
     case "stranded_reported":
       return `${callsign} is stranded. ${why}`;
     case "objective_rejected":
+      if (decision.reasonCode === "no_road_near_line_end") return `${callsign} cannot cut line from that end: no road reaches it. Try the other end.`;
       return `${callsign} cannot do that and return with the required margin.${detail === "" ? "" : ` ${detail}`}`;
     case "idle":
       return `${callsign} is holding. ${why}`;
