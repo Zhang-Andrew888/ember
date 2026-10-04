@@ -1,6 +1,6 @@
 import type { Observation, SiteId } from "@ember/domain";
 import type { SiteKnowledge } from "@ember/navigation";
-import type { PublicMap } from "@ember/simulation/model";
+import { SIM_DEFAULTS, type PublicMap } from "@ember/simulation/model";
 
 /**
  * Incrementally digests an agent's own, append-only observation list: directly observed closed
@@ -12,6 +12,8 @@ export class EvidenceTracker {
   private readonly sites = new Map<SiteId, { completedWork: number; damage: number; destroyed: boolean; at: number }>();
   /** Ids of the latest observations that reported burning or burned cells. */
   private readonly fireObservationIds: string[] = [];
+  /** Newest burn sighting per cell (observation time wins over ingest order). */
+  private readonly cellBurnLatest = new Map<number, { at: number; state: "unburned" | "burning" | "burned" }>();
 
   constructor(private readonly map: PublicMap) {}
 
@@ -30,6 +32,7 @@ export class EvidenceTracker {
             hasFire = true;
             this.closed.add(f.gridCellIndex);
           }
+          this.noteCellBurn(f.gridCellIndex, f.burnState, obs.observedAt);
         } else if (f.kind === "site") {
           const prev = this.sites.get(f.siteId);
           if (prev === undefined || prev.at <= obs.observedAt) {
@@ -53,6 +56,33 @@ export class EvidenceTracker {
 
   supportingObservationIds(): string[] {
     return [...this.fireObservationIds];
+  }
+
+  /**
+   * Grid cells the crew should treat as actively burning for containment planning.
+   * Drops cells with a newer burned/unburned sighting, and cells whose last burning sighting
+   * is older than the simulated burn duration (the cell would have burned out by now).
+   */
+  knownBurningCells(nowMs: number): readonly number[] {
+    const horizon = SIM_DEFAULTS.cellBurnMs;
+    const out: number[] = [];
+    for (const [cell, seen] of this.cellBurnLatest) {
+      if (seen.state !== "burning") continue;
+      if (nowMs > seen.at + horizon) continue;
+      out.push(cell);
+    }
+    return out;
+  }
+
+  private noteCellBurn(cell: number, state: "unburned" | "burning" | "burned", at: number): void {
+    const prev = this.cellBurnLatest.get(cell);
+    if (prev !== undefined && at < prev.at) return;
+    this.cellBurnLatest.set(cell, { at, state });
+  }
+
+  /** Stop planning new containment on a cell after a crew finished or abandoned that assignment. */
+  retireContainmentCell(cell: number, at: number): void {
+    this.noteCellBurn(cell, "burned", at);
   }
 
   siteKnowledge(): SiteKnowledge[] {

@@ -108,11 +108,17 @@ export function planWithHazard(ctx: PlanningContext, hm: HazardModel, targets: r
         // Validating and hashing a plan costs more than finding it, and a search yields many candidates of
         // which a caller reads only the best few, so each plan is built on first access.
         let plan: MissionPlan | null = null;
-        const buildPlan = (): MissionPlan =>
-          (plan ??= MissionPlan.parse({
+        const buildPlan = (): MissionPlan => {
+          const work =
+            target.kind === "contain" && target.gridCellIndex !== undefined
+              ? { kind: "suppress_fire" as const, gridCellIndex: target.gridCellIndex }
+              : undefined;
+          return (plan ??= MissionPlan.parse({
             ...planBody,
+            ...(work === undefined ? {} : { work }),
             id: MissionPlanId.parse(`plan-${hashValue({ t: target.id, p: planBody, n: ctx.nowMs }).slice(0, 12)}`),
           }));
+        };
         out.push({
           mission: {
             target,

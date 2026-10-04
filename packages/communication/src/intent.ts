@@ -12,7 +12,7 @@ export const IntentEnvelope = z.object({
   kind: z.enum(["objective", "relay", "status", "clarification_answer"]),
   objective: z
     .object({
-      kind: z.enum(["protect", "observe", "return", "hold", "avoid", "resume", "move"]),
+      kind: z.enum(["protect", "contain", "observe", "return", "hold", "avoid", "resume", "move"]),
       targetName: z.string().optional(),
       direction: CompassDirection.optional(),
       maxDistanceMeters: z.number().positive().max(1200).optional(),

@@ -6,6 +6,7 @@ import {
   FireField,
   RoadIndex,
   SIM_DEFAULTS,
+  cellCenter,
   cellIndexOf,
   cellsWithin,
   createTerrain,
@@ -97,7 +98,15 @@ export type SimNotice =
   | { tick: number; kind: "plan_interrupted_by_end"; agentId: AgentId; planId: string }
   | { tick: number; kind: "agent_lost"; agentId: AgentId }
   | { tick: number; kind: "site_resolved"; siteId: SiteId; how: "protected" | "destroyed" }
-  | { tick: number; kind: "edge_closed"; edgeId: EdgeId };
+  | { tick: number; kind: "edge_closed"; edgeId: EdgeId }
+  | {
+      tick: number;
+      kind: "containment_completed";
+      agentId: AgentId;
+      gridCellIndex: number;
+      outcome: "succeeded" | "failed";
+      reasonCode: string;
+    };
 
 export interface CommitResult {
   readonly accepted: boolean;
@@ -195,6 +204,7 @@ export class World {
 
     let cursor: NodeId | null = null;
     if (agent.pos.kind === "node") cursor = agent.pos.nodeId;
+    let approachEndNode: NodeId | null = null;
     for (let i = 0; i < legs.length; i++) {
       const leg = legs[i];
       if (leg === undefined) continue;
@@ -208,17 +218,28 @@ export class World {
         if (start !== cursor) return reject("leg_not_connected");
       }
       cursor = leg.direction === "forward" ? edge.to : edge.from;
+      if (i === approachCount - 1) approachEndNode = cursor;
       if (i === approachCount - 1 && hasWork && workSiteId !== null) {
         const site = this.sites.find((s) => s.id === workSiteId);
         if (site === undefined || site.nodeId !== cursor) return reject("work_site_not_at_approach_end");
       }
     }
+    const suppress =
+      plan.work?.kind === "suppress_fire" ? plan.work : undefined;
+    if (suppress !== undefined && workSiteId !== null) return reject("containment_with_site_work");
     if (hasWork && workSiteId !== null) {
       const site = this.sites.find((s) => s.id === workSiteId);
       if (site === undefined) return reject("unknown_site");
       if (approachCount === 0 && !(agent.pos.kind === "node" && agent.pos.nodeId === site.nodeId)) {
         return reject("work_site_not_at_approach_end");
       }
+    }
+    if (hasWork && suppress !== undefined) {
+      const endNode =
+        approachEndNode ??
+        (agent.pos.kind === "node" && approachCount === 0 ? agent.pos.nodeId : null);
+      if (endNode === null) return reject("containment_work_not_at_node");
+      if (!this.nodeCanSuppressCell(endNode, suppress.gridCellIndex)) return reject("containment_cell_unreachable");
     }
 
     if (agent.pos.kind === "edge" && legs.length > 0) {
@@ -334,6 +355,12 @@ export class World {
     const plan = c.plan;
     const atApproachEnd = c.legIndex >= c.approachCount;
     if (c.hasWork && atApproachEnd && stepStartMs < plan.workInterval.endMs) {
+      if (stepStartMs < plan.workInterval.startMs) return;
+      const suppress = plan.work?.kind === "suppress_fire" ? plan.work : undefined;
+      if (suppress !== undefined && this.fire.state[suppress.gridCellIndex] !== CELL_BURNING) {
+        this.cancel(agent, c, "containment_cell_not_burning", stepStartMs + STEP);
+        return;
+      }
       agent.working = true;
       return;
     }
@@ -399,8 +426,31 @@ export class World {
     }
   }
 
+  private nodeCanSuppressCell(nodeId: NodeId, gridCellIndex: number): boolean {
+    const p = this.road.nodePoint(nodeId);
+    const c = cellCenter(gridCellIndex);
+    return Math.hypot(p.x - c.x, p.y - c.y) <= SIM_DEFAULTS.containmentReachM;
+  }
+
   private applyWorkAndDamage(): void {
     const dt = STEP / 1000;
+    for (const agent of this.agents) {
+      if (agent.state === "lost" || agent.role !== "protection_crew" || !agent.working) continue;
+      const work = agent.commitment?.plan.work;
+      if (work?.kind !== "suppress_fire") continue;
+      const cell = work.gridCellIndex;
+      const newlyDone = this.fire.applyContainmentWork(cell, dt * SIM_DEFAULTS.containmentWorkRate);
+      if (newlyDone) {
+        this.notices.push({
+          tick: this.timeMs + STEP,
+          kind: "containment_completed",
+          agentId: agent.id,
+          gridCellIndex: cell,
+          outcome: "succeeded",
+          reasonCode: "containment_work_complete",
+        });
+      }
+    }
     for (const site of this.sites) {
       if (!site.destroyed && site.completedWork < site.requiredWork) {
         let rate = 0;

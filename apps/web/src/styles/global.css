@@ -87,6 +87,20 @@ input {
   color: #e8c878;
 }
 
+.grok-integration {
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  border: 1px dashed var(--color-border);
+  color: var(--color-muted, #9aa8ab);
+}
+
+.grok-integration--grok {
+  border-color: #6a9fd4;
+  color: #b8d4f0;
+}
+
 .briefing__header {
   display: flex;
   align-items: center;
@@ -837,7 +851,7 @@ input {
   flex-basis: 100%;
 }
 
-/* Stale information: dashed, dimmed - the label text also states the age. */
+/* Stale information: dashed, dimmed; hover title / inspection panel carry exact time. */
 .scene-label--stale {
   border-style: dashed;
   opacity: 0.78;

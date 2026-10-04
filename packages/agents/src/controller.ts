@@ -18,6 +18,7 @@ import {
   DEFAULT_NAV_CONFIG,
   certifyPlan,
   planDirectionalMove,
+  containmentTargets,
   planMissions,
   planRetreat,
   planReturn,
@@ -177,6 +178,8 @@ export class CrewController implements AgentController {
     // Reconcile with the simulator: a missing commitment means done, cancelled or rejected.
     if (proj.commitment === null && this.active !== null && now > this.active.committedAtMs) {
       if (this.objective?.kind === "move_direction") this.objective = null;
+      const work = this.active.plan.work;
+      if (work?.kind === "suppress_fire") this.evidence.retireContainmentCell(work.gridCellIndex, now);
       this.active = null;
     }
     if (proj.position.kind === "node" && this.active === null) this.stranded = this.stranded && !this.atRefuge(proj.position);
@@ -476,9 +479,21 @@ export class CrewController implements AgentController {
     return position.kind === "node" && this.road.refugeNodes.has(position.nodeId);
   }
 
-  candidateSearch(ctx: PlanningContext, allowed: ReadonlySet<string> | null): MissionSearchResult {
-    const targets = protectionTargets(this.evidence.siteKnowledge(), this.cfg.nav?.crewWorkRate ?? this.capabilities.workRate, allowed);
-    return planMissions(ctx, targets);
+  candidateSearch(
+    ctx: PlanningContext,
+    allowedSites: ReadonlySet<string> | null,
+    containCellIndex?: number,
+  ): MissionSearchResult {
+    const rate = this.cfg.nav?.crewWorkRate ?? this.capabilities.workRate;
+    const nav = this.cfg.nav;
+    let siteTargets = protectionTargets(this.evidence.siteKnowledge(), rate, allowedSites);
+    let cellTargets = containmentTargets(this.evidence.knownBurningCells(ctx.nowMs), this.road, rate, nav);
+    if (allowedSites !== null) cellTargets = [];
+    if (containCellIndex !== undefined) {
+      siteTargets = [];
+      cellTargets = cellTargets.filter((t) => t.gridCellIndex === containCellIndex);
+    }
+    return planMissions(ctx, [...siteTargets, ...cellTargets]);
   }
 
   private chooseWhenIdle(proj: AgentProjection, ctx: PlanningContext, out: TickOutput): void {
@@ -503,12 +518,14 @@ export class CrewController implements AgentController {
     this.evalDirty = false;
     this.lastEvalMs = now;
 
-    const allowed = this.objective?.kind === "protect_site" && this.objective.targetId !== null ? new Set([this.objective.targetId]) : null;
+    const allowed =
+      this.objective?.kind === "protect_site" && this.objective.targetId !== null ? new Set([this.objective.targetId]) : null;
+    const containCell = objectiveContainCell(this.objective);
     if (!admitsProtection(ctx.ensemble)) {
       this.noteIdle(proj, "forecast_unreliable", out);
       return;
     }
-    const result = this.candidateSearch(ctx, allowed);
+    const result = this.candidateSearch(ctx, allowed, containCell);
     const chosen = result.best !== null ? this.commitFirst(proj, result, out) : null;
     if (chosen !== null) {
       this.lastIdleReason = null;
@@ -603,6 +620,28 @@ export class CrewController implements AgentController {
         this.decide(out, proj, hadPlan ? "mission_update" : "mission_start", "objective_accepted", `${this.missionVerb(chosen.target.id)} on coordinator objective`);
         return;
       }
+      case "contain_fire": {
+        const cell = objectiveContainCell(obj);
+        if (cell === undefined) return reject("missing_target");
+        const result = this.candidateSearch(ctx, null, cell);
+        const verdict = decideOrder(this.callsign, {
+          kind: obj.kind,
+          forecastReliable: ctx.ensemble.reliability !== "unreliable",
+          feasible: result.best !== null,
+          limitingReason: result.limitingReason,
+        });
+        if (verdict.action === "refuse") return reject(verdict.reason);
+        const hadPlan = this.active !== null;
+        this.objective = obj;
+        this.holding = false;
+        const chosen = this.commitFirst(proj, result, out);
+        if (chosen === null) {
+          this.objective = null;
+          return reject("reservation_unavailable");
+        }
+        this.decide(out, proj, hadPlan ? "mission_update" : "mission_start", "objective_accepted", `${this.missionVerb(chosen.target.id)} on coordinator objective`);
+        return;
+      }
       case "avoid_corridor": {
         if (obj.targetId === null) return reject("missing_target");
         this.avoidCorridorEdges.add(EdgeId.parse(obj.targetId));
@@ -638,6 +677,7 @@ export class CrewController implements AgentController {
   // ---------- helpers ----------
 
   protected missionVerb(id: string): string {
+    if (id.startsWith("cell-")) return `containing fire near ${id.slice(5)}`;
     return `heading to ${this.siteName(id)}`;
   }
 
@@ -706,6 +746,10 @@ export class CrewController implements AgentController {
   protected commitFirst(proj: AgentProjection, result: MissionSearchResult, out: TickOutput): RankedMissionT | null {
     for (const cand of result.candidates.slice(0, 20)) {
       const t = cand.target;
+      if (t.kind === "contain") {
+        if (t.gridCellIndex === undefined || !this.evidence.knownBurningCells(proj.simTimeMs).includes(t.gridCellIndex)) continue;
+        if (cand.approachMs === 0 && (proj.position.kind !== "node" || proj.position.nodeId !== t.nodeId)) continue;
+      }
       if (this.commit(proj, cand.plan, "normal", "mission", t.id, t.siteId, cand.score, out)) return cand;
     }
     return null;
@@ -777,6 +821,14 @@ export class CrewController implements AgentController {
     if (hasWork && c !== null && c.legIndex >= a.approachCount) return "RETURNING";
     return "APPROACHING";
   }
+}
+
+function objectiveContainCell(obj: Objective | null): number | undefined {
+  if (obj === null || obj.kind !== "contain_fire") return undefined;
+  if (obj.constraints.gridCellIndex !== undefined) return obj.constraints.gridCellIndex;
+  if (obj.targetId === null || obj.targetId === "") return undefined;
+  const parsed = Number.parseInt(obj.targetId, 10);
+  return Number.isFinite(parsed) ? parsed : undefined;
 }
 
 function reasonOf(failure: CertifyFailure | null): string {

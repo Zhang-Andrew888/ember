@@ -15,24 +15,43 @@ export interface Freshness {
   readonly stale: boolean;
   /** 1 while fresh, easing down to MIN_OPACITY by FULL_FADE_MS. */
   readonly opacity: number;
-  /** "last seen 0:45 ago" (incident clock) or null when fresh. */
-  readonly ageLabel: string | null;
+  /** Full age phrase for inspection panels and label tooltips; null when fresh. */
+  readonly detailAgeLabel: string | null;
 }
 
 /** @param ageMs simTimeMs minus the observation's time; null = never observed */
 export function freshness(ageMs: number | null, serverStale = false): Freshness {
   if (ageMs === null) {
-    return { stale: true, opacity: MIN_OPACITY, ageLabel: "never observed" };
+    return { stale: true, opacity: MIN_OPACITY, detailAgeLabel: "never observed" };
   }
   const age = Math.max(0, ageMs);
   const stale = serverStale || age > STALE_AFTER_MS;
-  if (!stale) return { stale: false, opacity: 1, ageLabel: null };
+  if (!stale) return { stale: false, opacity: 1, detailAgeLabel: null };
   const t = Math.min(1, Math.max(0, (age - STALE_AFTER_MS) / (FULL_FADE_MS - STALE_AFTER_MS)));
   return {
     stale: true,
     opacity: 1 - (1 - MIN_OPACITY) * t,
-    ageLabel: `last seen ${formatIncidentClock(age)} ago`,
+    detailAgeLabel: `last seen ${formatIncidentClock(age)} ago`,
   };
+}
+
+/** Tooltip on stale map labels: exact incident time plus age, without cluttering the label text. */
+export function staleObservationTooltip(simTimeMs: number, ageMs: number | null, serverStale = false): string | undefined {
+  const fresh = freshness(ageMs, serverStale);
+  if (!fresh.stale) return undefined;
+  if (ageMs === null) return "Never observed";
+  const observedAt = simTimeMs - ageMs;
+  return `Last observed at ${formatIncidentClock(observedAt)} incident time (${fresh.detailAgeLabel})`;
+}
+
+/** Inspection readout for a selected fire cell or similar observed item. */
+export function formatObservationInspection(lastObservedAt: number, simTimeMs: number, stale: boolean): string {
+  const ageMs = Math.max(0, simTimeMs - lastObservedAt);
+  const clock = formatIncidentClock(lastObservedAt);
+  const ageSec = Math.round(ageMs / 1000);
+  return stale
+    ? `${clock} incident time (${ageSec}s ago), stale`
+    : `${clock} incident time (${ageSec}s ago)`;
 }
 
 /** Observation age in sim time; null when it was never observed. */

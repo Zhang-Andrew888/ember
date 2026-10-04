@@ -41,6 +41,7 @@ import { DemoBanner } from "./components/DemoBanner.js";
 import { MockPlaybackEndedOverlay } from "./components/MockPlaybackEndedOverlay.js";
 import { handleGrokAudioCue, PreparedSpeechPlayback } from "./net/grokSpeechPlayback.js";
 import { transcribeViaServer } from "./net/grokStt.js";
+import { fetchServerHealth, type ServerHealthResponse } from "./net/serverHealth.js";
 
 const INCIDENT_ID = import.meta.env.VITE_INCIDENT_ID ?? "demo";
 const INCIDENT_TOKEN = import.meta.env.VITE_INCIDENT_TOKEN as string | undefined;
@@ -76,6 +77,13 @@ export function App() {
   const liveWsUrlRef = useRef<string | null>(null);
   const grokPlaybackRef = useRef(new PreparedSpeechPlayback());
   const reducedMotion = useReducedMotion();
+  const [serverHealth, setServerHealth] = useState<ServerHealthResponse | null>(null);
+
+  useEffect(() => {
+    if (!HAS_LIVE_REST) return;
+    const base = REST_BASE_URL ?? "";
+    void fetchServerHealth(base).then(setServerHealth);
+  }, []);
 
   const { status: connectionStatus, view, sideband } = useCoordinatorView(client);
 
@@ -339,6 +347,7 @@ export function App() {
       <div className="app-layout__content" inert={hasEnded || mockFrozen || undefined}>
         <TopBar
           transportMode={TRANSPORT_MODE}
+          serverHealth={serverHealth}
           simTimeMs={view ? (view.simTimeMs as number) : null}
           wallElapsedMs={view ? (view.wallElapsedMs as number) : null}
           connectionStatus={connectionStatus}

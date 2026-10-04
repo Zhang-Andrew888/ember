@@ -8,14 +8,11 @@ import { SceneLegend } from "./SceneLegend.js";
 import { SceneCompass } from "./SceneCompass.js";
 import type { CameraControlsHandle } from "./CameraControls.js";
 import { sceneTerrain } from "./terrain/sceneTerrain.js";
-import { agentLabelText } from "./models/markerCues.js";
-import { freshness } from "./staleness.js";
+import { agentMapLabelMeta, agentMapLabelText, siteMapLabelMeta, siteMapLabelText } from "./mapLabels.js";
+import { formatObservationInspection } from "./staleness.js";
 import { humanizeReason, labelledBands, polylineMidpoint } from "./sceneLayers.js";
 import { listRefugeNodes, type FireCellMarker, type SceneEntities } from "./sceneEntities.js";
 import { scenarioMap } from "../../map/activeScenario.js";
-import { siteProtectionStatusLabel, siteDamageLabel } from "../../format/reports.js";
-import { formatIncidentClock } from "../../format/time.js";
-
 /**
  * Dev-only scene tuning panel. `import.meta.env.DEV` is a build-time
  * constant, so in a production build this whole expression (including the
@@ -35,12 +32,6 @@ export interface SceneViewProps {
 interface RenderContext {
   readonly camera: Camera;
   readonly canvasElement: HTMLCanvasElement;
-}
-
-function agentStaleText(agent: SceneEntities["agents"][number]): string {
-  const base = agentLabelText(agent.callsign, agent.state);
-  const fresh = freshness(agent.ageMs);
-  return fresh.stale ? `${base} (${fresh.ageLabel})` : base;
 }
 
 /** Combines the 3D canvas, DOM label overlay, and legend into one scene region. */
@@ -107,27 +98,31 @@ export function SceneView({
       // never color-only (docs/FRONTEND.md) - the label always spells both
       // out as text. Sites have no click-to-inspect (unlike agents and fire
       // cells), so the label is the only accessible path to either value.
-      const damageLabel = siteDamageLabel(site.damage);
-      const fresh = freshness(site.ageMs, site.stale);
+      const meta = siteMapLabelMeta(site, simTimeMs);
       return {
         id: `site:${site.id}`,
         x: site.position.x,
         y: sceneTerrain.groundY(site.position.x, site.position.z) + 40,
         z: site.position.z,
-        text: `${site.name}: ${siteProtectionStatusLabel(site.protectionStatus)}${damageLabel ? `, ${damageLabel}` : ""}${fresh.stale && site.ageMs !== null ? ` (${fresh.ageLabel})` : ""}`,
+        text: siteMapLabelText(site),
         variant: "site" as const,
-        stale: fresh.stale && site.ageMs !== null,
+        stale: meta.stale,
+        ...(meta.title === undefined ? {} : { title: meta.title }),
       };
     });
-    const agentLabels = entities.agents.map((agent) => ({
-      id: `agent:${agent.id}`,
-      x: agent.position.x,
-      y: sceneTerrain.groundY(agent.position.x, agent.position.z) + 44,
-      z: agent.position.z,
-      text: agentStaleText(agent),
-      variant: "agent" as const,
-      stale: freshness(agent.ageMs).stale,
-    }));
+    const agentLabels = entities.agents.map((agent) => {
+      const meta = agentMapLabelMeta(agent, simTimeMs);
+      return {
+        id: `agent:${agent.id}`,
+        x: agent.position.x,
+        y: sceneTerrain.groundY(agent.position.x, agent.position.z) + 44,
+        z: agent.position.z,
+        text: agentMapLabelText(agent),
+        variant: "agent" as const,
+        stale: meta.stale,
+        ...(meta.title === undefined ? {} : { title: meta.title }),
+      };
+    });
     const routeLabels = entities.routes.map((line) => {
       const mid = polylineMidpoint(line.points);
       return {
@@ -157,7 +152,7 @@ export function SceneView({
       ...(showRoutes ? routeLabels : []),
       ...(showForecast ? forecastLabels : []),
     ];
-  }, [entities, showRoutes, showForecast]);
+  }, [entities, showRoutes, showForecast, simTimeMs]);
 
   return (
     <div className="scene-view">
@@ -241,7 +236,10 @@ function CellInspectionPanel({
   readonly onClose: () => void;
   readonly panelRef: RefObject<HTMLDivElement | null>;
 }) {
-  const ageMs = simTimeMs === null ? null : Math.max(0, simTimeMs - cell.lastObservedAt);
+  const inspection =
+    simTimeMs === null || cell.unseen
+      ? null
+      : formatObservationInspection(cell.lastObservedAt, simTimeMs, cell.stale);
   return (
     <div ref={panelRef} className="cell-inspection-panel" role="status">
       <button type="button" className="cell-inspection-panel__close" onClick={onClose} aria-label="Close">
@@ -260,14 +258,10 @@ function CellInspectionPanel({
             <dd>This state was not observed by the coordinator (full simulated fire, replay only)</dd>
           </>
         ) : null}
-        {cell.unseen ? null : (
+        {inspection === null ? null : (
           <>
             <dt>Last observed</dt>
-            <dd>
-              {formatIncidentClock(cell.lastObservedAt)}
-              {ageMs !== null ? ` (${Math.round(ageMs / 1000)}s ago)` : ""}
-              {cell.stale ? ", stale" : ""}
-            </dd>
+            <dd>{inspection}</dd>
           </>
         )}
       </dl>
