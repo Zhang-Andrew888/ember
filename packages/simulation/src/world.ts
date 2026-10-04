@@ -1,5 +1,5 @@
 import type { AgentId, AgentPosition, AgentState, EdgeId, MissionPlan, NodeId, SiteId } from "@ember/domain";
-import { EdgePosition, Meters, SimTimeMs } from "@ember/domain";
+import { EdgePosition, Meters, OffRoadPosition, SimTimeMs, isOffRoadLeg, isRoadLeg } from "@ember/domain";
 import {
   CELL_BURNED,
   CELL_BURNING,
@@ -12,6 +12,7 @@ import {
   createTerrain,
   refugeCells,
   streamRng,
+  offRoadSegmentTraversable,
   type FireParams,
   type RoadEdge,
 } from "./model/index.js";
@@ -51,7 +52,8 @@ export function derivePrivateParameters(seed: string, overrides: PrivateOverride
 
 type Pos =
   | { kind: "node"; nodeId: NodeId }
-  | { kind: "edge"; edgeId: EdgeId; dist: number; direction: "forward" | "reverse"; turnMs: number };
+  | { kind: "edge"; edgeId: EdgeId; dist: number; direction: "forward" | "reverse"; turnMs: number }
+  | { kind: "off_road"; x: number; y: number; toX: number; toY: number; headingRad: number };
 
 interface Commitment {
   plan: MissionPlan;
@@ -172,6 +174,7 @@ export class World {
 
   agentPoint(agent: TruthAgent): { x: number; y: number } {
     if (agent.pos.kind === "node") return this.road.nodePoint(agent.pos.nodeId);
+    if (agent.pos.kind === "off_road") return { x: agent.pos.x, y: agent.pos.y };
     return this.road.pointAlong(this.road.mustEdge(agent.pos.edgeId), agent.pos.dist);
   }
 
@@ -205,13 +208,37 @@ export class World {
     let cursor: NodeId | null = null;
     if (agent.pos.kind === "node") cursor = agent.pos.nodeId;
     let approachEndNode: NodeId | null = null;
+    const near = (ax: number, ay: number, bx: number, by: number, tol = 2): boolean => Math.hypot(ax - bx, ay - by) <= tol;
+
     for (let i = 0; i < legs.length; i++) {
       const leg = legs[i];
       if (leg === undefined) continue;
+      if (isOffRoadLeg(leg)) {
+        if (!offRoadSegmentTraversable(leg.fromX, leg.fromY, leg.toX, leg.toY)) return reject("off_road_not_traversable");
+        try {
+          this.road.nodePoint(leg.endNodeId);
+        } catch {
+          return reject("unknown_node");
+        }
+        const endPt = this.road.nodePoint(leg.endNodeId);
+        if (!near(endPt.x, endPt.y, leg.toX, leg.toY, 5)) return reject("off_road_end_not_at_node");
+        if (i === 0) {
+          const p = this.agentPoint(agent);
+          if (!near(p.x, p.y, leg.fromX, leg.fromY)) return reject("off_road_not_connected");
+        } else if (cursor !== null) {
+          const startPt = this.road.nodePoint(cursor);
+          if (!near(startPt.x, startPt.y, leg.fromX, leg.fromY)) return reject("off_road_not_connected");
+        } else {
+          return reject("off_road_not_connected");
+        }
+        cursor = leg.endNodeId;
+        if (i === approachCount - 1) approachEndNode = cursor;
+        continue;
+      }
+      if (!isRoadLeg(leg)) return reject("unknown_leg");
       const edge = this.road.edges.get(leg.edgeId);
       if (edge === undefined) return reject("unknown_edge");
       if (cursor === null) {
-        // Agent is mid-edge: the first leg must be the edge it is on.
         if (i !== 0 || agent.pos.kind !== "edge" || agent.pos.edgeId !== leg.edgeId) return reject("leg_not_connected");
       } else {
         const start = leg.direction === "forward" ? edge.from : edge.to;
@@ -244,7 +271,7 @@ export class World {
 
     if (agent.pos.kind === "edge" && legs.length > 0) {
       const first = legs[0];
-      if (first !== undefined && first.direction !== agent.pos.direction) {
+      if (first !== undefined && isRoadLeg(first) && first.direction !== agent.pos.direction) {
         // Reversal keeps edge occupancy through the turnaround delay.
         agent.pos.direction = first.direction;
         agent.pos.turnMs = SIM_DEFAULTS.turnaroundMs;
@@ -332,6 +359,13 @@ export class World {
       this.advanceFromNode(agent, c, stepStartMs);
     }
 
+    if (agent.pos.kind === "off_road") {
+      const pos = agent.pos;
+      if (c !== null && c.legIndex < c.plan.timedLegs.length) {
+        this.travelOffRoad(agent, pos, SIM_DEFAULTS.agentSpeedMps * SIM_DEFAULTS.offRoadSpeedFactor * (STEP / 1000));
+      }
+    }
+
     if (agent.pos.kind === "edge") {
       const pos = agent.pos;
       if (pos.turnMs > 0) {
@@ -372,6 +406,19 @@ export class World {
       return;
     }
     if (stepStartMs < leg.departMs) return;
+    if (isOffRoadLeg(leg)) {
+      c.blockedNoticed = false;
+      agent.pos = {
+        kind: "off_road",
+        x: leg.fromX,
+        y: leg.fromY,
+        toX: leg.toX,
+        toY: leg.toY,
+        headingRad: Math.atan2(leg.toY - leg.fromY, leg.toX - leg.fromX),
+      };
+      return;
+    }
+    if (!isRoadLeg(leg)) return;
     const edge = this.road.mustEdge(leg.edgeId);
     if (this.closedEdges.has(edge.id)) {
       this.cancel(agent, c, "edge_closed", stepStartMs + STEP);
@@ -397,6 +444,45 @@ export class World {
   private cancel(agent: TruthAgent, c: Commitment, reason: string, tick: number): void {
     this.notices.push({ tick, kind: "plan_cancelled", agentId: agent.id, planId: c.plan.id, reason });
     agent.commitment = null;
+  }
+
+  private travelOffRoad(agent: TruthAgent, pos: Extract<Pos, { kind: "off_road" }>, meters: number): void {
+    const dx = pos.toX - pos.x;
+    const dy = pos.toY - pos.y;
+    const remaining = Math.hypot(dx, dy);
+    if (remaining <= 0) {
+      this.finishOffRoadLeg(agent);
+      return;
+    }
+    const step = Math.min(meters, remaining);
+    const ux = dx / remaining;
+    const uy = dy / remaining;
+    const samples = Math.max(1, Math.ceil(step));
+    for (let i = 1; i <= samples; i++) {
+      const t = (step * i) / samples;
+      const x = pos.x + ux * t;
+      const y = pos.y + uy * t;
+      if (this.isBurningAt(x, y)) {
+        pos.x = x;
+        pos.y = y;
+        this.lose(agent, this.timeMs + STEP);
+        return;
+      }
+    }
+    pos.x += ux * step;
+    pos.y += uy * step;
+    if (Math.hypot(pos.toX - pos.x, pos.toY - pos.y) < 0.01) {
+      this.finishOffRoadLeg(agent);
+    }
+  }
+
+  private finishOffRoadLeg(agent: TruthAgent): void {
+    const c = agent.commitment;
+    if (c === null) return;
+    const leg = c.plan.timedLegs[c.legIndex];
+    if (leg === undefined || !isOffRoadLeg(leg)) return;
+    agent.pos = { kind: "node", nodeId: leg.endNodeId };
+    c.legIndex += 1;
   }
 
   /** Move along the current edge, checking the swept path so no active cell is skipped. */
@@ -509,6 +595,14 @@ export class World {
 
   toAgentPosition(agent: TruthAgent): AgentPosition {
     if (agent.pos.kind === "node") return { kind: "node", nodeId: agent.pos.nodeId };
+    if (agent.pos.kind === "off_road") {
+      return OffRoadPosition.parse({
+        kind: "off_road",
+        x: Meters.parse(agent.pos.x),
+        y: Meters.parse(agent.pos.y),
+        headingRad: agent.pos.headingRad,
+      });
+    }
     return EdgePosition.parse({
       kind: "edge",
       edgeId: agent.pos.edgeId,

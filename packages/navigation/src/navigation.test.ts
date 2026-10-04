@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AgentId, EdgeId, NodeId, SiteId, type AgentPosition } from "@ember/domain";
+import { AgentId, EdgeId, isRoadLeg, NodeId, MissionPlan, MissionPlanId, SequenceNumber, SimTimeMs, SiteId, type AgentPosition } from "@ember/domain";
 import { buildSyntheticScenario } from "@ember/simulation";
 import { Rng, RoadIndex, SIM_DEFAULTS } from "@ember/simulation/model";
 import {
@@ -10,6 +10,7 @@ import {
   cellsOfEdge,
   certifyPlan,
   makeEnsemble,
+  offRoadTravelMs,
   planMissions,
   planRetreat,
   planReturn,
@@ -65,14 +66,14 @@ describe("complete mission search", () => {
     const plan = result.plan!;
     const legs = plan.timedLegs;
     expect(legs[0]?.departMs).toBe(0);
-    expect(legs.slice(0, 4).map((l) => l.edgeId)).toEqual(["e-rw-j1", "e-j1-s", "e-s-h", "e-h-sa"]);
+    expect(legs.slice(0, 4).filter(isRoadLeg).map((l) => l.edgeId)).toEqual(["e-rw-j1", "e-j1-s", "e-s-h", "e-h-sa"]);
     // 75 + 95 + 95 + 85 s: each leg's travel time is rounded up to a 5 s bucket.
     expect(legs[3]?.arriveMs).toBe(350_000);
     expect(plan.workInterval.startMs).toBe(350_000);
     expect(plan.workInterval.endMs - plan.workInterval.startMs).toBe(300_000);
     // Returning to Refuge South (1191 m) beats Refuge West (1342 m).
     expect(legs.length).toBe(7);
-    expect(legs.slice(4).map((l) => l.edgeId)).toEqual(["e-h-sa", "e-s-h", "e-rs-s"]);
+    expect(legs.slice(4).filter(isRoadLeg).map((l) => l.edgeId)).toEqual(["e-h-sa", "e-s-h", "e-rs-s"]);
     expect(plan.refugeId).toBe("n-rs");
     for (const l of legs) {
       expect(l.departMs % 5000).toBe(0);
@@ -123,10 +124,10 @@ describe("complete mission search", () => {
     ]);
     const result = planMissions(ctxWith({ ensemble }), protectionTargets(siteA));
     expect(result.feasible).toBe(true);
-    const legs = result.plan!.timedLegs.map((l) => l.edgeId);
+    const legs = result.plan!.timedLegs.filter(isRoadLeg).map((l) => l.edgeId);
     expect(legs).not.toContain("e-j1-n");
     const hm = new HazardModel(road, ensemble, new Set(), DEFAULT_NAV_CONFIG);
-    for (const l of result.plan!.timedLegs) {
+    for (const l of result.plan!.timedLegs.filter(isRoadLeg)) {
       expect(l.departMs).toBeLessThan(hm.latestDepartMs(road.mustEdge(l.edgeId), l.direction));
     }
   });
@@ -160,10 +161,10 @@ describe("complete mission search", () => {
       ctxWith({ ensemble: makeEnsemble(map, [{ id: "a", ignition: ignite(road, ["e-s-h"], 150_000) }]) }),
       protectionTargets(siteA),
     );
-    expect(before.plan!.timedLegs.map((l) => l.edgeId)).toContain("e-s-h");
+    expect(before.plan!.timedLegs.filter(isRoadLeg).map((l) => l.edgeId)).toContain("e-s-h");
     expect(after.feasible).toBe(true);
-    expect(after.plan!.timedLegs.map((l) => l.edgeId)).not.toContain("e-s-h");
-    expect(after.plan!.timedLegs.map((l) => l.edgeId)).toContain("e-n-h");
+    expect(after.plan!.timedLegs.filter(isRoadLeg).map((l) => l.edgeId)).not.toContain("e-s-h");
+    expect(after.plan!.timedLegs.filter(isRoadLeg).map((l) => l.edgeId)).toContain("e-n-h");
     const arrival = (r: typeof before): number => r.plan!.workInterval.startMs;
     expect(arrival(after)).toBeGreaterThan(arrival(before));
   });
@@ -192,11 +193,11 @@ describe("complete mission search", () => {
       protectionTargets(siteA),
     );
     expect(result.feasible).toBe(true);
-    const corridor = result.plan!.timedLegs.find((l) => l.edgeId === "e-s-h" && l.direction === "forward")!;
+    const corridor = result.plan!.timedLegs.find((l) => isRoadLeg(l) && l.edgeId === "e-s-h" && l.direction === "forward")!;
     expect(corridor.departMs).toBeGreaterThanOrEqual(busyUntil);
     // It reached the corridor mouth well before the window opened, so the gap is spent waiting at a node.
     const approachLegs = result.plan!.timedLegs.slice(0, result.plan!.timedLegs.indexOf(corridor));
-    expect(approachLegs.map((l) => l.edgeId)).toEqual(["e-rw-j1", "e-j1-s"]);
+    expect(approachLegs.filter(isRoadLeg).map((l) => l.edgeId)).toEqual(["e-rw-j1", "e-j1-s"]);
     expect(corridor.departMs - approachLegs[1]!.departMs).toBeGreaterThan(95_000);
   });
 
@@ -204,7 +205,7 @@ describe("complete mission search", () => {
     const oracle: ReservationOracle = { isFree: (edgeId) => edgeId !== "e-s-h" };
     const result = planMissions(ctxWith({ ensemble: makeEnsemble(map, [{ id: "a" }]), oracle }), protectionTargets(siteA));
     expect(result.feasible).toBe(true);
-    expect(result.plan!.timedLegs.map((l) => l.edgeId)).toContain("e-n-h");
+    expect(result.plan!.timedLegs.filter(isRoadLeg).map((l) => l.edgeId)).toContain("e-n-h");
   });
 
   it("admits multiple distinct approach routes when both corridors are free", () => {
@@ -281,6 +282,47 @@ describe("certifying committed plans", () => {
     const result = certifyPlan({ ...input, ensemble: makeEnsemble(map, [{ id: "a" }], { reliability: "unreliable" }) });
     expect(result.failure?.kind).toBe("forecast_unreliable");
   });
+
+  it("certifies an off-road leg and a following road return", () => {
+    const ensemble = makeEnsemble(map, [{ id: "a" }]);
+    const dist = 360.555;
+    const travelMs = offRoadTravelMs(dist, DEFAULT_NAV_CONFIG);
+    const offPlan = MissionPlan.parse({
+      id: MissionPlanId.parse("off-cert"),
+      recipientId: agent,
+      knowledgeRevision: SequenceNumber.parse(0),
+      timedLegs: [
+        {
+          kind: "off_road",
+          fromX: 700,
+          fromY: 600,
+          toX: 1000,
+          toY: 800,
+          endNodeId: NodeId.parse("n-h"),
+          departMs: SimTimeMs.parse(0),
+          arriveMs: SimTimeMs.parse(travelMs),
+        },
+      ],
+      workInterval: { startMs: SimTimeMs.parse(travelMs), endMs: SimTimeMs.parse(travelMs) },
+      refugeId: NodeId.parse("n-rs"),
+      reservationRevision: 0,
+      limitingReason: null,
+    });
+    const atSouth: AgentPosition = { kind: "node", nodeId: NodeId.parse("n-s") };
+    const ok = certifyPlan({
+      road,
+      ensemble,
+      closedCells: new Set(),
+      plan: offPlan,
+      position: atSouth,
+      legIndex: 0,
+      nowMs: 0,
+    });
+    expect(ok.ok).toBe(true);
+    const ret = planReturn(ctxWith({ ensemble, position: { kind: "node", nodeId: NodeId.parse("n-h") }, nowMs: travelMs }));
+    expect(ret).not.toBeNull();
+    expect(ret!.plan.timedLegs.filter(isRoadLeg).length).toBeGreaterThan(0);
+  });
 });
 
 describe("withdrawal, reversal and retreat", () => {
@@ -298,6 +340,8 @@ describe("withdrawal, reversal and retreat", () => {
     const ret = planReturn(ctxWith({ ensemble, position: midCorridor, nowMs: 60_000 }));
     expect(ret).not.toBeNull();
     const first = ret!.plan.timedLegs[0]!;
+    expect(isRoadLeg(first)).toBe(true);
+    if (!isRoadLeg(first)) throw new Error("expected road leg");
     expect(first.edgeId).toBe("e-s-h");
     expect(first.direction).toBe("reverse");
     expect(first.departMs).toBe(60_000);
@@ -310,7 +354,9 @@ describe("withdrawal, reversal and retreat", () => {
     const behind = cellOnEdge(road, "e-s-h", 0.1);
     const ensemble = makeEnsemble(map, [{ id: "a", ignition: new Map([[behind, 80_000]]) }], { nowMs: 60_000 });
     const ret = planReturn(ctxWith({ ensemble, position: midCorridor, nowMs: 60_000 }));
-    expect(ret!.plan.timedLegs[0]?.direction).toBe("forward");
+    const leg0 = ret!.plan.timedLegs[0]!;
+    expect(isRoadLeg(leg0)).toBe(true);
+    if (isRoadLeg(leg0)) expect(leg0.direction).toBe("forward");
   });
 
   it("falls back to a best-effort retreat that minimizes exposure when no normal return passes", () => {
@@ -326,7 +372,9 @@ describe("withdrawal, reversal and retreat", () => {
     expect(retreat).not.toBeNull();
     expect(retreat!.bestEffort).toBe(true);
     expect(retreat!.plan.limitingReason).toBe("best_effort_retreat");
-    expect(retreat!.plan.timedLegs[0]?.edgeId).toBe("e-n-h");
+    const r0 = retreat!.plan.timedLegs[0];
+    expect(isRoadLeg(r0!)).toBe(true);
+    if (isRoadLeg(r0!)) expect(r0.edgeId).toBe("e-n-h");
   });
 
   it("never retreats through directly observed burning cells and reports stranded when none is passable", () => {
@@ -340,7 +388,9 @@ describe("withdrawal, reversal and retreat", () => {
     const atHub: AgentPosition = { kind: "node", nodeId: NodeId.parse("n-h") };
     const ensemble = makeEnsemble(map, [{ id: "p", ignition: ignite(road, ["e-s-h", "e-h-sc"], 20_000) }], { reliability: "unreliable" });
     const retreat = planRetreat(ctxWith({ ensemble, position: atHub, nowMs: 10_000 }));
-    expect(retreat?.plan.timedLegs[0]?.edgeId).toBe("e-n-h");
+    const r0 = retreat?.plan.timedLegs[0];
+    expect(isRoadLeg(r0!)).toBe(true);
+    if (isRoadLeg(r0!)) expect(r0.edgeId).toBe("e-n-h");
     expect(retreat?.bestEffort).toBe(true);
     expect(SiteId.parse("x")).toBe("x");
   });

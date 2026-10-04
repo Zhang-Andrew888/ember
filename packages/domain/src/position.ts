@@ -21,5 +21,15 @@ export const NodePosition = z.object({
 });
 export type NodePosition = z.infer<typeof NodePosition>;
 
-export const AgentPosition = z.discriminatedUnion("kind", [EdgePosition, NodePosition]);
+/** Agent moving off-road in map meters (world x/y; y is north). */
+export const OffRoadPosition = z.object({
+  kind: z.literal("off_road"),
+  x: Meters,
+  y: Meters,
+  /** Radians from east, counter-clockwise (matches compass movement). */
+  headingRad: z.number(),
+});
+export type OffRoadPosition = z.infer<typeof OffRoadPosition>;
+
+export const AgentPosition = z.discriminatedUnion("kind", [EdgePosition, NodePosition, OffRoadPosition]);
 export type AgentPosition = z.infer<typeof AgentPosition>;

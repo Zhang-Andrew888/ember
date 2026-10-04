@@ -1,11 +1,18 @@
-import type { EdgeId, TimedLeg } from "@ember/domain";
+import { isRoadLeg, type EdgeId, type TimedLeg } from "@ember/domain";
 
 export function routeIdOf(legs: readonly TimedLeg[]): string {
-  return legs.map((l) => `${l.edgeId}${l.direction === "forward" ? "+" : "-"}`).join(">");
+  return legs
+    .map((l) => {
+      if (l.kind === "off_road") {
+        return `or:${l.fromX},${l.fromY}>${l.toX},${l.toY}@${l.endNodeId}`;
+      }
+      return `${l.edgeId}${l.direction === "forward" ? "+" : "-"}`;
+    })
+    .join(">");
 }
 
 export function edgeKeys(legs: readonly TimedLeg[]): EdgeId[] {
-  return [...new Set(legs.map((l) => l.edgeId))];
+  return [...new Set(legs.filter(isRoadLeg).map((l) => l.edgeId))];
 }
 
 export interface ApproachRoute {

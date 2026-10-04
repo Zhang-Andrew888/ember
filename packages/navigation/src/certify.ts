@@ -1,9 +1,10 @@
-import type { AgentPosition, MissionPlan, NodeId } from "@ember/domain";
+import { isOffRoadLeg, isRoadLeg, type AgentPosition, type MissionPlan, type NodeId } from "@ember/domain";
 import { HazardModel } from "./hazard.js";
 import type { ForecastEnsemble } from "@ember/forecast";
 import { admitsProtection } from "@ember/forecast";
 import type { RoadIndex } from "@ember/simulation/model";
 import { DEFAULT_NAV_CONFIG, type NavConfig } from "./types.js";
+import { offRoadSpeedMps } from "./travel.js";
 
 export type CertifyFailure =
   | { readonly kind: "forecast_unreliable" }
@@ -54,6 +55,18 @@ export function certifyPlan(input: CertifyInput): CertifyResult {
     const leg = legs[i]!;
     const departMs = leg.departMs + late;
     const arriveMs = leg.arriveMs + late;
+    if (isOffRoadLeg(leg)) {
+      const speed = offRoadSpeedMps(config);
+      if (!(departMs < hm.offRoadLatestDepartMs(leg.fromX, leg.fromY, leg.toX, leg.toY, speed))) {
+        return fail({ kind: "leg", index: i, edgeId: "off_road" });
+      }
+      if (arriveMs + config.bufferMs >= hm.horizonEndMs) return fail({ kind: "horizon" });
+      if (i === input.legIndex && input.position.kind === "node" && !hm.nodeSafeAt(leg.endNodeId, arriveMs)) {
+        return fail({ kind: "wait", index: i, nodeId: leg.endNodeId });
+      }
+      continue;
+    }
+    if (!isRoadLeg(leg)) continue;
     const edge = input.road.mustEdge(leg.edgeId);
     if (i === input.legIndex && input.position.kind === "edge") {
       const dist = input.position.distanceAlongPolyline;
@@ -70,9 +83,15 @@ export function certifyPlan(input: CertifyInput): CertifyResult {
     }
     const prev = i > 0 ? legs[i - 1] : undefined;
     if (prev !== undefined && i > input.legIndex) {
-      const pe = input.road.mustEdge(prev.edgeId);
-      const node: NodeId = prev.direction === "forward" ? pe.to : pe.from;
-      if (!hm.nodeSafeAt(node, departMs)) return fail({ kind: "wait", index: i, nodeId: node });
+      const node: NodeId | null = isOffRoadLeg(prev)
+        ? prev.endNodeId
+        : isRoadLeg(prev)
+          ? (() => {
+              const pe = input.road.mustEdge(prev.edgeId);
+              return prev.direction === "forward" ? pe.to : pe.from;
+            })()
+          : null;
+      if (node !== null && !hm.nodeSafeAt(node, departMs)) return fail({ kind: "wait", index: i, nodeId: node });
     }
   }
   const work = input.plan.workInterval;
@@ -81,8 +100,11 @@ export function certifyPlan(input: CertifyInput): CertifyResult {
     const lastApproach = approachCount > 0 ? legs[approachCount - 1] : undefined;
     let node: NodeId | null = null;
     if (lastApproach !== undefined) {
-      const e = input.road.mustEdge(lastApproach.edgeId);
-      node = lastApproach.direction === "forward" ? e.to : e.from;
+      if (isOffRoadLeg(lastApproach)) node = lastApproach.endNodeId;
+      else if (isRoadLeg(lastApproach)) {
+        const e = input.road.mustEdge(lastApproach.edgeId);
+        node = lastApproach.direction === "forward" ? e.to : e.from;
+      }
     } else if (input.position.kind === "node") {
       node = input.position.nodeId;
     }

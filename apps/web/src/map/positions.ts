@@ -100,6 +100,9 @@ export function resolveAgentPosition(map: ScenarioMap, position: AgentPosition):
   if (position.kind === "node") {
     return resolveNodePosition(map, position.nodeId);
   }
+  if (position.kind === "off_road") {
+    return worldToScene(position.x, position.y, map.worldMeters);
+  }
   return resolveEdgePoint(map, position.edgeId, position.distanceAlongPolyline);
 }
 

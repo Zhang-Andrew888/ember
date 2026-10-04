@@ -10,6 +10,7 @@ describe("enumerateApproachRoutes", () => {
       const pick = ban.has(EdgeId.parse("e-b")) ? alternate : primary;
       if (pick.some((e) => ban.has(EdgeId.parse(e)))) return null;
       const legs = pick.map((edgeId, i) => ({
+        kind: "road" as const,
         edgeId: EdgeId.parse(edgeId),
         direction: "forward" as const,
         departMs: SimTimeMs.parse(i * 5000),
@@ -30,7 +31,7 @@ describe("enumerateApproachRoutes", () => {
       n += 1;
       const edge = EdgeId.parse(`e-${n}`);
       return {
-        legs: [{ edgeId: edge, direction: "forward" as const, departMs: SimTimeMs.parse(0), arriveMs: SimTimeMs.parse(5000) }],
+        legs: [{ kind: "road" as const, edgeId: edge, direction: "forward" as const, departMs: SimTimeMs.parse(0), arriveMs: SimTimeMs.parse(5000) }],
         k: 1,
       };
     };

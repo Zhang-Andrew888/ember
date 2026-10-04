@@ -2,7 +2,6 @@ import { z } from "zod";
 import {
   AgentId,
   CommandId,
-  EdgeId,
   MissionPlanId,
   NodeId,
   ObjectiveId,
@@ -12,6 +11,9 @@ import {
 } from "./ids.js";
 import { Meters, SequenceNumber, SimTimeMs, WallTimeMs, WorkUnits } from "./units.js";
 import { AgentPosition } from "./position.js";
+import { TimedLeg } from "./legs.js";
+
+export { TimedLeg, RoadTimedLeg, OffRoadTimedLeg, isRoadLeg, isOffRoadLeg } from "./legs.js";
 
 export const AgentRole = z.enum(["protection_crew", "scout"]);
 export type AgentRole = z.infer<typeof AgentRole>;
@@ -207,14 +209,6 @@ export const Objective = z.object({
 export type Objective = z.infer<typeof Objective>;
 
 // ---------- MissionPlan ----------
-
-export const TimedLeg = z.object({
-  edgeId: EdgeId,
-  direction: z.enum(["forward", "reverse"]),
-  departMs: SimTimeMs,
-  arriveMs: SimTimeMs,
-});
-export type TimedLeg = z.infer<typeof TimedLeg>;
 
 export const MissionPlan = z.object({
   id: MissionPlanId,

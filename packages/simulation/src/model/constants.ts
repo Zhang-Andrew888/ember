@@ -12,6 +12,8 @@ export const SIM_DEFAULTS = {
   stepMs: 1000,
   incidentHorizonMs: 1_500_000,
   agentSpeedMps: 4,
+  /** Off-road travel uses this fraction of road speed (initial #120 setting). */
+  offRoadSpeedFactor: 0.5,
   turnaroundMs: 5000,
   observationRadiusM: 150,
   staleAfterMs: 30_000,

@@ -392,7 +392,9 @@ export class Incident {
       agentPlans.push({
         agentId: agent.id,
         planId: c.plan.id,
-        legs: c.plan.timedLegs.map((leg) => ({ edgeId: leg.edgeId, direction: leg.direction })),
+        legs: c.plan.timedLegs.flatMap((leg) =>
+          leg.kind === "road" ? [{ edgeId: leg.edgeId, direction: leg.direction }] : [],
+        ),
         workInterval: c.plan.workInterval,
         ...(c.plan.work === undefined ? {} : { work: c.plan.work }),
         refugeId: c.plan.refugeId,

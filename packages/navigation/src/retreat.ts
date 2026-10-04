@@ -122,6 +122,8 @@ export function planRetreat(ctx: PlanningContext): ReturnPlan | null {
   const seeds: Label[] = [];
   if (ctx.position.kind === "node") {
     seeds.push({ node: ctx.position.nodeId, exposure: 0, timeMs: ctx.nowMs, legs: [] });
+  } else if (ctx.position.kind === "off_road") {
+    // Road-only retreat search; off-road legs finish on a node before graph expansion applies.
   } else {
     const pos = ctx.position;
     const edge = ctx.road.mustEdge(pos.edgeId);
@@ -140,6 +142,7 @@ export function planRetreat(ctx: PlanningContext): ReturnPlan | null {
         timeMs: ctx.nowMs + travelMs,
         legs: [
           {
+            kind: "road",
             edgeId: edge.id,
             direction,
             departMs: SimTimeMs.parse(ctx.nowMs),
@@ -179,6 +182,7 @@ export function planRetreat(ctx: PlanningContext): ReturnPlan | null {
         legs: [
           ...label.legs,
           {
+            kind: "road",
             edgeId: edge.id,
             direction: adj.direction,
             departMs: SimTimeMs.parse(label.timeMs),

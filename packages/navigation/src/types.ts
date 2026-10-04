@@ -9,6 +9,8 @@ export interface NavConfig {
   readonly minWorkMs: number;
   readonly workStepMs: number;
   readonly speedMps: number;
+  /** Off-road speed; default is half of `speedMps` when omitted. */
+  readonly offRoadSpeedMps?: number;
   readonly turnaroundMs: number;
   readonly crewWorkRate: number;
   readonly reservationGuardMs: number;

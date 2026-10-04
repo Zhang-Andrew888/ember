@@ -3,7 +3,8 @@
 export * from "./types.js";
 export { enumerateApproachRoutes, routeIdOf, edgeKeys, type ApproachDiscover, type ApproachRoute } from "./approach-routes.js";
 export { HazardModel } from "./hazard.js";
-export { Reach, ReturnTable, bucketTravelMs, startsFromPosition, timeExpandedSearch, type SearchStart } from "./search.js";
+export { Reach, ReturnTable, startsFromPosition, timeExpandedSearch, type SearchStart } from "./search.js";
+export { bucketTravelMs, offRoadSpeedMps, offRoadTravelMs } from "./travel.js";
 export { planMissions, planWithHazard, protectionTargets, workOptions } from "./mission.js";
 export { containmentTargets, nearestReachableNode } from "./containment.js";
 export { certifyPlan, type CertifyFailure, type CertifyInput, type CertifyResult } from "./certify.js";
