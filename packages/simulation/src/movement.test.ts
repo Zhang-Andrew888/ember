@@ -52,6 +52,19 @@ describe("clock mapping", () => {
 });
 
 describe("movement rules", () => {
+  it("rejects off-road legs until the simulator implements them", () => {
+    const inc = new Incident({ scenario: twoAtCorridor(), seed: "m", overrides: calm });
+    const plan = MissionPlan.parse({
+      id: "offroad", recipientId: "crew-1", knowledgeRevision: inc.agentRevision(AgentId.parse("crew-1")),
+      timedLegs: [],
+      offroadLegs: [{ kind: "offroad", start: { x: 400, y: 800 }, end: { x: 500, y: 900 }, departMs: 0, arriveMs: 70_000 }],
+      workInterval: { startMs: 70_000, endMs: 70_000 }, refugeId: "n-rw", reservationRevision: 0, limitingReason: null,
+    });
+    inc.submit({ kind: "commit_plan", agentId: AgentId.parse("crew-1"), plan, workSiteId: null, mode: "normal" });
+    inc.advanceTo(1000);
+    expect(inc.notices).toContainEqual(expect.objectContaining({ kind: "plan_rejected", reason: "offroad_movement_not_supported" }));
+  });
+
   it("waits at a node until the leg's planned departure time", () => {
     const inc = new Incident({ scenario: twoAtCorridor(), seed: "m", overrides: calm });
     inc.submit(walk(inc, "crew-1", "n-s", ["e-s-h"], 20_000));
