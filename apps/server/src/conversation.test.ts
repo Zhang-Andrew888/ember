@@ -46,9 +46,12 @@ describe("conversation over a session (no provider)", () => {
     session.runUntil(100_000, () => bridge.collect());
     const position = session.incident.projectAgent(AgentId.parse("crew-1")).position;
     const road = new RoadIndex(scenario.map);
-    const point = position.kind === "node"
-      ? road.nodePoint(position.nodeId)
-      : road.pointAlong(road.mustEdge(position.edgeId), position.distanceAlongPolyline);
+    const point =
+      position.kind === "node"
+        ? road.nodePoint(position.nodeId)
+        : position.kind === "offroad"
+          ? { x: position.end.x, y: position.end.y }
+          : road.pointAlong(road.mustEdge(position.edgeId), position.distanceAlongPolyline);
     expect(point.y).toBeGreaterThan(800);
   });
 

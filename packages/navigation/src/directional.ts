@@ -17,6 +17,12 @@ const VECTORS: Record<CompassDirection, { x: number; y: number }> = {
 function currentPoint(ctx: PlanningContext): { x: number; y: number } {
   const position = ctx.position;
   if (position.kind === "node") return ctx.road.nodePoint(position.nodeId);
+  if (position.kind === "offroad") {
+    return {
+      x: position.start.x + (position.end.x - position.start.x) * position.progress,
+      y: position.start.y + (position.end.y - position.start.y) * position.progress,
+    };
+  }
   return ctx.road.pointAlong(ctx.road.mustEdge(position.edgeId), position.distanceAlongPolyline);
 }
 
