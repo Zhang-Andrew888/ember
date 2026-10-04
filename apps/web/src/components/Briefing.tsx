@@ -22,7 +22,7 @@ function BriefingFacts({ content }: { readonly content: BriefingContent }) {
     <div className="briefing__facts">
       <section aria-labelledby="briefing-sites-heading">
         <h2 id="briefing-sites-heading">Sites to protect</h2>
-        <div className="briefing__site-heading" aria-hidden="true"><span></span><span>Relative value</span></div>
+        <div className="briefing__site-heading" aria-hidden="true"><span>Site</span><span>Relative value</span></div>
         {content.sites.length ? (
           <ul className="briefing__sites">
             {content.sites.map((site) => (
@@ -69,15 +69,17 @@ export function Briefing({ onStart, starting, content, demoMode, transportMode, 
           <div className="briefing__right">
             <BriefingFacts content={content} />
             <div className="briefing__actions">
-              <div>
-                <p className="briefing__voice-note">Voice is optional. Text works throughout the incident.</p>
-                <MicCheck onProbe={probeMic} />
-                {demoMode ? <p className="briefing__demo-note">Demo voice uses simulated speech.</p> : null}
-              </div>
               {error ? <p className="briefing__error" role="alert" tabIndex={-1} ref={errorRef}>Couldn’t start the incident. {error}</p> : null}
               <button type="button" className="briefing__start" onClick={onStart} disabled={starting} aria-busy={starting}>
                 {starting ? "Starting…" : "Start incident"}
               </button>
+              <div className="briefing__voice">
+                <p className="briefing__voice-note">
+                  Voice is optional. Text works throughout the incident.
+                  {demoMode ? " Demo voice uses simulated speech." : null}
+                </p>
+                <MicCheck onProbe={probeMic} />
+              </div>
             </div>
           </div>
         </main>
