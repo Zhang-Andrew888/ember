@@ -32,7 +32,7 @@ Voice uses the same JSON push-to-talk client messages as events.
 
 Set **`XAI_API_KEY`** on the server. Outgoing lines are synthesized via xAI TTS (`GET /incidents/:id/speech/:itemId`); incoming PTT can use xAI STT (`POST /incidents/:id/stt` with JSON `{ audioBase64, mimeType }`).
 
-For **Grok intent** (chat completions instead of `ScriptedInterpreter`), also set **`XAI_INTENT=1`**. Optional **`XAI_CHAT_MODEL`** (default `grok-4-1-fast-non-reasoning`). `GET /health` reports `grokVoice` and `grokIntent`.
+For **Grok intent** (chat completions instead of `ScriptedInterpreter`), also set **`XAI_INTENT=1`**. Optional **`XAI_CHAT_MODEL`** (default `grok-4-1-fast-non-reasoning`). `GET /health` reports `grokVoice`, `grokIntent`, `coordinatorIntent` (mode and missing env var **names** only), and `crewMissionPlanning: "deterministic"` / `llmCrewPlanning: false` — never the API key. Crew mission planning is not LLM-driven (see `src/xai/crew-llm-policy.ts`).
 
 ```sh
 export XAI_API_KEY=...

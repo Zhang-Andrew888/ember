@@ -8,7 +8,8 @@ function chatModel(): string {
   return m === "" || m === undefined ? DEFAULT_MODEL : m;
 }
 
-function buildSystemPrompt(req: InterpretationRequest): string {
+/** Exported for boundary tests (#126); not part of the wire contract. */
+export function buildIntentSystemPrompt(req: InterpretationRequest): string {
   const directory = JSON.stringify(req.directory, null, 2);
   const active = req.activeRecipientCallsign ?? "(none)";
   return [
@@ -56,7 +57,7 @@ export async function completeIntentInterpretation(
       stream: false,
       temperature: 0,
       messages: [
-        { role: "system", content: buildSystemPrompt(req) },
+        { role: "system", content: buildIntentSystemPrompt(req) },
         { role: "user", content: req.text },
       ],
     }),
