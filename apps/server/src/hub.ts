@@ -50,6 +50,7 @@ export class SessionHub {
     this.outboxes.set(id, []);
     this.ptt.set(id, new PushToTalk());
     this.emitView(this.session.coordinatorView(), id);
+    this.syncAudience();
     return id;
   }
 
@@ -66,8 +67,7 @@ export class SessionHub {
     if (wasRecording) this.noteCaptureEnded(id);
     this.outboxes.delete(id);
     this.backpressureClosed.delete(id);
-    const playing = this.bridge.scheduler.nowPlaying;
-    if (playing !== null) this.bridge.acknowledgeSpeechPlayback(playing.id);
+    this.syncAudience();
   }
 
   /** Per-client records still held. Closed sockets must not remain in any of these. */
@@ -83,6 +83,7 @@ export class SessionHub {
   reconnect(id: ClientId): void {
     if (!this.ptt.has(id)) return;
     this.outboxes.set(id, []);
+    this.syncAudience();
     this.emitView(this.session.coordinatorView(), id);
     const unsent = this.ptt.get(id)?.unsentUtterance;
     if (unsent !== null && unsent !== undefined) {
@@ -115,6 +116,11 @@ export class SessionHub {
 
   private broadcast(message: ServerMessage): void {
     for (const id of [...this.outboxes.keys()]) this.send(id, message);
+  }
+
+  /** Grok playback only starts while a browser is connected to acknowledge it. */
+  private syncAudience(): void {
+    this.bridge.setSpeechAudience(this.outboxes.size);
   }
 
   private noteCaptureBegan(id: ClientId): void {
@@ -176,8 +182,8 @@ export class SessionHub {
         submit(u.text, `resend-${id}-${u.releasedMs}`);
         return;
       }
-      case "audio_finished":
-        this.bridge.acknowledgeSpeechPlayback(msg.itemId);
+      case "speech_playback":
+        this.bridge.acknowledgePlayback(msg.itemId, msg.outcome);
         return;
     }
   }

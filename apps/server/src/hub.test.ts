@@ -232,7 +232,7 @@ describe("wire protocol and information boundary", () => {
     expect(firstBatch[0]?.type === "audio" ? firstBatch[0].itemId : null).toBe("one");
     expect(bridge.scheduler.nowPlaying?.id).toBe("one");
 
-    hub.handle(id, encodeClient({ type: "audio_finished", itemId: "one" }), 5000);
+    hub.handle(id, encodeClient({ type: "speech_playback", itemId: "one", outcome: "ended" }), 5000);
     expect(bridge.scheduler.nowPlaying?.id).toBe("two");
 
     hub.afterStep();

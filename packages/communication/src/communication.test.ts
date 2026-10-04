@@ -13,6 +13,7 @@ import {
   parseModelIntentJson,
   lossNarration,
   matchName,
+  playbackAckBudgetMs,
   replyForDecision,
   statusReply,
   type Directory,
@@ -454,6 +455,66 @@ describe("audio scheduler", () => {
     broken = false;
     s.enqueue(item("r1", 4, "Crew 1 is holding.", 2));
     expect(spoken).toEqual(["Crew 1 is holding."]);
+  });
+
+  it("releases a failed clip and plays the next one", () => {
+    const { s, sink, events } = scheduler();
+    s.enqueue(item("r1", 4, "one", 1));
+    s.enqueue(item("r2", 4, "two", 2));
+    s.playbackFailed("r1");
+    expect(events.some((e) => e.kind === "audio_unavailable" && e.itemId === "r1")).toBe(true);
+    expect(sink.spoken).toEqual(["one", "two"]);
+    expect(s.nowPlaying?.id).toBe("r2");
+    s.playbackFailed("r1");
+    expect(s.nowPlaying?.id).toBe("r2");
+  });
+
+  it("keeps the next clip queued until the wall-clock acknowledgement budget", () => {
+    const { s, events } = scheduler();
+    s.enqueue(item("r1", 4, "one", 1));
+    s.enqueue(item("r2", 4, "two", 2));
+    const started = 1_000;
+    s.pollPlayback(started);
+    expect(s.nowPlaying?.id).toBe("r1");
+    const budget = playbackAckBudgetMs("one");
+    s.pollPlayback(started + budget - 1);
+    expect(s.nowPlaying?.id).toBe("r1");
+    s.pollPlayback(started + budget);
+    expect(s.nowPlaying?.id).toBe("r2");
+    expect(events.filter((e) => e.kind === "started").map((e) => e.itemId)).toEqual(["r1", "r2"]);
+  });
+
+  it("restarts the acknowledgement budget when the same clip plays again", () => {
+    const s = new AudioScheduler({
+      sink: new RecordingSink(),
+      currentPlanRevision: () => 1,
+      ackBudgetMs: () => 1_000,
+    });
+    s.enqueue(item("r1", 4, "routine status", 1));
+    s.pollPlayback(0);
+    s.startRecording();
+    s.stopRecording();
+    s.pollPlayback(5_000);
+    expect(s.nowPlaying?.id).toBe("r1");
+    s.pollPlayback(6_000);
+    expect(s.nowPlaying).toBeNull();
+  });
+
+  it("holds ready clips while playback is suspended", () => {
+    const { s, events } = scheduler();
+    s.suspendPlayback();
+    s.enqueue(item("r1", 4, "one", 1));
+    s.enqueue(item("r2", 4, "two", 2));
+    expect(s.nowPlaying).toBeNull();
+    expect(events.some((e) => e.kind === "started")).toBe(false);
+    s.resumePlayback();
+    expect(s.nowPlaying?.id).toBe("r1");
+    s.suspendPlayback();
+    s.finished("r1");
+    expect(s.nowPlaying).toBeNull();
+    expect(s.pending().map((pending) => pending.id)).toEqual(["r2"]);
+    s.resumePlayback();
+    expect(s.nowPlaying?.id).toBe("r2");
   });
 
   it("flush drops every queued sample immediately", () => {
