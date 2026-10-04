@@ -50,12 +50,17 @@ export class IncidentRegistry {
   /**
    * @param defaultSeed Operator-chosen seed (server side only, e.g. `DEMO_SEED`) so a rehearsed fire can
    *   be replayed. When absent each incident gets a random seed that is independent of its public id.
+   * @param operatorScenario Operator-chosen scenario (e.g. with `EMBER_FIREBREAK` firebreaks) used when a
+   *   request names none; the synthetic scenario otherwise.
    */
-  constructor(private readonly defaultSeed?: string) {}
+  constructor(
+    private readonly defaultSeed?: string,
+    private readonly operatorScenario?: SimScenario,
+  ) {}
 
   /** The scenario a `create` without an explicit one runs; also what `GET /scenario` briefs before any incident exists. */
   defaultScenario(): SimScenario {
-    return buildSyntheticScenario({ gameChanges: true });
+    return this.operatorScenario ?? buildSyntheticScenario({ gameChanges: true });
   }
 
   create(body: CreateIncidentBody = {}, clock: MonotonicClock): IncidentRecord {

@@ -18,4 +18,7 @@ export const colors = {
   road: "#39454A",
   /** Observed belief (crew sightings, possibly old): drawn as an outlined frame, never a solid fire tile. */
   observedBelief: "#CFE3E0",
+  /** Firebreak: cleared ground, drawn as a pale crosshatched band (the pattern carries the meaning). */
+  firebreak: "#D9C79E",
+  firebreakHatch: "#5C4A2E",
 } as const;

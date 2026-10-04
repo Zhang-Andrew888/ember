@@ -22,6 +22,8 @@ export {
   nearestStandoffNodeForBrigade,
   type LineStandoffOptions,
 } from "./containment-standoff.js";
+export { firelineTarget, nearestRoadNodeWithin } from "./firelines.js";
+export type { FirelineRefusal, FirelineTargetResult } from "./firelines.js";
 export { certifyPlan, type CertifyFailure, type CertifyInput, type CertifyResult } from "./certify.js";
 export { planRetreat, planReturn, type ReturnPlan } from "./retreat.js";
 export { makeEnsemble, cellOnEdge, cellsOfEdge, type MemberSpec } from "./testing.js";

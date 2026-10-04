@@ -1,5 +1,6 @@
 import type { CoordinatorAgentPlanView, CoordinatorAgentView } from "@ember/domain";
-import { displayState, type AgentDisplayState } from "./scene/models/markerCues.js";
+import { displayState } from "./scene/models/markerCues.js";
+import { CREW_STATE_LABEL } from "./crewDetails.js";
 
 export interface AgentRailProps {
   readonly agents: CoordinatorAgentView[];
@@ -18,16 +19,6 @@ const ROLE_LABEL: Record<CoordinatorAgentView["role"], string> = {
   scout: "Agent",
 };
 
-const STATE_LABEL: Record<AgentDisplayState, string> = {
-  idle: "Idle",
-  approaching: "Approaching",
-  returning: "Returning",
-  working: "Working",
-  withdrawing: "Withdrawing",
-  retreating: "Retreating",
-  lost: "Lost",
-};
-
 /**
  * Lower scene rail: compact agent cards. Selecting one inspects/follows it
  * in the scene but is kept entirely separate from the conversation's
@@ -35,7 +26,7 @@ const STATE_LABEL: Record<AgentDisplayState, string> = {
  */
 export function AgentRail({ agents, plans = [], selectedAgentId, onSelectAgent }: AgentRailProps) {
   return (
-    <ul className="agent-rail" aria-label="Agents">
+    <ul className="agent-rail" aria-label="Crews: select one to inspect it on the map">
       {agents.map((agent) => (
         <li key={agent.id}>
           <button
@@ -46,7 +37,8 @@ export function AgentRail({ agents, plans = [], selectedAgentId, onSelectAgent }
           >
             <span className="agent-rail__callsign">{agent.callsign}</span>
             <span className="agent-rail__role">{ROLE_LABEL[agent.role]}</span>
-            <span className="agent-rail__state">{STATE_LABEL[displayState(agent.state, plans.find((plan) => plan.agentId === agent.id)?.phase)]}</span>
+            <span className="agent-rail__state">{CREW_STATE_LABEL[displayState(agent.state, plans.find((plan) => plan.agentId === agent.id)?.phase)]}</span>
+            {agent.id === selectedAgentId ? <span className="agent-rail__inspecting">Inspecting</span> : null}
           </button>
         </li>
       ))}

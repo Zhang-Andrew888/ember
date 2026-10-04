@@ -27,6 +27,12 @@ export const SIM_DEFAULTS = {
   containmentWorkRate: 1,
   /** Accumulated work-units to fully restrain spread from a burning cell (deterministic game param). */
   containmentWorkRequired: 45,
+  /** Work-units to clear one fire-line cell to bare ground (15 s for one crew; Phase 0 feasibility runs). */
+  lineWorkPerCell: 15,
+  /** Work-units per second while a crew clears a fire line. */
+  lineWorkRate: 1,
+  /** A crew clears line cells within this distance of the node it works from. */
+  lineReachM: 400,
   baseSpreadRate: 0.5,
   cellBurnMs: 240_000,
   refugeRadiusM: 50,

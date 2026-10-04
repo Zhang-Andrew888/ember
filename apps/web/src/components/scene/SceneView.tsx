@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import type { ReactNode, RefObject } from "react";
 import type { RootState } from "@react-three/fiber";
 import type { Camera } from "three";
@@ -11,7 +11,9 @@ import { sceneTerrain } from "./terrain/sceneTerrain.js";
 import { agentMapLabelMeta, agentMapLabelText, siteMapLabelMeta, siteMapLabelText } from "./mapLabels.js";
 import { humanizeReason, labelledBands, polylineMidpoint } from "./sceneLayers.js";
 import { listRefugeNodes, type FireCellMarker, type SceneEntities } from "./sceneEntities.js";
-import { inspectMapTile, type MapInspectionTarget } from "./tileInspection.js";
+import { fireCellTarget, inspectMapTile, type MapInspectionTarget } from "./tileInspection.js";
+import { SceneErrorBoundary } from "./SceneErrorBoundary.js";
+import { MAP_FAILURE_TEXT, canCreateWebGL, type MapFailure } from "./webglSupport.js";
 import { scenarioMap } from "../../map/activeScenario.js";
 /**
  * Dev-only scene tuning panel. `import.meta.env.DEV` is a build-time
@@ -19,6 +21,9 @@ import { scenarioMap } from "../../map/activeScenario.js";
  * dynamic import and the panel module) is eliminated.
  */
 const DebugPanel = import.meta.env.DEV ? lazy(() => import("./DebugPanel.js")) : null;
+
+/** After this long without a first frame, say so instead of leaving an indefinite loading cover. */
+const SLOW_FIRST_FRAME_MS = 12_000;
 
 export interface SceneViewProps {
   readonly entities: SceneEntities;
@@ -54,6 +59,9 @@ export function SceneView({
 }: SceneViewProps) {
   const [renderContext, setRenderContext] = useState<RenderContext | null>(null);
   const [firstFrameDrawn, setFirstFrameDrawn] = useState(false);
+  const [mapFailure, setMapFailure] = useState<MapFailure | null>(() => (canCreateWebGL() ? null : "unsupported"));
+  const [slowFirstFrame, setSlowFirstFrame] = useState(false);
+  const [canvasAttempt, setCanvasAttempt] = useState(0);
   const [showFireCells, setShowFireCells] = useState(true);
   const [showCurrentFire, setShowCurrentFire] = useState(true);
   const [showRoutes, setShowRoutes] = useState(true);
@@ -61,7 +69,7 @@ export function SceneView({
   const [follow, setFollow] = useState(true);
   const [inspectionTarget, setInspectionTarget] = useState<MapInspectionTarget | null>(null);
   const handleInspectCell = useCallback((cell: FireCellMarker) => {
-    setInspectionTarget({ kind: "fire-cell", cell });
+    setInspectionTarget(fireCellTarget(cell));
   }, []);
   const handleSelectMapTile = useCallback((gridCellIndex: number) => {
     setInspectionTarget({ kind: "terrain", gridCellIndex });
@@ -70,11 +78,33 @@ export function SceneView({
   const legendRef = useRef<HTMLDivElement>(null);
   const compassRef = useRef<HTMLDivElement>(null);
   const cellPanelRef = useRef<HTMLDivElement>(null);
-  const reservedElementRefs = useMemo(() => [legendRef, compassRef, cellPanelRef], []);
+  const dockRef = useRef<HTMLDivElement>(null);
+  const reservedElementRefs = useMemo(() => [legendRef, compassRef, cellPanelRef, dockRef], []);
 
   const handleReady = useCallback((state: RootState) => {
-    setRenderContext({ camera: state.camera, canvasElement: state.gl.domElement });
+    const canvasElement = state.gl.domElement;
+    canvasElement.addEventListener("webglcontextlost", (event) => {
+      // Allows the browser to restore the context; until then the map is reported as stopped.
+      event.preventDefault();
+      setMapFailure("context-lost");
+    });
+    canvasElement.addEventListener("webglcontextrestored", () => setMapFailure(null));
+    setRenderContext({ camera: state.camera, canvasElement });
   }, []);
+
+  useEffect(() => {
+    if (firstFrameDrawn || mapFailure !== null) return;
+    const timer = setTimeout(() => setSlowFirstFrame(true), SLOW_FIRST_FRAME_MS);
+    return () => clearTimeout(timer);
+  }, [firstFrameDrawn, mapFailure, canvasAttempt]);
+
+  const retryMap = () => {
+    setRenderContext(null);
+    setFirstFrameDrawn(false);
+    setSlowFirstFrame(false);
+    setMapFailure(canCreateWebGL() ? null : "unsupported");
+    setCanvasAttempt((attempt) => attempt + 1);
+  };
 
   const entitiesRef = useRef(entities);
   entitiesRef.current = entities;
@@ -109,6 +139,17 @@ export function SceneView({
       text: refuge.label ?? "Refuge",
       variant: "refuge" as const,
     }));
+    // Named junctions are places a fire line can run between, so orders can name them.
+    const junctionLabels = [...scenarioMap.nodes.values()]
+      .filter((node) => node.kind === "junction" && node.label !== undefined)
+      .map((node) => ({
+        id: `junction:${node.id}`,
+        x: node.x,
+        y: sceneTerrain.groundY(node.x, node.z) + 16,
+        z: node.z,
+        text: node.label!,
+        variant: "junction" as const,
+      }));
     const siteLabels = entities.sites.map((site) => {
       // Status and damage are color-coded on the marker too (a ring sized
       // by damage, separate from the body's protection-status color), but
@@ -140,7 +181,7 @@ export function SceneView({
         ...(meta.title === undefined ? {} : { title: meta.title }),
       };
     });
-    const routeLabels = entities.routes.map((line) => {
+    const routeLabels = entities.routes.filter((line) => line.labelled !== false).map((line) => {
       const mid = polylineMidpoint(line.points);
       return {
         id: `route:${line.key}`,
@@ -164,6 +205,7 @@ export function SceneView({
     });
     return [
       ...refugeLabels,
+      ...junctionLabels,
       ...siteLabels,
       ...agentLabels,
       ...(showRoutes ? routeLabels : []),
@@ -173,31 +215,44 @@ export function SceneView({
 
   return (
     <div className={`scene-view${mapAssignMode ? " scene-view--map-assign" : ""}`}>
-      <SceneCanvas
-        ref={controlsRef}
-        entities={entities}
-        showFireCells={showFireCells}
-        showCurrentFire={showCurrentFire}
-        showRoutes={showRoutes}
-        showForecast={showForecast}
-        selectedAgentId={selectedAgentId}
-        followTarget={followTarget}
-        onUserPan={handleUserPan}
-        onInspectAgent={handleInspectAgent}
-        onInspectCell={handleInspectCell}
-        onSelectMapTile={handleSelectMapTile}
-        mapAssignMode={mapAssignMode}
-        mapPreviewFrom={mapPreviewFrom}
-        mapPreviewTo={mapPreviewTo}
-        onMapDestinationPick={onMapDestinationPick}
-        onReady={handleReady}
-        onFirstFrame={() => setFirstFrameDrawn(true)}
-        reducedMotion={reducedMotion}
-      />
-      {mapCommandPanel}
-      {firstFrameDrawn ? null : (
+      {mapFailure === null ? (
+        <SceneErrorBoundary key={canvasAttempt} onError={() => setMapFailure("crashed")}>
+          <SceneCanvas
+            ref={controlsRef}
+            entities={entities}
+            showFireCells={showFireCells}
+            showCurrentFire={showCurrentFire}
+            showRoutes={showRoutes}
+            showForecast={showForecast}
+            selectedAgentId={selectedAgentId}
+            followTarget={followTarget}
+            onUserPan={handleUserPan}
+            onInspectAgent={handleInspectAgent}
+            onInspectCell={handleInspectCell}
+            onSelectMapTile={handleSelectMapTile}
+            mapAssignMode={mapAssignMode}
+            mapPreviewFrom={mapPreviewFrom}
+            mapPreviewTo={mapPreviewTo}
+            onMapDestinationPick={onMapDestinationPick}
+            onReady={handleReady}
+            onFirstFrame={() => setFirstFrameDrawn(true)}
+            reducedMotion={reducedMotion}
+          />
+        </SceneErrorBoundary>
+      ) : null}
+      {mapFailure !== null ? (
+        <MapFailurePanel failure={mapFailure} entities={entities} simTimeMs={simTimeMs} onRetry={retryMap} />
+      ) : firstFrameDrawn ? null : (
         <div className="scene-view__loading" role="status">
-          Preparing the map…
+          <p>Preparing the map…</p>
+          {slowFirstFrame ? (
+            <p className="scene-view__loading-detail">
+              This is taking longer than expected. Crew status and the conversation already work.{" "}
+              <button type="button" onClick={retryMap}>
+                Try the map again
+              </button>
+            </p>
+          ) : null}
         </div>
       )}
       <SceneLabelLayer
@@ -207,6 +262,7 @@ export function SceneView({
         reservedElementRefs={reservedElementRefs}
       />
       {renderContext ? <SceneCompass ref={compassRef} camera={renderContext.camera} /> : null}
+      <div className="scene-view__tools">
       <SceneLegend
         ref={legendRef}
         showFireCells={showFireCells}
@@ -220,6 +276,9 @@ export function SceneView({
         onToggleForecast={() => setShowForecast((value) => !value)}
         forecast={entities.forecast}
         showUnseenKey={entities.fireCells.some((cell) => cell.unseen === true)}
+        firebreakCount={entities.firebreaks.length}
+        clearingCount={entities.clearing.length}
+        plannedLineCount={entities.plannedLine.length}
         onResetCamera={() => {
           setFollow(false);
           controlsRef.current?.reset();
@@ -231,6 +290,12 @@ export function SceneView({
         onInspectCell={handleInspectCell}
         onInspectMapTile={handleSelectMapTile}
       />
+      {mapCommandPanel === null ? null : (
+        <div ref={dockRef} className="scene-view__dock">
+          {mapCommandPanel}
+        </div>
+      )}
+      </div>
       {DebugPanel ? (
         <Suspense fallback={null}>
           <DebugPanel />
@@ -264,11 +329,29 @@ function MapTileInspectionPanel({
   readonly panelRef: RefObject<HTMLDivElement | null>;
 }) {
   const inspection = inspectMapTile(target, entities, simTimeMs);
+  const headingId = useId();
+  const headingRef = useRef<HTMLHeadingElement>(null);
+
+  // Opened from a keyboard control: move focus into the panel, and back to that control on close.
+  useEffect(() => {
+    const opener = document.activeElement;
+    const fromControl = opener instanceof HTMLElement && opener !== document.body && opener.tagName !== "CANVAS";
+    if (fromControl) headingRef.current?.focus();
+    return () => {
+      if (fromControl && opener.isConnected && (document.activeElement === document.body || document.activeElement === null)) {
+        opener.focus();
+      }
+    };
+  }, []);
+
   return (
-    <div ref={panelRef} className="cell-inspection-panel" role="status">
-      <button type="button" className="cell-inspection-panel__close" onClick={onClose} aria-label="Close">
+    <section ref={panelRef} className="cell-inspection-panel" aria-labelledby={headingId}>
+      <button type="button" className="cell-inspection-panel__close" onClick={onClose} aria-label="Close map tile inspection">
         ×
       </button>
+      <h2 id={headingId} ref={headingRef} tabIndex={-1} className="cell-inspection-panel__title">
+        Map tile
+      </h2>
       <dl>
         <dt>Cell</dt>
         <dd>
@@ -287,6 +370,47 @@ function MapTileInspectionPanel({
           </>
         )}
       </dl>
+    </section>
+  );
+}
+
+/** Replaces the canvas when it cannot render; the DOM keeps sites and crews readable. */
+function MapFailurePanel({
+  failure,
+  entities,
+  simTimeMs,
+  onRetry,
+}: {
+  readonly failure: MapFailure;
+  readonly entities: SceneEntities;
+  readonly simTimeMs: number | null;
+  readonly onRetry: () => void;
+}) {
+  return (
+    <div className="scene-view__failure" role="alert">
+      <p className="scene-view__failure-title">{MAP_FAILURE_TEXT[failure]}</p>
+      <p>
+        The crew rail, urgent reports and the conversation keep working, so you can still coordinate by text.
+        {failure === "unsupported" ? " Turn on hardware acceleration or use another browser to see the map." : null}
+      </p>
+      {failure === "unsupported" ? null : (
+        <button type="button" onClick={onRetry}>
+          Try the map again
+        </button>
+      )}
+      {entities.sites.length > 0 ? (
+        <>
+          <h2 className="scene-view__failure-heading">Sites as last reported</h2>
+          <ul>
+            {entities.sites.map((site) => (
+              <li key={site.id}>
+                {siteMapLabelText(site)}
+                {siteMapLabelMeta(site, simTimeMs).stale ? " (stale)" : ""}
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : null}
     </div>
   );
 }

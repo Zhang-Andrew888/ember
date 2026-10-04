@@ -16,7 +16,7 @@ export interface LabelDescriptor {
   readonly y: number;
   readonly z: number;
   readonly text: string;
-  readonly variant: "agent" | "site" | "refuge" | "route" | "forecast";
+  readonly variant: "agent" | "site" | "refuge" | "junction" | "route" | "forecast";
   /** Old information: dashed, dimmed label; exact age belongs in `title` / inspection. */
   readonly stale?: boolean;
   readonly title?: string;

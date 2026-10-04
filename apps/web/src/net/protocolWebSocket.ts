@@ -2,7 +2,8 @@ import type { WebSocketLike } from "./CoordinatorViewClient.js";
 import { encodeClient, type OutboundClientMessage } from "./wireProtocol.js";
 
 export interface ProtocolWebSocket extends WebSocketLike {
-  sendCommand(message: OutboundClientMessage): void;
+  /** False when the socket was not open and the frame was dropped. */
+  sendCommand(message: OutboundClientMessage): boolean;
 }
 
 /** Live WebSocket that wraps outbound frames in protocol v1 client envelopes. */
@@ -16,9 +17,9 @@ export function createProtocolWebSocket(url: string): ProtocolWebSocket {
       ws.close();
     },
     sendCommand(message: OutboundClientMessage) {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(encodeClient(message));
-      }
+      if (ws.readyState !== WebSocket.OPEN) return false;
+      ws.send(encodeClient(message));
+      return true;
     },
   } as ProtocolWebSocket;
 

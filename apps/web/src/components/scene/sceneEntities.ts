@@ -74,6 +74,19 @@ export interface CurrentFireLayer {
   readonly burnedCount: number;
 }
 
+/** A firebreak cell: ground cleared of fuel, which the fire cannot cross. Public map knowledge. */
+export interface FirebreakMarker {
+  readonly key: string;
+  readonly gridCellIndex: number;
+  readonly position: SceneVector;
+}
+
+/** A cell partly cleared toward a firebreak; fire spreads into it more slowly. */
+export interface ClearingMarker extends FirebreakMarker {
+  /** Fraction of fuel cleared, strictly between 0 and 1. */
+  readonly clearance: number;
+}
+
 export interface SceneEntities {
   readonly agents: AgentMarker[];
   readonly sites: SiteMarker[];
@@ -81,6 +94,12 @@ export interface SceneEntities {
   readonly fireCells: FireCellMarker[];
   /** Live current fire; null when the view carries none (older sender, mock, fixture): nothing is invented. */
   readonly currentFire: CurrentFireLayer | null;
+  /** Firebreak cells from the view; empty when the view carries none. */
+  readonly firebreaks: FirebreakMarker[];
+  /** Cells being cleared (partial clearance). */
+  readonly clearing: ClearingMarker[];
+  /** Fire-line cells crews were sent to clear that have not been started yet. */
+  readonly plannedLine: FirebreakMarker[];
   /** Reportable plans (route emphasis); selection is applied at render time. */
   readonly routes: RouteLine[];
   /** Coordinator forecast envelope; null before the first build. */
@@ -126,11 +145,39 @@ export function buildSceneEntities(
     map,
   );
 
+  const firebreaks = (view.firebreakCells ?? []).map((gridCellIndex) => ({
+    key: `firebreak-${gridCellIndex}`,
+    gridCellIndex,
+    position: resolveGridCellPosition(map, gridCellIndex),
+  }));
+  const clearing = (view.clearingCells ?? []).map(({ gridCellIndex, clearance }) => ({
+    key: `clearing-${gridCellIndex}`,
+    gridCellIndex,
+    position: resolveGridCellPosition(map, gridCellIndex),
+    clearance,
+  }));
+  const started = new Set([...(view.firebreakCells ?? []), ...clearing.map((cell) => cell.gridCellIndex)]);
+  // Planned = ordered but not started. A resolved line has no unburned cell left, so whatever it
+  // did not clear was taken by the fire and is not work still to do.
+  const planned = new Set<number>();
+  for (const line of view.firelines ?? []) {
+    if (line.resolved) continue;
+    for (const cell of line.cells) if (!started.has(cell)) planned.add(cell);
+  }
+  const plannedLine = [...planned].sort((a, b) => a - b).map((gridCellIndex) => ({
+    key: `planned-${gridCellIndex}`,
+    gridCellIndex,
+    position: resolveGridCellPosition(map, gridCellIndex),
+  }));
+
   return {
     agents,
     sites,
     fireCells,
     currentFire,
+    firebreaks,
+    clearing,
+    plannedLine,
     routes: buildRouteLines(view, map, null),
     forecast: buildForecastLayer(view, map),
   };

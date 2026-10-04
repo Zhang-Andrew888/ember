@@ -1,4 +1,4 @@
-import type { AgentId, AgentPosition, EdgeId, MissionPlan, NodeId, SiteId, TimedLeg } from "@ember/domain";
+import type { AgentId, AgentPosition, EdgeId, MapPoint, MissionPlan, NodeId, SiteId, TimedLeg } from "@ember/domain";
 import type { ForecastEnsemble } from "@ember/forecast";
 import type { RoadIndex } from "@ember/simulation/model";
 
@@ -52,11 +52,13 @@ export interface SiteKnowledge {
 /** One candidate destination for a mission. */
 export interface MissionTarget {
   readonly id: string;
-  readonly kind: "protect" | "observe" | "contain";
+  readonly kind: "protect" | "observe" | "contain" | "line";
   readonly nodeId: NodeId;
   readonly siteId: SiteId | null;
   /** Set when `kind === "contain"`. */
   readonly gridCellIndex?: number;
+  /** Set when `kind === "line"`: the crew works from `workNodeId` (the target node) from `start` toward `end`. */
+  readonly line?: { readonly workNodeId: NodeId; readonly start: MapPoint; readonly end: MapPoint };
   readonly value: number;
   /** Candidate work/dwell durations in ms, ascending. */
   readonly workOptionsMs: readonly number[];

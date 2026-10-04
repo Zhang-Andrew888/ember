@@ -603,6 +603,12 @@ describe("replies from committed outcomes", () => {
     expect(replyForDecision("Crew 2", decision("mission_start", "mission_admitted", "heading to Waterworks")).text).toBe("Crew 2 is heading to Waterworks.");
   });
 
+  it("refuses a fire line end with no road in reach by suggesting the other end, not a safety margin", () => {
+    const d = decision("objective_rejected", "no_road_near_line_end");
+    expect(replyForDecision("Crew 2", d).text).toBe("Crew 2 cannot cut line from that end: no road reaches it. Try the other end.");
+    expect(replyForDecision("Crew 2", d, "radio").text).toBe("Crew 2, cannot comply. No road reaches that end. Try the other end.");
+  });
+
   it("narrates a loss as control, never as an utterance by the lost crew", () => {
     expect(lossNarration("Crew 3")).toEqual({ text: "Control: Crew 3 has been lost.", tier: 1 });
   });

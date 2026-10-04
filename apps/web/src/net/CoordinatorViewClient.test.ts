@@ -76,7 +76,7 @@ describe("net/CoordinatorViewClient - createCoordinatorViewClient", () => {
     expect(client.getState()).toEqual({
       status: "connecting",
       view: null,
-      sideband: { transcripts: [], receipts: [], audioCues: [] },
+      sideband: { transcripts: [], receipts: [], audioCues: [], notices: [], reports: [] },
     });
     client.close();
   });
@@ -122,6 +122,57 @@ describe("net/CoordinatorViewClient - createCoordinatorViewClient", () => {
       }),
     );
     expect(client.getState().sideband.receipts).toHaveLength(1);
+    client.close();
+  });
+
+  it("stamps a receipt with the incident time of the latest view when it arrived", () => {
+    const sockets: FakeSocket[] = [];
+    const client = createCoordinatorViewClient(() => {
+      const s = new FakeSocket();
+      sockets.push(s);
+      return s;
+    });
+    sockets[0]!.emitOpen();
+    sockets[0]!.emitMessage(JSON.stringify(fixtureCoordinatorView));
+    sockets[0]!.emitMessage(
+      JSON.stringify({
+        protocolVersion: 1,
+        message: {
+          type: "receipt",
+          receipt: {
+            commandId: "cmd-1",
+            status: "received",
+            recipientId: null,
+            appliedTick: null,
+            explanation: "",
+            planRevision: null,
+          },
+          reply: "Received.",
+        },
+      }),
+    );
+    sockets[0]!.emitMessage(
+      JSON.stringify({ ...fixtureCoordinatorView, sequence: fixtureCoordinatorView.sequence + 1, simTimeMs: fixtureCoordinatorView.simTimeMs + 30_000 }),
+    );
+    expect(client.getState().sideband.receipts[0]?.arrivalSimTimeMs).toBe(fixtureCoordinatorView.simTimeMs);
+    client.close();
+  });
+
+  it("retains reports from every view it receives", () => {
+    const sockets: FakeSocket[] = [];
+    const client = createCoordinatorViewClient(() => {
+      const s = new FakeSocket();
+      sockets.push(s);
+      return s;
+    });
+    sockets[0]!.emitOpen();
+    sockets[0]!.emitMessage(JSON.stringify(fixtureCoordinatorView));
+    const before = client.getState().sideband.reports.length;
+    sockets[0]!.emitMessage(
+      JSON.stringify({ ...fixtureCoordinatorView, sequence: fixtureCoordinatorView.sequence + 1, recentReports: [] }),
+    );
+    expect(before).toBe(fixtureCoordinatorView.recentReports.length);
+    expect(client.getState().sideband.reports).toHaveLength(before);
     client.close();
   });
 

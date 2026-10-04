@@ -1,6 +1,7 @@
 import type { CoordinatorView } from "@ember/domain";
 import type { ScenarioMap } from "../../map/scenarioMap.js";
 import { resolveEdgePolyline, type SceneVector } from "../../map/positions.js";
+import { worldToScene } from "../../map/worldScale.js";
 import { limitingReasonDisplayText } from "../../format/limitingReason.js";
 import { formatIncidentClock } from "../../format/time.js";
 
@@ -23,6 +24,8 @@ export interface RouteLine {
   /** Plain-text description, also used for the label so phase never depends on line style alone. */
   readonly label: string;
   readonly limitingReason: string | null;
+  /** False for the extra pieces of a plan whose route does not form one continuous line. */
+  readonly labelled?: boolean;
 }
 
 const PHASE_WORD: Record<RoutePhase, string> = {
@@ -31,10 +34,74 @@ const PHASE_WORD: Record<RoutePhase, string> = {
   return: "returning",
 };
 
+/** Scene units within which two path ends count as the same place. */
+const JOIN_TOLERANCE = 1;
+
+function samePlace(a: SceneVector, b: SceneVector): boolean {
+  return Math.hypot(a.x - b.x, a.z - b.z) <= JOIN_TOLERANCE;
+}
+
+function appendPoints(points: SceneVector[], next: readonly SceneVector[]): void {
+  for (const point of next) {
+    const last = points[points.length - 1];
+    if (!last || last.x !== point.x || last.z !== point.z) points.push(point);
+  }
+}
+
 /**
- * One RouteLine per reportable plan. Legs are concatenated into a single
- * polyline; a leg whose edge is unknown to the map is skipped (never drawn
- * at a fallback position).
+ * Joins path pieces whose ends meet into continuous polylines. Pieces that do not meet stay
+ * separate, so no connection is ever drawn that the plan does not report.
+ */
+function joinPieces(pieces: readonly SceneVector[][]): SceneVector[][] {
+  const joined: SceneVector[][] = [];
+  for (const piece of pieces) {
+    if (piece.length < 2) continue;
+    const before = joined.find((line) => samePlace(line[line.length - 1]!, piece[0]!));
+    if (before !== undefined) {
+      appendPoints(before, piece.slice(1));
+      continue;
+    }
+    const after = joined.find((line) => samePlace(piece[piece.length - 1]!, line[0]!));
+    if (after !== undefined) {
+      after.splice(0, 1, ...piece);
+      continue;
+    }
+    joined.push([...piece]);
+  }
+  return joined;
+}
+
+/** Road legs in travel order, then off-road legs in departure order, each as scene polylines. */
+function planPieces(plan: CoordinatorView["agentPlans"][number], map: ScenarioMap): SceneVector[][] {
+  const road: SceneVector[] = [];
+  for (const leg of plan.legs) {
+    const polyline = resolveEdgePolyline(map, leg.edgeId, leg.direction);
+    if (!polyline) continue;
+    appendPoints(road, polyline);
+  }
+  const offroad = [...(plan.offroadLegs ?? [])]
+    .sort((a, b) => a.departMs - b.departMs)
+    .map((leg) => [worldToScene(leg.start.x, leg.start.y, map.worldMeters), worldToScene(leg.end.x, leg.end.y, map.worldMeters)]);
+  return [road, ...offroad];
+}
+
+function workSuffix(plan: CoordinatorView["agentPlans"][number]): string {
+  switch (plan.work?.kind) {
+    case undefined:
+      return "";
+    case "suppress_fire":
+      return " (fire suppression)";
+    case "build_line":
+      return " (fire line construction)";
+    case "protect_structure":
+      return " (structure protection)";
+  }
+}
+
+/**
+ * RouteLines per reportable plan. Road legs and off-road legs are joined where their ends meet;
+ * a leg whose edge is unknown to the map is skipped (never drawn at a fallback position). Only
+ * the first line of a plan is labelled, so a split route still reads as one plan.
  */
 export function buildRouteLines(
   view: CoordinatorView,
@@ -43,27 +110,22 @@ export function buildRouteLines(
 ): RouteLine[] {
   const lines: RouteLine[] = [];
   for (const plan of view.agentPlans) {
-    const points: SceneVector[] = [];
-    for (const leg of plan.legs) {
-      const polyline = resolveEdgePolyline(map, leg.edgeId, leg.direction);
-      if (!polyline) continue;
-      for (const point of polyline) {
-        const last = points[points.length - 1];
-        if (!last || last.x !== point.x || last.z !== point.z) points.push(point);
-      }
-    }
-    if (points.length < 2) continue;
+    const paths = joinPieces(planPieces(plan, map));
+    if (paths.length === 0) continue;
     const agent = view.agents.find((candidate) => candidate.id === plan.agentId);
     const callsign = agent?.callsign ?? plan.agentId;
-    lines.push({
-      key: `route-${plan.planId}`,
-      agentId: plan.agentId,
-      callsign,
-      phase: plan.phase,
-      points,
-      selected: plan.agentId === selectedAgentId,
-      label: `${callsign} ${PHASE_WORD[plan.phase]}`,
-      limitingReason: plan.limitingReason,
+    paths.forEach((points, index) => {
+      lines.push({
+        key: index === 0 ? `route-${plan.planId}` : `route-${plan.planId}-${index}`,
+        agentId: plan.agentId,
+        callsign,
+        phase: plan.phase,
+        points,
+        selected: plan.agentId === selectedAgentId,
+        label: `${callsign} ${PHASE_WORD[plan.phase]}${workSuffix(plan)}`,
+        limitingReason: plan.limitingReason,
+        labelled: index === 0,
+      });
     });
   }
   return lines;

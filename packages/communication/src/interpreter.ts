@@ -1,6 +1,7 @@
 import type { Directory, IntentEnvelope } from "./intent.js";
 import { IntentEnvelope as IntentSchema } from "./intent.js";
 import { CompassDirection, type CompassDirection as CompassDirectionT } from "@ember/domain";
+import { parseLineOrder, type LineOrder } from "./line-order.js";
 
 export interface InterpretationRequest {
   readonly commandId: string;
@@ -59,6 +60,7 @@ export class ScriptedInterpreter implements Interpreter {
       }
     }
     const names = [...callsigns];
+    if (LINE_ORDER.test(lower)) return IntentSchema.parse(lineEnvelope(req, parseLineOrder(text, req.directory)));
     const envelope: IntentEnvelope = {
       commandId: req.commandId,
       inputSequence: req.inputSequence,
@@ -123,6 +125,26 @@ export class ScriptedInterpreter implements Interpreter {
     }
     return IntentSchema.parse(envelope);
   }
+}
+
+const LINE_ORDER = /\b(?:cut|build|dig|clear|construct|make|work)\b[^.]*\b(?:fire\s?line|line|fire\s?break|break)\b|\bfire\s?(?:line|break)\b/;
+function lineEnvelope(req: InterpretationRequest, line: LineOrder): IntentEnvelope {
+  const envelope: IntentEnvelope = {
+    commandId: req.commandId,
+    inputSequence: req.inputSequence,
+    kind: "objective",
+    evidenceQueries: [],
+    unsupportedClaims: [],
+    objective: {
+      kind: "line",
+      ...(line.anchor === undefined ? {} : { anchor: line.anchor }),
+      ...(line.course === undefined ? {} : { course: line.course }),
+      ...(line.crews === undefined ? {} : { crews: [...line.crews] }),
+    },
+  };
+  if (line.recipient !== undefined) envelope.explicitRecipient = line.recipient;
+  if (line.clarification !== undefined) envelope.clarification = line.clarification;
+  return envelope;
 }
 
 function tokensOverlap(lower: string, name: string): boolean {

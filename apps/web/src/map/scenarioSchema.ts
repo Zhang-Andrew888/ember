@@ -28,7 +28,7 @@ export const ScenarioFile = z
   .object({
     version: z.string().min(1),
     map: z.object({
-      nodes: z.array(z.object({ id: NodeId, x: z.number().finite(), y: z.number().finite() })).min(2),
+      nodes: z.array(z.object({ id: NodeId, x: z.number().finite(), y: z.number().finite(), name: z.string().min(1).optional() })).min(2),
       edges: z
         .array(
           z.object({

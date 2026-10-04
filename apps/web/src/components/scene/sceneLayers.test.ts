@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { CoordinatorView } from "@ember/domain";
+import { CoordinatorView, NodeId } from "@ember/domain";
 import { fixtureCoordinatorView } from "../../../../../tests/fixtures/coordinator-view.fixture.js";
 import { adaptToScenarioIds } from "../../net/mockBase.js";
 import { scenarioMap } from "../../map/activeScenario.js";
+import { SCENE_SIZE, worldToScene } from "../../map/worldScale.js";
 import { type ForecastBand, bandWidthForSpread, buildForecastLayer, buildRouteLines, humanizeReason, labelledBands, MAX_FORECAST_LABELS } from "./sceneLayers.js";
 
 const view = CoordinatorView.parse(adaptToScenarioIds(fixtureCoordinatorView));
@@ -45,6 +46,78 @@ describe("buildRouteLines", () => {
 
   it("returns nothing when there are no plans", () => {
     expect(buildRouteLines({ ...view, agentPlans: [] }, scenarioMap, null)).toEqual([]);
+  });
+
+  describe("off-road legs", () => {
+    const worldMeters = scenarioMap.worldMeters;
+    const scale = SCENE_SIZE / worldMeters;
+    const toWorld = (point: { x: number; z: number }) => ({ x: point.x / scale + worldMeters / 2, y: point.z / scale + worldMeters / 2 });
+    const offroad = (start: { x: number; y: number }, end: { x: number; y: number }, departMs: number) => ({
+      kind: "offroad" as const,
+      start,
+      end,
+      departMs: departMs as never,
+      arriveMs: (departMs + 10_000) as never,
+      speedFactor: 0.5 as const,
+    });
+
+    it("draws an off-road-only plan instead of dropping it", () => {
+      const plan = view.agentPlans[0]!;
+      const lines = buildRouteLines(
+        { ...view, agentPlans: [{ ...plan, legs: [], offroadLegs: [offroad({ x: 100, y: 100 }, { x: 300, y: 100 }, 0)] }] },
+        scenarioMap,
+        null,
+      );
+      expect(lines).toHaveLength(1);
+      expect(lines[0]?.points).toEqual([worldToScene(100, 100, worldMeters), worldToScene(300, 100, worldMeters)]);
+    });
+
+    it("joins an off-road leg that starts where the road route ends, in departure order", () => {
+      const plan = view.agentPlans[0]!;
+      const [road] = buildRouteLines(view, scenarioMap, null);
+      const roadEnd = toWorld(road!.points[road!.points.length - 1]!);
+      const mid = { x: roadEnd.x + 50, y: roadEnd.y };
+      const far = { x: roadEnd.x + 50, y: roadEnd.y + 80 };
+      const lines = buildRouteLines(
+        { ...view, agentPlans: [{ ...plan, offroadLegs: [offroad(mid, far, 20_000), offroad(roadEnd, mid, 10_000)] }] },
+        scenarioMap,
+        null,
+      );
+      expect(lines).toHaveLength(1);
+      expect(lines[0]?.points).toHaveLength(road!.points.length + 2);
+      const last = lines[0]!.points[lines[0]!.points.length - 1]!;
+      expect(last.x).toBeCloseTo(worldToScene(far.x, far.y, worldMeters).x);
+      expect(last.z).toBeCloseTo(worldToScene(far.x, far.y, worldMeters).z);
+    });
+
+    it("keeps a disconnected off-road leg separate and unlabelled rather than inventing a connection", () => {
+      const plan = view.agentPlans[0]!;
+      const lines = buildRouteLines(
+        { ...view, agentPlans: [{ ...plan, offroadLegs: [offroad({ x: 1500, y: 1500 }, { x: 1550, y: 1500 }, 0)] }] },
+        scenarioMap,
+        null,
+      );
+      expect(lines).toHaveLength(2);
+      expect(lines[0]?.labelled).toBe(true);
+      expect(lines[1]?.labelled).toBe(false);
+      expect(new Set(lines.map((line) => line.key)).size).toBe(2);
+    });
+
+    it("names the work type in the label when the plan reports it", () => {
+      const plan = view.agentPlans[0]!;
+      const suppress = buildRouteLines(
+        { ...view, agentPlans: [{ ...plan, work: { kind: "suppress_fire", gridCellIndex: 42 } }] },
+        scenarioMap,
+        null,
+      );
+      expect(suppress[0]?.label).toBe("Crew 1 approaching (fire suppression)");
+      const line = buildRouteLines(
+        { ...view, agentPlans: [{ ...plan, work: { kind: "build_line", workNodeId: NodeId.parse("n-h"), start: { x: 800, y: 800 }, end: { x: 800, y: 1300 } } }] },
+        scenarioMap,
+        null,
+      );
+      expect(line[0]?.label).toBe("Crew 1 approaching (fire line construction)");
+    });
   });
 });
 
