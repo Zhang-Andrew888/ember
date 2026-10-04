@@ -28,6 +28,9 @@ function legend(overrides: Partial<SceneLegendProps> = {}): string {
     createElement(SceneLegend, {
       showFireCells: true,
       onToggleFireCells: noop,
+      showCurrentFire: true,
+      onToggleCurrentFire: noop,
+      currentFire: null,
       showRoutes: true,
       onToggleRoutes: noop,
       showForecast: true,
@@ -39,6 +42,7 @@ function legend(overrides: Partial<SceneLegendProps> = {}): string {
       onResetCamera: noop,
       fireCells: [],
       onInspectCell: noop,
+      onInspectMapTile: noop,
       ...overrides,
     }),
   );
@@ -83,5 +87,12 @@ describe("issue #122 - legend separates forecast from actual fire", () => {
     const html = legend({ forecast: null });
     expect(html).toContain('data-reliability="none"');
     expect(html).toContain("Forecast: not yet built");
+  });
+
+  it("offers an accessible map tile inspector (#125)", () => {
+    const html = legend();
+    expect(html).toContain("Inspect map tile");
+    expect(html).toContain("Inspect tile");
+    expect(html).toContain("Grid index");
   });
 });

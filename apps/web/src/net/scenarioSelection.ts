@@ -6,6 +6,7 @@ import {
   modelStatesScenario,
   staleLaterScenario,
   runEndedScenarios,
+  currentFireScenarios,
 } from "./scenarios.js";
 import { fixtureCoordinatorView } from "../../../../tests/fixtures/coordinator-view.fixture.js";
 
@@ -24,6 +25,7 @@ export const SCENARIO_NAMES = [
   "ended-all-crews-lost",
   "connection-error",
   "disconnect",
+  "current-fire",
 ] as const;
 
 export type ScenarioName = (typeof SCENARIO_NAMES)[number];
@@ -73,5 +75,7 @@ export function resolveScenario(search: string): MockIncidentSocketOptions | nul
       return { failToOpen: true };
     case "disconnect":
       return { disconnectAfterMs: 3000 };
+    case "current-fire":
+      return { snapshots: currentFireScenarios, intervalMs: 4000 };
   }
 }

@@ -9,9 +9,9 @@ import { SceneCompass } from "./SceneCompass.js";
 import type { CameraControlsHandle } from "./CameraControls.js";
 import { sceneTerrain } from "./terrain/sceneTerrain.js";
 import { agentMapLabelMeta, agentMapLabelText, siteMapLabelMeta, siteMapLabelText } from "./mapLabels.js";
-import { formatObservationInspection } from "./staleness.js";
 import { humanizeReason, labelledBands, polylineMidpoint } from "./sceneLayers.js";
 import { listRefugeNodes, type FireCellMarker, type SceneEntities } from "./sceneEntities.js";
+import { inspectMapTile, type MapInspectionTarget } from "./tileInspection.js";
 import { scenarioMap } from "../../map/activeScenario.js";
 /**
  * Dev-only scene tuning panel. `import.meta.env.DEV` is a build-time
@@ -55,10 +55,17 @@ export function SceneView({
   const [renderContext, setRenderContext] = useState<RenderContext | null>(null);
   const [firstFrameDrawn, setFirstFrameDrawn] = useState(false);
   const [showFireCells, setShowFireCells] = useState(true);
+  const [showCurrentFire, setShowCurrentFire] = useState(true);
   const [showRoutes, setShowRoutes] = useState(true);
   const [showForecast, setShowForecast] = useState(true);
   const [follow, setFollow] = useState(true);
-  const [inspectedCell, setInspectedCell] = useState<FireCellMarker | null>(null);
+  const [inspectionTarget, setInspectionTarget] = useState<MapInspectionTarget | null>(null);
+  const handleInspectCell = useCallback((cell: FireCellMarker) => {
+    setInspectionTarget({ kind: "fire-cell", cell });
+  }, []);
+  const handleSelectMapTile = useCallback((gridCellIndex: number) => {
+    setInspectionTarget({ kind: "terrain", gridCellIndex });
+  }, []);
   const controlsRef = useRef<CameraControlsHandle>(null);
   const legendRef = useRef<HTMLDivElement>(null);
   const compassRef = useRef<HTMLDivElement>(null);
@@ -170,13 +177,15 @@ export function SceneView({
         ref={controlsRef}
         entities={entities}
         showFireCells={showFireCells}
+        showCurrentFire={showCurrentFire}
         showRoutes={showRoutes}
         showForecast={showForecast}
         selectedAgentId={selectedAgentId}
         followTarget={followTarget}
         onUserPan={handleUserPan}
         onInspectAgent={handleInspectAgent}
-        onInspectCell={setInspectedCell}
+        onInspectCell={handleInspectCell}
+        onSelectMapTile={handleSelectMapTile}
         mapAssignMode={mapAssignMode}
         mapPreviewFrom={mapPreviewFrom}
         mapPreviewTo={mapPreviewTo}
@@ -202,6 +211,9 @@ export function SceneView({
         ref={legendRef}
         showFireCells={showFireCells}
         onToggleFireCells={() => setShowFireCells((value) => !value)}
+        showCurrentFire={showCurrentFire}
+        onToggleCurrentFire={() => setShowCurrentFire((value) => !value)}
+        currentFire={entities.currentFire}
         showRoutes={showRoutes}
         onToggleRoutes={() => setShowRoutes((value) => !value)}
         showForecast={showForecast}
@@ -216,67 +228,62 @@ export function SceneView({
         follow={follow}
         onToggleFollow={() => setFollow((value) => !value)}
         fireCells={entities.fireCells}
-        onInspectCell={setInspectedCell}
+        onInspectCell={handleInspectCell}
+        onInspectMapTile={handleSelectMapTile}
       />
       {DebugPanel ? (
         <Suspense fallback={null}>
           <DebugPanel />
         </Suspense>
       ) : null}
-      {inspectedCell ? (
-        <CellInspectionPanel
+      {inspectionTarget ? (
+        <MapTileInspectionPanel
           panelRef={cellPanelRef}
-          cell={inspectedCell}
+          target={inspectionTarget}
+          entities={entities}
           simTimeMs={simTimeMs}
-          onClose={() => setInspectedCell(null)}
+          onClose={() => setInspectionTarget(null)}
         />
       ) : null}
     </div>
   );
 }
 
-/**
- * "Observed burned/active cells, with timestamps in inspection"
- * (docs/FRONTEND.md scene layer 3) - clicking a fire cell shows when it was
- * last observed, not just its current color.
- */
-function CellInspectionPanel({
-  cell,
+/** Coordinator-authorized tile inspection (#125); fire beds and bare terrain share this panel. */
+function MapTileInspectionPanel({
+  target,
+  entities,
   simTimeMs,
   onClose,
   panelRef,
 }: {
-  readonly cell: FireCellMarker;
+  readonly target: MapInspectionTarget;
+  readonly entities: SceneEntities;
   readonly simTimeMs: number | null;
   readonly onClose: () => void;
   readonly panelRef: RefObject<HTMLDivElement | null>;
 }) {
-  const inspection =
-    simTimeMs === null || cell.unseen
-      ? null
-      : formatObservationInspection(cell.lastObservedAt, simTimeMs, cell.stale);
+  const inspection = inspectMapTile(target, entities, simTimeMs);
   return (
     <div ref={panelRef} className="cell-inspection-panel" role="status">
       <button type="button" className="cell-inspection-panel__close" onClick={onClose} aria-label="Close">
         ×
       </button>
       <dl>
-        <dt>Edge</dt>
+        <dt>Cell</dt>
         <dd>
-          Grid cell {cell.gridCellIndex}
+          Grid cell {inspection.gridCellIndex} (row {inspection.row}, column {inspection.column})
         </dd>
+        <dt>Location</dt>
+        <dd>{inspection.location}</dd>
+        <dt>Source</dt>
+        <dd>{inspection.source}</dd>
         <dt>State</dt>
-        <dd>{cell.burnState}</dd>
-        {cell.unseen ? (
+        <dd>{inspection.state}</dd>
+        {inspection.time === null ? null : (
           <>
-            <dt>Observation</dt>
-            <dd>This state was not observed by the coordinator (full simulated fire, replay only)</dd>
-          </>
-        ) : null}
-        {inspection === null ? null : (
-          <>
-            <dt>Last observed</dt>
-            <dd>{inspection}</dd>
+            <dt>{inspection.timeHeading}</dt>
+            <dd>{inspection.time}</dd>
           </>
         )}
       </dl>

@@ -7,6 +7,7 @@
   --color-refuge: #70d6d1;
   --color-rejected: #c1443b;
   --color-stale: #5b6a6d;
+  --color-observed-belief: #cfe3e0;
   /*
    * WCAG 1.4.11 (non-text contrast) needs >=3:1 against adjacent
    * backgrounds for a border that's the only way to see a control's
@@ -389,10 +390,47 @@ input {
   gap: 0.4rem;
 }
 
+.scene-legend__tile-pick,
 .scene-legend__cells {
   border-top: 1px solid var(--color-border);
   padding-top: 0.4rem;
   max-width: 320px;
+}
+
+.scene-legend__tile-pick summary,
+.scene-legend__tile-hint {
+  font-size: 0.75rem;
+  margin: 0.35rem 0;
+  color: var(--color-text-muted);
+}
+
+.scene-legend__tile-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.35rem 0.5rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.75rem;
+}
+
+.scene-legend__tile-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.scene-legend__tile-form input {
+  width: 4.5rem;
+  padding: 0.2rem 0.35rem;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: var(--color-background);
+  color: var(--color-text);
+}
+
+.scene-legend__tile-form button {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
 }
 
 .scene-legend__cells summary {
@@ -977,6 +1015,22 @@ input {
 .scene-legend__swatch--unseen {
   background: transparent;
   outline: 2px dashed #b79cff;
+}
+
+.scene-legend__swatch--burned {
+  background: #1c1714;
+  outline: 1px solid var(--color-border);
+}
+
+.scene-legend__swatch--belief {
+  background: transparent;
+  outline: 2px solid var(--color-observed-belief);
+}
+
+.scene-legend__currentfire {
+  margin: 0;
+  font-size: 0.8rem;
+  max-width: 320px;
 }
 
 .replay-banner__toggle {

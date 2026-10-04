@@ -3,7 +3,7 @@ import { buildEmberParticles, buildFlameInstances } from "./flameInstances.js";
 import type { FireCellMarker } from "../sceneEntities.js";
 
 function cell(index: number, burnState: FireCellMarker["burnState"], stale = false): FireCellMarker {
-  return { key: `c${index}`, gridCellIndex: index, position: { x: index, z: -index }, burnState, stale, lastObservedAt: 0, ageMs: stale ? 90_000 : 0 };
+  return { key: `c${index}`, gridCellIndex: index, position: { x: index, z: -index }, burnState, stale, source: "observed", lastObservedAt: 0, ageMs: stale ? 90_000 : 0 };
 }
 
 describe("buildFlameInstances", () => {

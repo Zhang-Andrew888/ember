@@ -1,12 +1,20 @@
-import { forwardRef, useState } from "react";
+import { forwardRef, useId, useState } from "react";
 import { colors } from "../../styles/colors.js";
 import type { ForecastLayer } from "./sceneLayers.js";
 import { scenarioMap } from "../../map/activeScenario.js";
-import type { FireCellMarker } from "./sceneEntities.js";
+import type { CurrentFireLayer, FireCellMarker } from "./sceneEntities.js";
+import { formatIncidentClock } from "../../format/time.js";
+import { GRID_SIZE } from "../../map/positions.js";
+import { gridCellIndexFromRowColumn, isValidGridCellIndex } from "./tileInspection.js";
 
 export interface SceneLegendProps {
   readonly showFireCells: boolean;
   readonly onToggleFireCells: () => void;
+  /** Live current-fire layer on/off. Only offered when the feed carries one (`currentFire` not null). */
+  readonly showCurrentFire: boolean;
+  readonly onToggleCurrentFire: () => void;
+  /** Summary of the live current fire; null when the view has none. */
+  readonly currentFire: Pick<CurrentFireLayer, "simTimeMs" | "burningCount" | "burnedCount"> | null;
   readonly showRoutes: boolean;
   readonly onToggleRoutes: () => void;
   readonly showForecast: boolean;
@@ -20,6 +28,7 @@ export interface SceneLegendProps {
   readonly onResetCamera: () => void;
   readonly fireCells: FireCellMarker[];
   readonly onInspectCell: (cell: FireCellMarker) => void;
+  readonly onInspectMapTile: (gridCellIndex: number) => void;
 }
 
 /**
@@ -30,12 +39,48 @@ export interface SceneLegendProps {
  * scene labels from rendering underneath it.
  */
 export const SceneLegend = forwardRef<HTMLDivElement, SceneLegendProps>(function SceneLegend(
-  { showFireCells, onToggleFireCells, showRoutes, onToggleRoutes, showForecast, onToggleForecast, forecast, showUnseenKey = false, canFollow, follow, onToggleFollow, onResetCamera, fireCells, onInspectCell },
+  {
+    showFireCells,
+    onToggleFireCells,
+    showCurrentFire,
+    onToggleCurrentFire,
+    currentFire,
+    showRoutes,
+    onToggleRoutes,
+    showForecast,
+    onToggleForecast,
+    forecast,
+    showUnseenKey = false,
+    canFollow,
+    follow,
+    onToggleFollow,
+    onResetCamera,
+    fireCells,
+    onInspectCell,
+    onInspectMapTile,
+  },
   ref,
 ) {
   // The key is collapsed on narrower viewports so it never hides routes or forecast.
   const unseenCount = fireCells.filter((cell) => cell.unseen === true).length;
   const [keyOpen, setKeyOpen] = useState(() => typeof window !== "undefined" && window.innerWidth >= 1700);
+  const gridSize = scenarioMap.terrain?.gridSize ?? GRID_SIZE;
+  const rowInputId = useId();
+  const columnInputId = useId();
+  const indexInputId = useId();
+  const [pickRow, setPickRow] = useState("0");
+  const [pickColumn, setPickColumn] = useState("0");
+  const [pickIndex, setPickIndex] = useState("0");
+
+  const inspectFromRowColumn = () => {
+    const index = gridCellIndexFromRowColumn(Number(pickRow), Number(pickColumn));
+    if (index !== null) onInspectMapTile(index);
+  };
+
+  const inspectFromIndex = () => {
+    const index = Number(pickIndex);
+    if (isValidGridCellIndex(index)) onInspectMapTile(index);
+  };
   return (
     <div ref={ref} className="scene-legend" role="group" aria-label="Map layers and camera">
       <details
@@ -45,10 +90,27 @@ export const SceneLegend = forwardRef<HTMLDivElement, SceneLegendProps>(function
       >
       <summary>Legend</summary>
       <ul className="scene-legend__key">
-        <li data-key="observed-fire">
-          <span className="scene-legend__swatch" style={{ background: colors.observedFire }} />
-          Observed fire
-        </li>
+        {currentFire ? (
+          <>
+            <li data-key="current-fire">
+              <span className="scene-legend__swatch" style={{ background: colors.observedFire }} />
+              Current fire: solid orange tiles and flames (live feed, whole map)
+            </li>
+            <li data-key="current-burned">
+              <span className="scene-legend__swatch scene-legend__swatch--burned" />
+              Burned out: flat dark tile
+            </li>
+            <li data-key="observed-belief">
+              <span className="scene-legend__swatch scene-legend__swatch--belief" />
+              Observed belief: outlined frame, may be old; inspect for time
+            </li>
+          </>
+        ) : (
+          <li data-key="observed-fire">
+            <span className="scene-legend__swatch" style={{ background: colors.observedFire }} />
+            Observed fire
+          </li>
+        )}
         <li>
           <span className="scene-legend__swatch scene-legend__swatch--stale" />
           Stale: faded, hatched; inspect for exact time
@@ -82,10 +144,22 @@ export const SceneLegend = forwardRef<HTMLDivElement, SceneLegendProps>(function
       </p>
       </details>
       <div className="scene-legend__controls">
+        {currentFire ? (
+          <label className="scene-legend__toggle">
+            <input type="checkbox" checked={showCurrentFire} onChange={onToggleCurrentFire} />
+            Show current fire
+          </label>
+        ) : null}
         <label className="scene-legend__toggle">
           <input type="checkbox" checked={showFireCells} onChange={onToggleFireCells} />
           Show fire observations
         </label>
+        {currentFire ? (
+          <p className="scene-legend__currentfire" role="status">
+            Current fire at {formatIncidentClock(currentFire.simTimeMs)} incident time: {currentFire.burningCount} burning,{" "}
+            {currentFire.burnedCount} burned
+          </p>
+        ) : null}
         <label className="scene-legend__toggle">
           <input type="checkbox" checked={showRoutes} onChange={onToggleRoutes} />
           Show planned routes
@@ -112,6 +186,61 @@ export const SceneLegend = forwardRef<HTMLDivElement, SceneLegendProps>(function
         keyboard or screen-reader path to that otherwise. This <details>
         is the DOM equivalent: same inspection, reachable by keyboard.
       */}
+      <details className="scene-legend__tile-pick">
+        <summary>Inspect map tile</summary>
+        <p className="scene-legend__tile-hint">Click the ground on the map, or enter row and column (0–{gridSize - 1}).</p>
+        <form
+          className="scene-legend__tile-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            inspectFromRowColumn();
+          }}
+        >
+          <label htmlFor={rowInputId}>
+            Row
+            <input
+              id={rowInputId}
+              type="number"
+              min={0}
+              max={gridSize - 1}
+              value={pickRow}
+              onChange={(event) => setPickRow(event.target.value)}
+            />
+          </label>
+          <label htmlFor={columnInputId}>
+            Column
+            <input
+              id={columnInputId}
+              type="number"
+              min={0}
+              max={gridSize - 1}
+              value={pickColumn}
+              onChange={(event) => setPickColumn(event.target.value)}
+            />
+          </label>
+          <button type="submit">Inspect tile</button>
+        </form>
+        <form
+          className="scene-legend__tile-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            inspectFromIndex();
+          }}
+        >
+          <label htmlFor={indexInputId}>
+            Grid index
+            <input
+              id={indexInputId}
+              type="number"
+              min={0}
+              max={gridSize * gridSize - 1}
+              value={pickIndex}
+              onChange={(event) => setPickIndex(event.target.value)}
+            />
+          </label>
+          <button type="submit">Inspect by index</button>
+        </form>
+      </details>
       {fireCells.length > 0 ? (
         <details className="scene-legend__cells">
           <summary>

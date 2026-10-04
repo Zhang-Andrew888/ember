@@ -60,16 +60,19 @@ export function truthFrameAt(frames: readonly ReplayTruthFrame[], simTimeMs: num
  * observation of keeps that observation. Every other truth cell (never
  * observed, or last observed in a different/out-of-date state) is marked
  * `unseen`: that state was never observed, so it must not be presented as an
- * observation with an age.
+ * observation with an age. Truth cells listed in `alreadyShown` (the live current-fire layer the
+ * recorded view already carries) are skipped: they are drawn there, not as unseen frames.
  */
 export function mergeTruthCells(
   observed: readonly FireCellMarker[],
   frame: ReplayTruthFrame,
   map: ScenarioMap,
+  alreadyShown?: ReadonlySet<number>,
 ): FireCellMarker[] {
   const byIndex = new Map(observed.map((cell) => [cell.gridCellIndex, cell] as const));
   const merged: FireCellMarker[] = [];
   const add = (index: number, burnState: "burning" | "burned") => {
+    if (alreadyShown?.has(index)) return;
     const existing = byIndex.get(index);
     if (existing && existing.burnState === burnState && !existing.stale) {
       merged.push(existing);
@@ -82,6 +85,7 @@ export function mergeTruthCells(
         stale: false,
         lastObservedAt: frame.timeMs,
         ageMs: 0,
+        source: "replay-truth",
         unseen: true,
       });
     }

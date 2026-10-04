@@ -59,7 +59,7 @@ const IS_MOCK_MODE = START_PLAN.kind === "mock";
 const USE_GROK_VOICE = import.meta.env.VITE_GROK_VOICE === "1";
 const GROK_LIVE = USE_GROK_VOICE && HAS_LIVE_REST;
 
-const EMPTY_ENTITIES = { agents: [], sites: [], fireCells: [], routes: [], forecast: null };
+const EMPTY_ENTITIES = { agents: [], sites: [], fireCells: [], currentFire: null, routes: [], forecast: null };
 
 type Phase = "briefing" | "live" | "replay";
 
@@ -368,8 +368,8 @@ export function App() {
   );
 
   const entities = useMemo(
-    () => (view ? buildSceneEntities(view, scenarioMap) : EMPTY_ENTITIES),
-    [view],
+    () => (view ? buildSceneEntities(view, scenarioMap, { phase }) : EMPTY_ENTITIES),
+    [view, phase],
   );
 
   const activeRecipientCallsign = useMemo(() => {

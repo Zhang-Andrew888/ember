@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildSyntheticScenario } from "@ember/simulation";
+import { buildSyntheticScenario, SIM_DEFAULTS } from "@ember/simulation";
 import { cellIndexOf } from "@ember/simulation/model";
 import { ENDED_PUMP_GRACE_MS } from "./hub.js";
 import { FINISHED_RETENTION_MS, IncidentRegistry, UNSTARTED_RETENTION_MS } from "./incident-registry.js";
@@ -18,6 +18,12 @@ function quickScenario() {
 }
 
 const clock = { nowMs: () => 0 };
+
+/** End the sim at the horizon without pumping wall time through LiveRun (hundreds of steps). */
+function endIncidentAtHorizon(record: ReturnType<IncidentRegistry["create"]>): void {
+  record.session.incident.setWallElapsed(SIM_DEFAULTS.realPlayLimitMs);
+  record.session.incident.advanceTo(SIM_DEFAULTS.incidentHorizonMs);
+}
 
 describe("IncidentRegistry.create", () => {
   it("uses a random seed independent of the public incident id", () => {
@@ -66,10 +72,12 @@ describe("IncidentRegistry sweep", () => {
   it("keeps a finished incident for the replay window, then drops it", () => {
     const clock = new FakeClock();
     const registry = new IncidentRegistry("seed");
-    const record = registry.create({ scenario: quickScenario() }, clock);
+    const record = registry.create(
+      { scenario: quickScenario(), session: { uncontrolled: ["crew-1"] } },
+      clock,
+    );
     registry.start(record);
-    clock.t += 400_000; // past the five-minute wall limit
-    record.live.safePump();
+    endIncidentAtHorizon(record);
     expect(record.session.incident.ended).toBe(true);
 
     const seenAt = clock.t;
@@ -84,10 +92,12 @@ describe("LiveRun after the incident ends", () => {
   it("stops advancing once the drain grace period has passed", () => {
     const clock = new FakeClock();
     const registry = new IncidentRegistry("seed");
-    const record = registry.create({ scenario: quickScenario() }, clock);
+    const record = registry.create(
+      { scenario: quickScenario(), session: { uncontrolled: ["crew-1"] } },
+      clock,
+    );
     registry.start(record);
-    clock.t += 400_000;
-    record.live.safePump();
+    endIncidentAtHorizon(record);
     expect(record.session.incident.ended).toBe(true);
 
     let afterSteps = 0;

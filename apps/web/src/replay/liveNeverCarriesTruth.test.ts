@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CoordinatorView } from "@ember/domain";
 import { fixtureCoordinatorView } from "../../../../tests/fixtures/coordinator-view.fixture.js";
+import {
+  fixtureCoordinatorViewWithCurrentFire,
+  fixtureCurrentFire,
+} from "../../../../tests/fixtures/coordinator-view-current-fire.fixture.js";
 import { adaptToScenarioIds } from "../net/mockBase.js";
 import {
   authoredSnapshots,
@@ -13,13 +17,16 @@ import { parseCoordinatorViewFrame } from "../net/wireProtocol.js";
 import { buildSceneEntities } from "../components/scene/sceneEntities.js";
 import { scenarioMap } from "../map/activeScenario.js";
 import { mockRecording, mockTruthFrames } from "./mockRecording.js";
-import { truthForDisplay, type AppPhase } from "./truthGate.js";
+import { currentFireForDisplay, truthForDisplay, type AppPhase } from "./truthGate.js";
 
 /**
- * Proof that the full fire exists ONLY in replay.
- * 1. every payload the live app can receive carries no truth (schema-strict and key-scanned);
- * 2. the wire client strips anything extra a server might send;
- * 3. the single display gate releases truth only in replay with the toggle on;
+ * Proof that the full simulated fire (the replay TRUTH) exists ONLY in replay, and that live play
+ * carries at most the authorized `currentFire` (#112/#114).
+ * 1. every payload the live app can receive carries no truth (schema-strict and key-scanned); the
+ *    only fire it may carry is `currentFire`: cells burning or burned now, nothing private or future;
+ * 2. the wire client strips anything extra a server might send, inside currentFire too;
+ * 3. the truth gate releases the replay truth only in replay with the toggle on, and the current-fire
+ *    gate releases only the coordinator's currentFire;
  * 4. no module except ReplayView can even import the truth data.
  */
 
@@ -39,7 +46,17 @@ const TRUTH_KEYS = [
   "privateWorldParameters",
   "requiredWork",
   "finalSnapshot",
+  // Private world parameters, future state and burn internals the currentFire contract excludes.
+  "futureBurningCells",
+  "spreadMultiplier",
+  "windShiftTimeMs",
+  "burnTimers",
+  "fuel",
+  "height",
 ];
+
+/** The only keys a live `currentFire` may carry. */
+const CURRENT_FIRE_KEYS = ["burnedCells", "burningCells", "simTimeMs"];
 
 function allKeys(value: unknown, into = new Set<string>()): Set<string> {
   if (Array.isArray(value)) value.forEach((v) => allKeys(v, into));
@@ -53,7 +70,10 @@ function allKeys(value: unknown, into = new Set<string>()): Set<string> {
 }
 
 function livePayloads(): Array<{ source: string; view: CoordinatorView }> {
-  const out: Array<{ source: string; view: CoordinatorView }> = [{ source: "fixture", view: fixtureCoordinatorView }];
+  const out: Array<{ source: string; view: CoordinatorView }> = [
+    { source: "fixture", view: fixtureCoordinatorView },
+    { source: "fixture+currentFire", view: fixtureCoordinatorViewWithCurrentFire },
+  ];
   authoredSnapshots.forEach((view, i) => out.push({ source: `authoredSnapshots[${i}]`, view }));
   out.push({ source: "modelStatesScenario", view: modelStatesScenario });
   for (const [reason, view] of Object.entries(runEndedScenarios)) out.push({ source: `ended:${reason}`, view });
@@ -89,6 +109,61 @@ describe("live payloads carry no truth", () => {
     const truthCells = new Set(mockTruthFrames.flatMap((f) => [...f.burning, ...f.burned]));
     const liveCells = new Set(payloads.flatMap(({ view }) => view.observedCells.map((c) => c.gridCellIndex)));
     expect(truthCells.size).toBeGreaterThan(liveCells.size * 5);
+  });
+});
+
+describe("live may carry currentFire only", () => {
+  const payloads = livePayloads();
+  const withFire = payloads.filter(({ view }) => view.currentFire !== undefined);
+
+  it("some live payloads carry currentFire and some (older senders, the base fixture) do not", () => {
+    expect(withFire.length).toBeGreaterThan(0);
+    expect(withFire.length).toBeLessThan(payloads.length);
+  });
+
+  it.each(withFire.map((p) => [p.source, p.view] as const))("%s: currentFire holds cells and a time, nothing else", (_source, view) => {
+    expect(Object.keys(view.currentFire!).sort()).toEqual(CURRENT_FIRE_KEYS);
+    // A snapshot of NOW: it never describes a time after the view it rides on.
+    expect(view.currentFire!.simTimeMs).toBe(view.simTimeMs);
+  });
+
+  it("currentFire is a top-level CoordinatorView field and appears nowhere nested", () => {
+    for (const { view } of payloads) {
+      const children = {
+        agents: view.agents,
+        sites: view.sites,
+        observedCells: view.observedCells,
+        agentPlans: view.agentPlans,
+        coordinatorForecast: view.coordinatorForecast,
+        recentReports: view.recentReports,
+        incidentEnd: view.incidentEnd,
+      };
+      expect(allKeys(children).has("currentFire")).toBe(false);
+    }
+  });
+
+  it("the wire client strips private parameters and future state smuggled inside currentFire", () => {
+    const poisoned = {
+      ...adaptToScenarioIds(fixtureCoordinatorViewWithCurrentFire),
+      currentFire: {
+        ...fixtureCurrentFire,
+        spreadMultiplier: 1.4,
+        windShiftTimeMs: 400_000,
+        ignitedAtMs: { 10: 1_000 },
+        futureBurningCells: [200],
+      },
+    };
+    const view = parseCoordinatorViewFrame(JSON.stringify(poisoned));
+    expect(view).not.toBeNull();
+    expect(Object.keys(view!.currentFire!).sort()).toEqual(CURRENT_FIRE_KEYS);
+  });
+
+  it("the scene draws current-fire cells as current fire, never as the replay-only unseen frames", () => {
+    for (const { view } of withFire) {
+      const entities = buildSceneEntities(view, scenarioMap);
+      expect(entities.currentFire).not.toBeNull();
+      expect(entities.currentFire!.cells.every((cell) => cell.source === "current-fire" && cell.unseen === undefined)).toBe(true);
+    }
   });
 });
 
@@ -166,6 +241,23 @@ describe("the display gate", () => {
   });
 });
 
+describe("the current-fire gate", () => {
+  it("releases the coordinator's currentFire while a run is live, and in replay of a recorded view", () => {
+    expect(currentFireForDisplay({ phase: "live", currentFire: fixtureCurrentFire })).toBe(fixtureCurrentFire);
+    expect(currentFireForDisplay({ phase: "replay", currentFire: fixtureCurrentFire })).toBe(fixtureCurrentFire);
+  });
+
+  it("shows nothing in the briefing, and nothing when the sender provides no currentFire", () => {
+    expect(currentFireForDisplay({ phase: "briefing", currentFire: fixtureCurrentFire })).toBeNull();
+    expect(currentFireForDisplay({ phase: "live", currentFire: undefined })).toBeNull();
+  });
+
+  it("does not open the replay truth: live still never gets a truth frame", () => {
+    const frame = mockTruthFrames[3]!;
+    for (const showFullFire of [false, true]) expect(truthForDisplay({ phase: "live", showFullFire, frame })).toBeNull();
+  });
+});
+
 describe("only ReplayView may reach the truth data", () => {
   const all = import.meta.glob<string>(["../**/*.ts", "../**/*.tsx", "!../**/*.test.ts", "!../**/*.test.tsx"], {
     eager: true,
@@ -176,9 +268,15 @@ describe("only ReplayView may reach the truth data", () => {
   const importers = (pattern: RegExp) =>
     files.filter(({ path, source }) => !path.startsWith("replay/") && pattern.test(source)).map(({ path }) => path);
 
-  it("nothing outside replay/ imports the recording, the mock truth or the gate except ReplayView", () => {
-    expect(importers(/replay\/(recording|mockRecording|truthGate)\.js/).sort()).toEqual(
+  it("nothing outside replay/ imports the recording or the mock truth except ReplayView", () => {
+    expect(importers(/replay\/(recording|mockRecording)\.js/).sort()).toEqual(
       ["components/ReplayView.tsx", "net/incidentRestClient.ts"].sort(),
+    );
+  });
+
+  it("the gate module is also imported by the scene entity builder, which applies the live current-fire gate", () => {
+    expect(importers(/replay\/truthGate\.js/).sort()).toEqual(
+      ["components/ReplayView.tsx", "components/scene/sceneEntities.ts"].sort(),
     );
   });
 
