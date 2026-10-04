@@ -281,7 +281,7 @@ export class ForecastService {
     groups: readonly (readonly FitObservation[])[],
   ): { pass: boolean; failedObservationId: string | null; warm?: WarmRollout } {
     const step = this.config.rolloutStepMs;
-    const field = new FireField(this.ctx.terrain, this.ctx.nonburnable);
+    const field = new FireField(this.ctx.terrain, this.ctx.nonburnable, this.ctx.cleared);
     field.ignite(this.ctx.initialCells, 0, c.params.initialProgress ?? 0);
     let t = 0;
     for (const group of groups) {

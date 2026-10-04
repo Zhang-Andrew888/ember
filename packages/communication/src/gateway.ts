@@ -8,7 +8,8 @@ import {
   type ObjectiveKind,
 } from "@ember/domain";
 import { AgentId, ObjectiveId, SequenceNumber, SimTimeMs } from "@ember/domain";
-import { matchName, type Directory, type IntentEnvelope } from "./intent.js";
+import { anchorPoint, compassBearing, DEFAULT_LINE_LENGTH_M, lineEnd } from "@ember/simulation/model";
+import { matchName, type Directory, type EndRef, type IntentEnvelope } from "./intent.js";
 import type { Interpreter } from "./interpreter.js";
 
 /** A report the coordinator actually received: a sensor observation or an agent's own report. */
@@ -82,7 +83,12 @@ interface Pending {
 
 const STILL_INTERPRETING_MS = 5000;
 
-/** Matches authoritative sim grid (64×25 m); communication must not depend on @ember/simulation. */
+/** Compass names by 45-degree step from north, for naming the ends of a fire line. */
+const COMPASS_NAMES = ["north", "northeast", "east", "southeast", "south", "southwest", "west", "northwest"] as const;
+/** A compass end needs the line to run at least this much along that direction (cos 67.5 degrees); otherwise the end is ambiguous. */
+const AMBIGUOUS_END_RATIO = 0.38;
+
+/** Matches authoritative sim grid (64×25 m). Only the fire-line helpers come from @ember/simulation/model; the rest of communication stays independent of the sim. */
 function gridCellIndexFromMeters(x: number, y: number): number | null {
   const cellMeters = 25;
   const gridSize = 64;
@@ -102,6 +108,7 @@ const KIND_OF: Record<string, ObjectiveKind | undefined> = {
   hold: "hold",
   avoid: "avoid_corridor",
   move: "move_direction",
+  line: "build_line",
 };
 
 /**
@@ -248,6 +255,9 @@ export class CommandGateway {
     const notes: string[] = [];
 
     if (env.clarification !== undefined) return this.ask(message, seq, env, env.clarification);
+    if (env.objective?.kind === "line" && (env.objective.crews?.length ?? 0) > 0) {
+      return this.resolveLine(message, seq, env, null, actions);
+    }
 
     // Recipient: an explicit name overrides; otherwise the active recipient as resolved so far.
     let recipient = this.active;
@@ -296,6 +306,8 @@ export class CommandGateway {
       }
     }
     for (const claim of env.unsupportedClaims) notes.push(`unsupported_claim:${claim}`);
+
+    if (env.objective?.kind === "line") return this.resolveLine(message, seq, env, recipientId, actions);
 
     let objectiveText = "";
     let rejectedObjective: string | null = null;
@@ -414,6 +426,162 @@ export class CommandGateway {
     if (env.unsupportedClaims.length > 0) parts.push("That claim is not backed by a report, so no hazard was changed.");
     const status: CommandStatus = rejectedObjective !== null && actions.every((a) => a.kind === "set_recipient") ? "rejected" : "accepted";
     return this.finish(message, seq, status, recipientId, actions, parts.join(" "), evidence, notes, now);
+  }
+
+  /**
+   * A fire-line order: anchor, course and crew ends as words become two points per crew (the
+   * crew's own end first), using the shared line helpers. Unclear orders get a question, never a
+   * guess. Feasibility is left to each crew; crews do not wait for each other. `recipientId` is the
+   * single addressee when the message names no crews.
+   */
+  private resolveLine(
+    message: IncomingMessage,
+    seq: number,
+    env: IntentEnvelope,
+    recipientId: AgentIdT | null,
+    actions: GatewayAction[],
+  ): GatewayOutcome {
+    const o = env.objective!;
+    const ask = (question: string): GatewayOutcome => this.ask(message, seq, env, question, actions);
+    const places = this.env.directory.places ?? [];
+    const lookup = (name: string): { place: (typeof places)[number] } | { question: string } => {
+      const m = matchName(name, places);
+      if (m.kind === "unique") return { place: places.find((p) => p.id === m.id)! };
+      return { question: m.kind === "ambiguous" ? `Which place do you mean by ${name}?` : `I don't know a place called ${name}.` };
+    };
+
+    // Start point: the anchor place, moved by its offset.
+    if (o.anchor === undefined) {
+      return ask("Where should the line start? Name a place, like 'from Waterworks', or a distance from one, like '200 meters west of Waterworks'.");
+    }
+    const anchorPlace = lookup(o.anchor.placeName);
+    if ("question" in anchorPlace) return ask(anchorPlace.question);
+    const { offsetMeters, offsetDirection } = o.anchor;
+    if ((offsetMeters === undefined) !== (offsetDirection === undefined)) {
+      return ask(offsetMeters === undefined ? "How far from there should the line start?" : "In which direction from there should the line start?");
+    }
+    const startDetail =
+      offsetMeters === undefined || offsetDirection === undefined ? anchorPlace.place.name : `${offsetMeters} m ${offsetDirection} of ${anchorPlace.place.name}`;
+    const start = offsetMeters === undefined || offsetDirection === undefined ? { x: anchorPlace.place.x, y: anchorPlace.place.y } : anchorPoint(anchorPlace.place, offsetMeters, offsetDirection);
+    if (start === null) return ask(`${startDetail} is off the map. Where should the line start?`);
+
+    // End point: a place to tie in at, or a heading from the start.
+    if (o.course === undefined) {
+      return ask("Where should the line go? Name a place to tie in at, or give a direction and length, like 'north 300 meters' or 'north to the edge'.");
+    }
+    let end: { x: number; y: number };
+    let endDetail: string | null = null;
+    let shortened = false;
+    if (o.course.kind === "to_place") {
+      const target = lookup(o.course.placeName);
+      if ("question" in target) return ask(target.question);
+      end = { x: target.place.x, y: target.place.y };
+      endDetail = target.place.name;
+    } else {
+      const bearing = o.course.bearingDeg ?? (o.course.direction === undefined ? undefined : compassBearing(o.course.direction));
+      if (bearing === undefined) return ask("Which way should the line run? Give a compass direction like north, or a bearing in degrees.");
+      const reach = lineEnd(start, bearing, o.course.toEdge === true ? "edge" : (o.course.lengthMeters ?? DEFAULT_LINE_LENGTH_M));
+      end = reach.end;
+      shortened = reach.clampedToEdge;
+    }
+    const length = Math.hypot(end.x - start.x, end.y - start.y);
+    if (length === 0) {
+      return ask(o.course.kind === "to_place" ? "A fire line needs two different points. Where should it end?" : "There is no room to run a line that way from there. Which way should it go?");
+    }
+
+    // Ends are named by compass, from the line's own direction.
+    const lineBearing = ((Math.atan2(end.x - start.x, end.y - start.y) * 180) / Math.PI + 360) % 360;
+    const farName = COMPASS_NAMES[Math.round(lineBearing / 45) % 8]!;
+    const startName = COMPASS_NAMES[(Math.round(lineBearing / 45) + 4) % 8]!;
+
+    // Which crew takes which end.
+    const crews = this.env.directory.agents.map((a) => ({ id: a.id, name: a.callsign }));
+    const orders: { agentId: string; recipient: string; atStart: boolean }[] = [];
+    if (o.crews !== undefined && o.crews.length > 0) {
+      if (o.crews.length > 2) return ask("A line takes at most two crews, one at each end. Which two should cut it?");
+      for (const assigned of o.crews) {
+        const crew = matchName(assigned.recipient, crews);
+        if (crew.kind !== "unique") return ask(this.unknownRecipient(assigned.recipient));
+        const which = this.endOf(assigned.end, assigned.recipient, { start, end, startName, farName, startPlace: anchorPlace.place.name, endPlace: endDetail, hasOffset: offsetMeters !== undefined }, lookup);
+        if (typeof which === "string") return ask(which);
+        orders.push({ agentId: crew.id, recipient: assigned.recipient, atStart: which.atStart });
+      }
+      if (new Set(orders.map((x) => x.agentId)).size < orders.length) return ask("Name each crew once. Which crews should cut the line?");
+      if (orders.length === 2 && orders[0]!.atStart === orders[1]!.atStart) {
+        return ask(`${orders[0]!.recipient} and ${orders[1]!.recipient} can't both take the same end. Which end should each take?`);
+      }
+    } else if (recipientId !== null) {
+      orders.push({ agentId: recipientId, recipient: recipientId, atStart: true });
+    } else {
+      return ask("Which crew should cut the fire line?");
+    }
+
+    const now = this.env.nowSimMs();
+    const lengthText = `${Math.round(length)} m`;
+    const lines: string[] = [];
+    for (const order of orders) {
+      const agent = this.env.directory.agents.find((a) => a.id === order.agentId)!;
+      if (agent.role !== "protection_crew") {
+        lines.push(`${agent.callsign} does not cut fire lines.`);
+        continue;
+      }
+      const from = order.atStart ? start : end;
+      const to = order.atStart ? end : start;
+      const objective = Objective.parse({
+        id: ObjectiveId.parse(`obj-${seq}-${agent.id}`),
+        recipientId: AgentId.parse(agent.id),
+        kind: "build_line",
+        targetId: null,
+        constraints: { line: { start: { x: from.x, y: from.y }, end: { x: to.x, y: to.y } } },
+        issueSequence: SequenceNumber.parse(seq),
+      });
+      actions.push({ kind: "objective", objective });
+      const fromDetail = order.atStart ? startDetail : endDetail;
+      const toDetail = order.atStart ? endDetail : startDetail;
+      const toNote = [...(toDetail === null ? [] : [toDetail]), lengthText, ...(shortened ? ["shortened at the map edge"] : [])].join(", ");
+      lines.push(
+        `Sent to ${agent.callsign}: cut line from the ${order.atStart ? startName : farName} end${fromDetail === null ? "" : ` (${fromDetail})`} toward the ${order.atStart ? farName : startName} end (${toNote}).`,
+      );
+    }
+    const sent = actions.some((a) => a.kind === "objective");
+    if (sent && orders.length === 1) lines[0] += " Its own feasibility check decides.";
+    else if (sent) lines.push("Each crew starts on its own; their own feasibility checks decide.");
+    const receiptRecipient = AgentId.parse(orders[0]!.agentId);
+    return this.finish(message, seq, sent ? "accepted" : "rejected", receiptRecipient, actions, lines.join("\n"), [], [], now);
+  }
+
+  /** Which end of a resolved line a crew was told to take, or the question to ask when that is unclear. */
+  private endOf(
+    ref: EndRef,
+    recipient: string,
+    line: {
+      start: { x: number; y: number };
+      end: { x: number; y: number };
+      startName: string;
+      farName: string;
+      startPlace: string;
+      endPlace: string | null;
+      hasOffset: boolean;
+    },
+    lookup: (name: string) => { place: { id: string; name: string; x: number; y: number } } | { question: string },
+  ): { atStart: boolean } | string {
+    if (ref === "start") return { atStart: true };
+    if (ref === "far") return { atStart: false };
+    if ("compass" in ref) {
+      // The end further in that direction; a line that runs mostly across it has no such end.
+      const bearing = (compassBearing(ref.compass) * Math.PI) / 180;
+      const along = ((line.end.x - line.start.x) * Math.sin(bearing) + (line.end.y - line.start.y) * Math.cos(bearing)) / Math.hypot(line.end.x - line.start.x, line.end.y - line.start.y);
+      if (Math.abs(along) < AMBIGUOUS_END_RATIO) {
+        return `A line from the ${line.startName} end to the ${line.farName} end has no ${ref.compass} end. Which end should ${recipient} take: the ${line.startName} end or the ${line.farName} end?`;
+      }
+      return { atStart: along < 0 };
+    }
+    const named = lookup(ref.placeName);
+    if ("question" in named) return named.question;
+    const endsAtStart = !line.hasOffset && named.place.name === line.startPlace;
+    if (endsAtStart) return { atStart: true };
+    if (line.endPlace !== null && named.place.name === line.endPlace) return { atStart: false };
+    return `${named.place.name} is not an end of this line. Which end should ${recipient} take: the ${line.startName} end or the ${line.farName} end?`;
   }
 
   /** Question for a named recipient that is not in the directory; scouts no longer exist in new incidents. */

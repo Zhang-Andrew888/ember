@@ -19,7 +19,7 @@ import {
   type SiteId,
 } from "@ember/domain";
 import { KnowledgeStore, STALE_AFTER_MS, type AgentKnowledgeSnapshot } from "@ember/knowledge";
-import { CELL_BURNED, CELL_BURNING, SIM_DEFAULTS, cellsWithin, hashValue } from "./model/index.js";
+import { CELL_BURNED, CELL_BURNING, CELL_UNBURNED, SIM_DEFAULTS, cellsWithin, hashValue } from "./model/index.js";
 import { SimInput, type AppliedInput, type InputReceipt } from "./inputs.js";
 import { SimScenario } from "./scenario.js";
 import { validateScenario } from "./validate.js";
@@ -441,6 +441,7 @@ export class Incident {
         observerAgentId: b.sourceAgentId,
       })),
       currentFire: this.currentFire(),
+      ...this.firebreakView(),
       agentPlans,
       coordinatorForecast: options.coordinatorForecast ?? null,
       recentReports: this.reports.slice(-20),
@@ -448,6 +449,29 @@ export class Incident {
       incidentEnd: this.endRecord,
     };
     return CoordinatorView.parse(view);
+  }
+
+  /** Firebreaks, partly cleared cells and fire lines: public crew work, never private parameters. */
+  private firebreakView(): Pick<CoordinatorView, "firebreakCells" | "clearingCells" | "firelines"> {
+    const firebreakCells = this.world.firebreakCells();
+    const clearingCells: NonNullable<CoordinatorView["clearingCells"]> = [];
+    const { clearance, state } = this.world.fire;
+    for (let cell = 0; cell < clearance.length; cell++) {
+      const c = clearance[cell]!;
+      if (c > 0 && c < 1 && state[cell] === CELL_UNBURNED) clearingCells.push({ gridCellIndex: cell, clearance: c });
+    }
+    const firelines = [...this.world.firelines.values()].map((line) => ({
+      id: line.id,
+      start: line.start,
+      end: line.end,
+      cells: [...line.cells],
+      resolved: line.resolved,
+    }));
+    return {
+      ...(firebreakCells.length === 0 ? {} : { firebreakCells }),
+      ...(clearingCells.length === 0 ? {} : { clearingCells }),
+      ...(firelines.length === 0 ? {} : { firelines }),
+    };
   }
 
   /**

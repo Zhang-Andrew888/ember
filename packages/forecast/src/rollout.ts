@@ -1,4 +1,4 @@
-import { FireField, SIM_DEFAULTS, createTerrain, refugeCells, RoadIndex, type PublicMap, type Terrain } from "@ember/simulation/model";
+import { FireField, createTerrain, mapFirebreakCells, nonburnableCells, RoadIndex, type PublicMap, type Terrain } from "@ember/simulation/model";
 import { hashValue } from "@ember/knowledge";
 import { forecastStep } from "./dynamics.js";
 import type { ForecastParams } from "./types.js";
@@ -8,20 +8,23 @@ export interface RolloutContext {
   readonly key: string;
   readonly terrain: Terrain;
   readonly nonburnable: ReadonlySet<number>;
+  /** Map firebreaks: fully cleared, so they also block diagonal corner gaps. */
+  readonly cleared: ReadonlySet<number>;
   readonly initialCells: readonly number[];
 }
 
 const contexts = new Map<string, RolloutContext>();
 
 export function rolloutContext(map: PublicMap): RolloutContext {
-  const key = hashValue({ t: map.terrainSeed, f: map.initialFireCells, r: map.refuges, n: map.nodes.length });
+  const key = hashValue({ t: map.terrainSeed, f: map.initialFireCells, r: map.refuges, n: map.nodes.length, b: map.firebreakCells ?? [] });
   const hit = contexts.get(key);
   if (hit !== undefined) return hit;
   const road = new RoadIndex(map);
   const ctx: RolloutContext = {
     key,
     terrain: createTerrain(map.terrainSeed),
-    nonburnable: refugeCells(road, SIM_DEFAULTS.refugeRadiusM),
+    nonburnable: nonburnableCells(road),
+    cleared: mapFirebreakCells(road),
     initialCells: map.initialFireCells,
   };
   contexts.set(key, ctx);
@@ -72,7 +75,7 @@ export function rolloutIgnition(
   // A warm start continues a field already stepped from the same start with the same parameters, so
   // the result is identical to rolling out from zero.
   const resume = warm !== undefined && warm.stepMs === stepMs && warm.atMs <= target;
-  const field = resume ? warm.field : new FireField(ctx.terrain, ctx.nonburnable);
+  const field = resume ? warm.field : new FireField(ctx.terrain, ctx.nonburnable, ctx.cleared);
   if (!resume) field.ignite(ctx.initialCells, 0, params.initialProgress ?? 0);
   for (let t = resume ? warm.atMs + stepMs : stepMs; t <= target; t += stepMs) forecastStep(field, t, stepMs, params);
   const ign = new Float64Array(field.ignitedAtMs.length);

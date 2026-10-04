@@ -2,11 +2,15 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import {
   CommandGateway,
   INTERPRETATION_DEADLINE_MS,
+  IntentEnvelope as IntentSchema,
+  ScriptedInterpreter,
   createGrokInterpreter,
   type IntentEnvelope,
   type InterpretationRequest,
 } from "@ember/communication";
-import { completeIntentInterpretation } from "./chat.js";
+import { buildSyntheticScenario } from "@ember/simulation";
+import { directoryFor } from "../conversation.js";
+import { FIRE_LINE_EXAMPLES, buildIntentSystemPrompt, completeIntentInterpretation } from "./chat.js";
 
 const sampleReq: InterpretationRequest = {
   commandId: "cmd-1",
@@ -146,5 +150,34 @@ describe("xai/chat", () => {
       unsupportedClaims: [],
     });
     expect(late).toHaveLength(0);
+  });
+
+  describe("fire line orders in the Grok prompt", () => {
+    const directory = directoryFor(buildSyntheticScenario());
+    const prompt = buildIntentSystemPrompt({ ...sampleReq, directory });
+
+    it("describes the objective shape and the order language", () => {
+      for (const word of ["anchor", "offsetMeters", "offsetDirection", "to_place", "bearingDeg", "lengthMeters", "toEdge", "crews", "far", "compass"]) {
+        expect(prompt).toContain(word);
+      }
+      expect(prompt).toMatch(/server uses 200 m/);
+      expect(prompt).toMatch(/never the screen/);
+      expect(prompt).toMatch(/"Hold the line" is not one: it is "contain"/);
+    });
+
+    it("carries every example order, and each example is a valid envelope", () => {
+      expect(FIRE_LINE_EXAMPLES.length).toBeGreaterThanOrEqual(5);
+      for (const { order, envelope } of FIRE_LINE_EXAMPLES) {
+        expect(prompt).toContain(JSON.stringify(order));
+        expect(IntentSchema.safeParse({ ...envelope, commandId: "c", inputSequence: 0 }).success).toBe(true);
+      }
+    });
+
+    it("teaches the model what the scripted parser reads for the same order", () => {
+      for (const { order, envelope } of FIRE_LINE_EXAMPLES) {
+        const read = new ScriptedInterpreter().interpret({ commandId: "c", inputSequence: 0, text: order, directory, activeRecipientCallsign: null });
+        expect(read, order).toEqual({ ...envelope, commandId: "c", inputSequence: 0 });
+      }
+    });
   });
 });
