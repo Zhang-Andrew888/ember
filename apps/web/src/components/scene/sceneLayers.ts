@@ -86,8 +86,16 @@ function planPieces(plan: CoordinatorView["agentPlans"][number], map: ScenarioMa
 }
 
 function workSuffix(plan: CoordinatorView["agentPlans"][number]): string {
-  if (plan.work === undefined) return "";
-  return plan.work.kind === "suppress_fire" ? " (fire suppression)" : " (structure protection)";
+  switch (plan.work?.kind) {
+    case undefined:
+      return "";
+    case "suppress_fire":
+      return " (fire suppression)";
+    case "build_line":
+      return " (fire line construction)";
+    case "protect_structure":
+      return " (structure protection)";
+  }
 }
 
 /**

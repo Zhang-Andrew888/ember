@@ -4,6 +4,7 @@ import type { TranscriptLine } from "../conversation/transcript.js";
 import type { NoticePresentation } from "../conversation/notices.js";
 import { isNearBottom } from "../conversation/stickToBottom.js";
 import { deliveryGuidance, deliveryLabel, type CommandDelivery } from "../command/commandDelivery.js";
+import { FireLineHelp } from "./FireLineHelp.js";
 import { formatIncidentClock } from "../format/time.js";
 import { createBrowserVoiceCapture, type BrowserVoiceCapture } from "../net/browserVoiceCapture.js";
 import { microphoneStartFailureMessage } from "../net/microphoneFailure.js";
@@ -442,6 +443,8 @@ export function ConversationPanel({
           ) : null}
         </div>
       ) : null}
+
+      <FireLineHelp />
 
       <form className="conversation-panel__composer" onSubmit={handleSubmit}>
         <label htmlFor="composer-input" className="sr-only">

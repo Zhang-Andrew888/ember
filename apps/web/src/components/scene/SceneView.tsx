@@ -139,6 +139,17 @@ export function SceneView({
       text: refuge.label ?? "Refuge",
       variant: "refuge" as const,
     }));
+    // Named junctions are places a fire line can run between, so orders can name them.
+    const junctionLabels = [...scenarioMap.nodes.values()]
+      .filter((node) => node.kind === "junction" && node.label !== undefined)
+      .map((node) => ({
+        id: `junction:${node.id}`,
+        x: node.x,
+        y: sceneTerrain.groundY(node.x, node.z) + 16,
+        z: node.z,
+        text: node.label!,
+        variant: "junction" as const,
+      }));
     const siteLabels = entities.sites.map((site) => {
       // Status and damage are color-coded on the marker too (a ring sized
       // by damage, separate from the body's protection-status color), but
@@ -194,6 +205,7 @@ export function SceneView({
     });
     return [
       ...refugeLabels,
+      ...junctionLabels,
       ...siteLabels,
       ...agentLabels,
       ...(showRoutes ? routeLabels : []),
@@ -264,6 +276,9 @@ export function SceneView({
         onToggleForecast={() => setShowForecast((value) => !value)}
         forecast={entities.forecast}
         showUnseenKey={entities.fireCells.some((cell) => cell.unseen === true)}
+        firebreakCount={entities.firebreaks.length}
+        clearingCount={entities.clearing.length}
+        plannedLineCount={entities.plannedLine.length}
         onResetCamera={() => {
           setFollow(false);
           controlsRef.current?.reset();

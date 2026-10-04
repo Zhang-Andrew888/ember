@@ -22,6 +22,12 @@ export interface SceneLegendProps {
   readonly forecast: ForecastLayer | null;
   /** Replay with the full fire on: explain the dashed frames. */
   readonly showUnseenKey?: boolean;
+  /** Firebreak cells on the map; the key entry shows only when there are some. */
+  readonly firebreakCount?: number;
+  /** Cells partly cleared; the key entry shows only when there are some. */
+  readonly clearingCount?: number;
+  /** Fire-line cells ordered but not started; the key entry shows only when there are some. */
+  readonly plannedLineCount?: number;
   readonly canFollow: boolean;
   readonly follow: boolean;
   readonly onToggleFollow: () => void;
@@ -51,6 +57,9 @@ export const SceneLegend = forwardRef<HTMLDivElement, SceneLegendProps>(function
     onToggleForecast,
     forecast,
     showUnseenKey = false,
+    firebreakCount = 0,
+    clearingCount = 0,
+    plannedLineCount = 0,
     canFollow,
     follow,
     onToggleFollow,
@@ -137,6 +146,24 @@ export const SceneLegend = forwardRef<HTMLDivElement, SceneLegendProps>(function
           <li>
             <span className="scene-legend__swatch scene-legend__swatch--unseen" />
             Dashed frame: fire the coordinator has not observed (replay only)
+          </li>
+        ) : null}
+        {firebreakCount > 0 ? (
+          <li data-key="firebreak">
+            <span className="scene-legend__swatch scene-legend__swatch--firebreak" />
+            Firebreak: crosshatched cleared ground, fire cannot cross ({firebreakCount} cells)
+          </li>
+        ) : null}
+        {clearingCount > 0 ? (
+          <li data-key="clearing">
+            <span className="scene-legend__swatch scene-legend__swatch--clearing" />
+            Being cleared: crosshatched tile grows as crews clear it; fire slows there ({clearingCount} cells)
+          </li>
+        ) : null}
+        {plannedLineCount > 0 ? (
+          <li data-key="planned-line">
+            <span className="scene-legend__swatch scene-legend__swatch--planned-line" />
+            Fire line ordered: small pale markers, not cleared yet ({plannedLineCount} cells)
           </li>
         ) : null}
         <li>
