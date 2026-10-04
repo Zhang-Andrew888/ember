@@ -86,6 +86,13 @@ describe("map/positions - resolveEdgePolyline", () => {
 });
 
 describe("map/positions - resolveAgentPosition", () => {
+  it("interpolates an off-road position in world metres", () => {
+    const point = resolveAgentPosition(scenarioMap, {
+      kind: "offroad", start: { x: 400, y: 800 }, end: { x: 600, y: 1000 }, progress: 0.5,
+    });
+    expect(point).toEqual({ x: -262.5, z: 87.5 });
+  });
+
   it("resolves a node-kind position", () => {
     const point = resolveAgentPosition(scenarioMap, { kind: "node", nodeId: "n-rw" as never } as never);
     expect(point).toEqual({ x: -612.5, z: 0 });
