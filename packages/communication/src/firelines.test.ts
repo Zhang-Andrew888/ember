@@ -10,11 +10,11 @@ const directory: Directory = {
   locations: [],
   corridors: [],
   places: [
-    { id: "n-sb", name: "Waterworks" },
-    { id: "n-sa", name: "Ridge Cabins" },
-    { id: "n-rw", name: "Refuge West" },
-    { id: "n-h", name: "East Junction" },
-    { id: "n-n", name: "North Junction" },
+    { id: "n-sb", name: "Waterworks", x: 400, y: 1200 },
+    { id: "n-sa", name: "Ridge Cabins", x: 1300, y: 1100 },
+    { id: "n-rw", name: "Refuge West", x: 100, y: 800 },
+    { id: "n-h", name: "East Junction", x: 800, y: 600 },
+    { id: "n-n", name: "North Junction", x: 800, y: 900 },
   ],
 };
 
@@ -45,29 +45,29 @@ describe("fire line orders: interpretation", () => {
   it("reads one crew's line and its starting end", () => {
     expect(interpret("Crew 1, cut a fire line from Ridge Cabins to Waterworks")?.objective).toEqual({
       kind: "line",
-      fromName: "Ridge Cabins",
-      toName: "Waterworks",
+      anchor: { placeName: "Ridge Cabins" },
+      course: { kind: "to_place", placeName: "Waterworks" },
     });
     // "starting at" picks the end even when it is named second.
     expect(interpret("Crew 1, build a firebreak between Waterworks and Ridge Cabins, starting at Ridge Cabins")?.objective).toMatchObject({
-      fromName: "Ridge Cabins",
-      toName: "Waterworks",
+      anchor: { placeName: "Ridge Cabins" },
+      course: { kind: "to_place", placeName: "Waterworks" },
     });
   });
 
   it("assigns each named crew to its own end", () => {
     const env = interpret("Crew 1 and Crew 2, cut a line between East Junction and North Junction, Crew 2 from East Junction, Crew 1 from North Junction");
     expect(env?.clarification).toBeUndefined();
-    expect(env?.objective?.assignments).toEqual([
-      { recipient: "Crew 1", startName: "North Junction" },
-      { recipient: "Crew 2", startName: "East Junction" },
+    expect(env?.objective?.crews).toEqual([
+      { recipient: "Crew 1", end: { placeName: "North Junction" } },
+      { recipient: "Crew 2", end: { placeName: "East Junction" } },
     ]);
   });
 
   it("splits unassigned crews across the two ends in the order named", () => {
-    expect(interpret("Crew 1 and Crew 2, cut a fire line from Waterworks to Ridge Cabins")?.objective?.assignments).toEqual([
-      { recipient: "Crew 1", startName: "Waterworks" },
-      { recipient: "Crew 2", startName: "Ridge Cabins" },
+    expect(interpret("Crew 1 and Crew 2, cut a fire line from Waterworks to Ridge Cabins")?.objective?.crews).toEqual([
+      { recipient: "Crew 1", end: { placeName: "Waterworks" } },
+      { recipient: "Crew 2", end: { placeName: "Ridge Cabins" } },
     ]);
   });
 
@@ -86,8 +86,8 @@ describe("fire line orders: gateway", () => {
     const outcome = say("Crew 1 and Crew 2, cut a line between East Junction and North Junction, Crew 1 from East Junction, Crew 2 from North Junction");
     expect(outcome.receipt.status).toBe("accepted");
     expect(lines(outcome)).toEqual([
-      { to: "crew-1", line: { fromNodeId: "n-h", toNodeId: "n-n" } },
-      { to: "crew-2", line: { fromNodeId: "n-n", toNodeId: "n-h" } },
+      { to: "crew-1", line: { start: { x: 800, y: 600 }, end: { x: 800, y: 900 } } },
+      { to: "crew-2", line: { start: { x: 800, y: 900 }, end: { x: 800, y: 600 } } },
     ]);
     expect(outcome.reply).toMatch(/Crew 1: cut a fire line from East Junction toward North Junction/);
     expect(outcome.reply).toMatch(/Each crew starts on its own/);
@@ -96,7 +96,7 @@ describe("fire line orders: gateway", () => {
   it("sends a single crew from the end it was given", () => {
     const { say, lines } = gateway();
     const outcome = say("Crew 2, cut a fire line from Ridge Cabins to Waterworks");
-    expect(lines(outcome)).toEqual([{ to: "crew-2", line: { fromNodeId: "n-sa", toNodeId: "n-sb" } }]);
+    expect(lines(outcome)).toEqual([{ to: "crew-2", line: { start: { x: 1300, y: 1100 }, end: { x: 400, y: 1200 } } }]);
   });
 
   it("asks again when a place is unknown", () => {

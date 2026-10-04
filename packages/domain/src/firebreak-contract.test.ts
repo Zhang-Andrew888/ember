@@ -43,24 +43,35 @@ describe("fire line contract", () => {
     issueSequence: 1,
   };
 
-  it("needs two different end nodes on a build_line objective", () => {
-    expect(Objective.safeParse({ ...objective, constraints: { line: { fromNodeId: "n-h", toNodeId: "n-n" } } }).success).toBe(true);
+  const start = { x: 300, y: 400 };
+  const end = { x: 300, y: 900 };
+
+  it("needs two different end points on a build_line objective", () => {
+    expect(Objective.safeParse({ ...objective, constraints: { line: { start, end } } }).success).toBe(true);
     expect(Objective.safeParse({ ...objective, constraints: {} }).success).toBe(false);
-    expect(Objective.safeParse({ ...objective, constraints: { line: { fromNodeId: "n-h", toNodeId: "n-h" } } }).success).toBe(false);
+    expect(Objective.safeParse({ ...objective, constraints: { line: { start, end: start } } }).success).toBe(false);
+  });
+
+  it("rejects line points off the map and the old node-to-node form", () => {
+    expect(Objective.safeParse({ ...objective, constraints: { line: { start, end: { x: 300, y: 1601 } } } }).success).toBe(false);
+    expect(Objective.safeParse({ ...objective, constraints: { line: { fromNodeId: "n-h", toNodeId: "n-n" } } }).success).toBe(false);
+    expect(MissionWork.safeParse({ kind: "build_line", fromNodeId: "n-h", toNodeId: "n-n" }).success).toBe(false);
   });
 
   it("carries build_line work on a mission", () => {
-    expect(MissionWork.parse({ kind: "build_line", fromNodeId: "n-h", toNodeId: "n-n" }).kind).toBe("build_line");
+    expect(MissionWork.parse({ kind: "build_line", workNodeId: "n-h", start, end }).kind).toBe("build_line");
+    expect(MissionWork.safeParse({ kind: "build_line", start, end }).success).toBe(false);
   });
 
   it("round-trips clearing cells and fire lines, and rejects a clearance outside (0, 1)", () => {
     const view = CoordinatorView.parse({
       ...baseView,
       clearingCells: [{ gridCellIndex: 40, clearance: 0.4 }],
-      firelines: [{ id: "line:n-h~n-n", fromNodeId: "n-h", toNodeId: "n-n", cells: [40, 104], resolved: false }],
+      firelines: [{ id: "line:40~104", start: { x: 40, y: 20 }, end: { x: 40, y: 140 }, cells: [40, 104], resolved: false }],
     });
     expect(view.clearingCells?.[0]?.clearance).toBe(0.4);
     expect(view.firelines?.[0]?.cells).toEqual([40, 104]);
+    expect(view.firelines?.[0]?.end).toEqual({ x: 40, y: 140 });
     for (const clearance of [0, 1]) {
       expect(CoordinatorView.safeParse({ ...baseView, clearingCells: [{ gridCellIndex: 40, clearance }] }).success).toBe(false);
     }

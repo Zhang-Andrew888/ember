@@ -1,6 +1,36 @@
 import { z } from "zod";
 import { CompassDirection } from "@ember/domain";
 
+/** The start of a fire line: a directory place, moved `offsetMeters` toward `offsetDirection` if given. */
+export const LineAnchor = z.object({
+  placeName: z.string(),
+  offsetMeters: z.number().positive().optional(),
+  offsetDirection: CompassDirection.optional(),
+});
+export type LineAnchor = z.infer<typeof LineAnchor>;
+
+/** Where a fire line goes: to another place, or along a heading (default length 200 m). */
+export const LineCourse = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("to_place"), placeName: z.string() }),
+  z.object({
+    kind: z.literal("heading"),
+    direction: CompassDirection.optional(),
+    bearingDeg: z.number().min(0).max(360).optional(),
+    lengthMeters: z.number().positive().optional(),
+    toEdge: z.boolean().optional(),
+  }),
+]);
+export type LineCourse = z.infer<typeof LineCourse>;
+
+/** An end of a fire line: the anchor end, the other end, the end further in a compass direction, or one named by place. */
+export const EndRef = z.union([
+  z.literal("start"),
+  z.literal("far"),
+  z.object({ compass: CompassDirection }),
+  z.object({ placeName: z.string() }),
+]);
+export type EndRef = z.infer<typeof EndRef>;
+
 /**
  * What the language interpreter may propose. The server, not the model, creates authoritative
  * ids, resolves entities and evidence, and authorizes recipients.
@@ -16,11 +46,12 @@ export const IntentEnvelope = z.object({
       targetName: z.string().optional(),
       direction: CompassDirection.optional(),
       maxDistanceMeters: z.number().positive().max(1200).optional(),
-      /** For `line`: the two named places the fire line runs between. */
-      fromName: z.string().optional(),
-      toName: z.string().optional(),
-      /** For `line`: which crew starts at which end; each crew starts on its own. */
-      assignments: z.array(z.object({ recipient: z.string(), startName: z.string() })).optional(),
+      /** For `line`: where the line starts, a directory place with an optional offset. */
+      anchor: LineAnchor.optional(),
+      /** For `line`: where the line goes from the anchor. */
+      course: LineCourse.optional(),
+      /** For `line`: which crew takes which end; absent, the addressed crew takes the start. */
+      crews: z.array(z.object({ recipient: z.string(), end: EndRef })).optional(),
     })
     .optional(),
   evidenceQueries: z.array(
@@ -45,7 +76,7 @@ export interface Directory {
   /** Named road segments for avoid-corridor objectives; id is the edge id. */
   readonly corridors: readonly { id: string; name: string }[];
   /** Named map nodes (sites, refuges, junctions) a fire line can run between; id is the node id. */
-  readonly places?: readonly { id: string; name: string }[];
+  readonly places?: readonly { id: string; name: string; x: number; y: number }[];
 }
 
 export type NameMatch = { kind: "unique"; id: string } | { kind: "ambiguous"; ids: string[] } | { kind: "unknown" };

@@ -249,7 +249,7 @@ export class CommandGateway {
     const notes: string[] = [];
 
     if (env.clarification !== undefined) return this.ask(message, seq, env, env.clarification);
-    if (env.objective?.kind === "line" && (env.objective.assignments?.length ?? 0) > 0) {
+    if (env.objective?.kind === "line" && (env.objective.crews?.length ?? 0) > 0) {
       return this.resolveLine(message, seq, env, null, actions);
     }
 
@@ -423,9 +423,10 @@ export class CommandGateway {
   }
 
   /**
-   * A fire-line order: the two ends must be named places, and each crew gets its own objective
-   * starting at its end. Crews do not wait for each other. `recipientId` is the single addressee
-   * when the message carries no per-crew assignments.
+   * A fire-line order. For now the line must run from a named place to another named place: the
+   * gateway turns the two places into points, and each crew gets its own objective starting at its
+   * end. Crews do not wait for each other. `recipientId` is the single addressee when the message
+   * names no crews.
    */
   private resolveLine(
     message: IncomingMessage,
@@ -435,31 +436,47 @@ export class CommandGateway {
     actions: GatewayAction[],
   ): GatewayOutcome {
     const o = env.objective!;
-    const places = (this.env.directory.places ?? []).map((p) => ({ id: p.id, name: p.name }));
+    const places = this.env.directory.places ?? [];
     const place = (name: string | undefined): { kind: "ok"; id: string; name: string } | { kind: "ask"; question: string } => {
       if (name === undefined) return { kind: "ask", question: "Between which two places should the fire line run?" };
       const m = matchName(name, places);
       if (m.kind === "unique") return { kind: "ok", id: m.id, name: places.find((p) => p.id === m.id)!.name };
       return { kind: "ask", question: m.kind === "ambiguous" ? `Which place do you mean by ${name}?` : `I don't know a place called ${name}.` };
     };
-    const from = place(o.fromName);
+    const from = place(o.anchor?.placeName);
     if (from.kind === "ask") return this.ask(message, seq, env, from.question, actions);
-    const to = place(o.toName);
+    if (o.anchor?.offsetMeters !== undefined || o.anchor?.offsetDirection !== undefined) {
+      return this.ask(message, seq, env, "A fire line must start at a named place for now. Where should it start?", actions);
+    }
+    if (o.course !== undefined && o.course.kind !== "to_place") {
+      return this.ask(message, seq, env, "A fire line must run to a named place for now. Where should it end?", actions);
+    }
+    const to = place(o.course?.placeName);
     if (to.kind === "ask") return this.ask(message, seq, env, to.question, actions);
     if (from.id === to.id) return this.ask(message, seq, env, "A fire line needs two different places. Where should it end?", actions);
 
     const crews = this.env.directory.agents.map((a) => ({ id: a.id, name: a.callsign }));
     const orders: { agentId: string; startId: string }[] = [];
-    if (o.assignments !== undefined && o.assignments.length > 0) {
-      for (const assignment of o.assignments) {
-        const crew = matchName(assignment.recipient, crews);
-        if (crew.kind !== "unique") return this.ask(message, seq, env, this.unknownRecipient(assignment.recipient), actions);
-        const start = place(assignment.startName);
-        if (start.kind === "ask") return this.ask(message, seq, env, start.question, actions);
-        if (start.id !== from.id && start.id !== to.id) {
-          return this.ask(message, seq, env, `${assignment.startName} is not an end of the line from ${from.name} to ${to.name}. Which end should ${assignment.recipient} start from?`, actions);
+    if (o.crews !== undefined && o.crews.length > 0) {
+      for (const assigned of o.crews) {
+        const crew = matchName(assigned.recipient, crews);
+        if (crew.kind !== "unique") return this.ask(message, seq, env, this.unknownRecipient(assigned.recipient), actions);
+        const end = assigned.end;
+        if (typeof end === "object" && "compass" in end) {
+          return this.ask(message, seq, env, `Name the end ${assigned.recipient} should start from by place: ${from.name} or ${to.name}.`, actions);
         }
-        orders.push({ agentId: crew.id, startId: start.id });
+        if (end === "start") {
+          orders.push({ agentId: crew.id, startId: from.id });
+        } else if (end === "far") {
+          orders.push({ agentId: crew.id, startId: to.id });
+        } else {
+          const start = place(end.placeName);
+          if (start.kind === "ask") return this.ask(message, seq, env, start.question, actions);
+          if (start.id !== from.id && start.id !== to.id) {
+            return this.ask(message, seq, env, `${end.placeName} is not an end of the line from ${from.name} to ${to.name}. Which end should ${assigned.recipient} start from?`, actions);
+          }
+          orders.push({ agentId: crew.id, startId: start.id });
+        }
       }
     } else if (recipientId !== null) {
       orders.push({ agentId: recipientId, startId: from.id });
@@ -477,12 +494,14 @@ export class CommandGateway {
       }
       const startName = order.startId === from.id ? from.name : to.name;
       const endName = order.startId === from.id ? to.name : from.name;
+      const startPlace = places.find((p) => p.id === order.startId)!;
+      const endPlace = places.find((p) => p.id === (order.startId === from.id ? to.id : from.id))!;
       const objective = Objective.parse({
         id: ObjectiveId.parse(`obj-${seq}-${agent.id}`),
         recipientId: AgentId.parse(agent.id),
         kind: "build_line",
         targetId: null,
-        constraints: { line: { fromNodeId: order.startId, toNodeId: order.startId === from.id ? to.id : from.id } },
+        constraints: { line: { start: { x: startPlace.x, y: startPlace.y }, end: { x: endPlace.x, y: endPlace.y } } },
         issueSequence: SequenceNumber.parse(seq),
       });
       actions.push({ kind: "objective", objective });

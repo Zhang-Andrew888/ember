@@ -1,4 +1,4 @@
-import type { AgentId, AgentPosition, AgentState, EdgeId, MissionPlan, NodeId, SiteId } from "@ember/domain";
+import type { AgentId, AgentPosition, AgentState, EdgeId, MapPoint, MissionPlan, NodeId, SiteId } from "@ember/domain";
 import { EdgePosition, Meters, OffroadPosition, SimTimeMs, approachLegCount, scheduledLegCount, scheduledLegs } from "@ember/domain";
 import {
   CELL_BURNED,
@@ -121,8 +121,9 @@ export type SimNotice =
 /** A fire line crews were sent to build; `cells` run from `from` to `to`. */
 export interface TruthFireline {
   readonly id: string;
-  readonly from: NodeId;
-  readonly to: NodeId;
+  /** Canonical order (lower end cell first), so the line does not depend on which crew registered it. */
+  readonly start: MapPoint;
+  readonly end: MapPoint;
   readonly cells: readonly number[];
   resolved: boolean;
 }
@@ -287,11 +288,12 @@ export class World {
     const line = plan.work?.kind === "build_line" ? plan.work : undefined;
     if (line !== undefined) {
       if (workSiteId !== null) return reject("fireline_with_site_work");
-      if (!this.road.nodes.has(line.fromNodeId) || !this.road.nodes.has(line.toNodeId)) return reject("fireline_unknown_node");
-      if (line.fromNodeId === line.toNodeId) return reject("fireline_needs_two_nodes");
+      if (!this.road.nodes.has(line.workNodeId)) return reject("fireline_unknown_node");
+      if (line.start.x === line.end.x && line.start.y === line.end.y) return reject("fireline_needs_two_points");
+      if (firelineCells(line.start, line.end).length === 0) return reject("fireline_off_map");
       if (hasWork) {
         const endNode = approachEndNode ?? (agent.pos.kind === "node" && approachCount === 0 ? agent.pos.nodeId : null);
-        if (endNode !== line.fromNodeId) return reject("fireline_work_not_at_start_node");
+        if (endNode !== line.workNodeId) return reject("fireline_work_not_at_start_node");
       }
     }
     if (hasWork && workSiteId !== null) {
@@ -328,7 +330,7 @@ export class World {
         reason: "superseded",
       });
     }
-    if (line !== undefined) this.registerFireline(line.fromNodeId, line.toNodeId);
+    if (line !== undefined) this.registerFireline(line.start, line.end);
     agent.commitment = { plan, workSiteId, mode, legIndex: 0, approachCount, hasWork, blockedNoticed: false };
     agent.planRevision += 1;
     agent.working = false;
@@ -561,12 +563,14 @@ export class World {
     }
   }
 
-  private registerFireline(from: NodeId, to: NodeId): void {
-    const id = firelineId(from, to);
+  private registerFireline(start: MapPoint, end: MapPoint): void {
+    const id = firelineId(start, end);
     if (this.firelines.has(id)) return;
-    // Canonical direction (lower node id first), so the stored cells do not depend on who came first.
-    const [a, b] = from < to ? [from, to] : [to, from];
-    this.firelines.set(id, { id, from: a, to: b, cells: firelineCells(this.road, a, b), resolved: false });
+    // Canonical direction (lower end cell first), so the stored line does not depend on who came first.
+    const cells = firelineCells(start, end);
+    const reversed = cells.length > 0 && cells[0]! > cells[cells.length - 1]!;
+    const [a, b] = reversed ? [end, start] : [start, end];
+    this.firelines.set(id, { id, start: a, end: b, cells: reversed ? cells.reverse() : cells, resolved: false });
   }
 
   /** One step of line clearing: each working crew clears the first unburned cell on its side, in reach. */
@@ -576,7 +580,7 @@ export class World {
       if (agent.state === "lost" || agent.role !== "protection_crew" || !agent.working) continue;
       const work = agent.commitment?.plan.work;
       if (work?.kind !== "build_line") continue;
-      const next = reachableFirelineCells(this.road, work.fromNodeId, work.toNodeId).find((c) => this.fire.state[c] === CELL_UNBURNED);
+      const next = reachableFirelineCells(this.road, work.workNodeId, work.start, work.end).find((c) => this.fire.state[c] === CELL_UNBURNED);
       if (next === undefined) continue;
       if (this.fire.applyClearance(next, fraction) === "completed") this.builtFirebreaks.add(next);
     }

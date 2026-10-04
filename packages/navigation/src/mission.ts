@@ -113,7 +113,7 @@ export function planWithHazard(ctx: PlanningContext, hm: HazardModel, targets: r
             target.kind === "contain" && target.gridCellIndex !== undefined
               ? { kind: "suppress_fire" as const, gridCellIndex: target.gridCellIndex }
               : target.kind === "line" && target.line !== undefined
-                ? { kind: "build_line" as const, fromNodeId: target.line.fromNodeId, toNodeId: target.line.toNodeId }
+                ? { kind: "build_line" as const, workNodeId: target.line.workNodeId, start: target.line.start, end: target.line.end }
                 : undefined;
           return (plan ??= MissionPlan.parse({
             ...planBody,

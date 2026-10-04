@@ -462,8 +462,8 @@ export class Incident {
     }
     const firelines = [...this.world.firelines.values()].map((line) => ({
       id: line.id,
-      fromNodeId: line.from,
-      toNodeId: line.to,
+      start: line.start,
+      end: line.end,
       cells: [...line.cells],
       resolved: line.resolved,
     }));

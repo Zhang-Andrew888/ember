@@ -1,5 +1,4 @@
 import { describe, it, expect } from "vitest";
-import { NodeId } from "@ember/domain";
 import { fixtureCoordinatorView as rawFixture } from "../../../../../tests/fixtures/coordinator-view.fixture.js";
 import { adaptToScenarioIds } from "../../net/mockBase.js";
 import { scenarioMap } from "../../map/activeScenario.js";
@@ -178,7 +177,7 @@ describe("components/scene/sceneEntities - fire line work", () => {
         ...fixtureCoordinatorView,
         firebreakCells: [1576],
         clearingCells: [{ gridCellIndex: 1640, clearance: 0.5 }],
-        firelines: [{ id: "line:n-h~n-n", fromNodeId: NodeId.parse("n-h"), toNodeId: NodeId.parse("n-n"), cells: [1576, 1640, 1704, 1768], resolved: false }],
+        firelines: [{ id: "line:1576~1768", start: { x: 1012.5, y: 612.5 }, end: { x: 1012.5, y: 687.5 }, cells: [1576, 1640, 1704, 1768], resolved: false }],
       },
       scenarioMap,
     );

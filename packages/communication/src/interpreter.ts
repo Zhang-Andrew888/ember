@@ -188,7 +188,7 @@ function lineEnvelope(req: InterpretationRequest, names: readonly string[], line
   const [a, b] = line.places;
   if (a === undefined || b === undefined) {
     envelope.clarification = "Between which two places should the fire line run?";
-    envelope.objective = { kind: "line", ...(a === undefined ? {} : { fromName: a }) };
+    envelope.objective = { kind: "line", ...(a === undefined ? {} : { anchor: { placeName: a } }) };
     if (names.length === 1) envelope.explicitRecipient = names[0]!;
     return envelope;
   }
@@ -196,15 +196,16 @@ function lineEnvelope(req: InterpretationRequest, names: readonly string[], line
     const crew = line.crews[0];
     if (crew !== undefined) envelope.explicitRecipient = crew;
     const start = crew === undefined ? undefined : line.starts.get(crew);
+    // The addressed crew takes the start, so a crew told to start at the far place gets the ends swapped.
     const from = start ?? a;
-    envelope.objective = { kind: "line", fromName: from, toName: from === a ? b : a };
+    envelope.objective = { kind: "line", anchor: { placeName: from }, course: { kind: "to_place", placeName: from === a ? b : a } };
     return envelope;
   }
   // Several crews: explicit starts first, then the ends nobody claimed, in mention order.
   const ends = [a, b];
   const unclaimed = ends.filter((end) => ![...line.starts.values()].includes(end));
-  const assignments = line.crews.map((crew) => ({ recipient: crew, startName: line.starts.get(crew) ?? unclaimed.shift() ?? a }));
-  envelope.objective = { kind: "line", fromName: a, toName: b, assignments };
+  const crews = line.crews.map((crew) => ({ recipient: crew, end: { placeName: line.starts.get(crew) ?? unclaimed.shift() ?? a } }));
+  envelope.objective = { kind: "line", anchor: { placeName: a }, course: { kind: "to_place", placeName: b }, crews };
   return envelope;
 }
 

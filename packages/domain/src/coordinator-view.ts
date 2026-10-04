@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { AgentId, EdgeId, MissionPlanId, NodeId, SiteId } from "./ids.js";
 import { SequenceNumber, SimTimeMs, WallTimeMs, WorkUnits } from "./units.js";
-import { AgentPosition } from "./position.js";
+import { AgentPosition, MapPoint } from "./position.js";
 import { AgentRole, AgentState, ContainmentWorkResult, IncidentEnd, MissionWork, OffroadTimedLeg } from "./records.js";
 import { WIRE_PROTOCOL_VERSION } from "./wire-protocol.js";
 
@@ -121,11 +121,15 @@ export const CoordinatorClearingCell = z.object({
 });
 export type CoordinatorClearingCell = z.infer<typeof CoordinatorClearingCell>;
 
-/** A fire line between two nodes. Cleared cells also appear in `firebreakCells`. */
+/**
+ * A fire line between two map points. Cleared cells also appear in `firebreakCells`. `id` is the
+ * same for both directions; `start`/`end` are in canonical order (lower end cell first).
+ */
 export const CoordinatorFirelineView = z.object({
   id: z.string(),
-  fromNodeId: NodeId,
-  toNodeId: NodeId,
+  start: MapPoint,
+  end: MapPoint,
+  /** Cells from `start` to `end`. */
   cells: z.array(z.number().int().nonnegative().max(4095)),
   /** No unburned cell is left: every cell is cleared, or the fire took some. */
   resolved: z.boolean(),

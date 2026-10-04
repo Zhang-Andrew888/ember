@@ -710,16 +710,18 @@ export class CrewController implements AgentController {
 
   protected missionVerb(id: string): string {
     if (id.startsWith("cell-")) return `containing fire near ${id.slice(5)}`;
-    const line = this.lineEnds(id);
-    if (line !== null) return `cutting a fire line from ${this.nodeName(line.from)} toward ${this.nodeName(line.to)}`;
+    const line = id.startsWith("line:") ? this.objective?.constraints.line : undefined;
+    if (line !== undefined) return `cutting a fire line from ${this.pointName(line.start)} toward ${this.pointName(line.end)}`;
     return `heading to ${this.siteName(id)}`;
   }
 
   /** Missions for one fire-line objective, or null when it names no line. */
   private lineSearch(ctx: PlanningContext, obj: Objective): MissionSearchResult | null {
     const line = obj.constraints.line;
-    if (line === undefined || !this.road.nodes.has(line.fromNodeId) || !this.road.nodes.has(line.toNodeId)) return null;
-    const target = firelineTarget(this.road, line.fromNodeId, line.toNodeId, this.capabilities.workRate, this.cfg.nav ?? DEFAULT_NAV_CONFIG);
+    if (line === undefined) return null;
+    const workNode = this.nearestNode(line.start);
+    if (workNode === null) return null;
+    const target = firelineTarget(this.road, workNode, line.start, line.end, this.capabilities.workRate, this.cfg.nav ?? DEFAULT_NAV_CONFIG);
     if (target === null) return null;
     // A line order wants the longest shift the forecast admits, not the best work-per-second ratio.
     const result = planMissions(ctx, [target]);
@@ -727,12 +729,25 @@ export class CrewController implements AgentController {
     return { ...result, candidates, best: candidates[0] ?? null };
   }
 
-  /** Ends of a fire-line target id (`line:a~b@from`), from the crew's side. */
-  private lineEnds(id: string): { from: string; to: string } | null {
-    const m = /^line:([^~]+)~([^@]+)@(.+)$/.exec(id);
-    if (m === null) return null;
-    const [, a, b, from] = m;
-    return from === a ? { from: a!, to: b! } : { from: b!, to: a! };
+  /** The road node nearest a map point, or null on a map without nodes. */
+  private nearestNode(p: { x: number; y: number }): NodeId | null {
+    let best: NodeId | null = null;
+    let bestDist = Infinity;
+    for (const id of this.road.nodes.keys()) {
+      const q = this.road.nodePoint(id);
+      const d = Math.hypot(q.x - p.x, q.y - p.y);
+      if (d < bestDist) {
+        best = id;
+        bestDist = d;
+      }
+    }
+    return best;
+  }
+
+  /** Player-facing name of the node nearest a map point; line ends are node coordinates for now. */
+  private pointName(p: { x: number; y: number }): string {
+    const id = this.nearestNode(p);
+    return id === null ? "an unnamed point" : this.nodeName(id);
   }
 
   /** Player-facing name for a map node: refuge or site; the raw id is never shown. */
@@ -868,7 +883,7 @@ export class CrewController implements AgentController {
     if (o === null) return null;
     if (o.kind === "move_direction" && o.movement !== undefined) return `move ${o.movement.direction} up to ${o.movement.maxDistanceMeters} m`;
     if (o.kind === "build_line" && o.constraints.line !== undefined) {
-      return `cut a fire line from ${this.nodeName(o.constraints.line.fromNodeId)} toward ${this.nodeName(o.constraints.line.toNodeId)}`;
+      return `cut a fire line from ${this.pointName(o.constraints.line.start)} toward ${this.pointName(o.constraints.line.end)}`;
     }
     return `${o.kind.replaceAll("_", " ")}${o.targetId === null ? "" : ` ${this.siteName(o.targetId)}`}`;
   }

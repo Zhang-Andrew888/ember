@@ -15,6 +15,7 @@ const crew1 = AgentId.parse("crew-1");
 const crew2 = AgentId.parse("crew-2");
 const RW = NodeId.parse("n-rw");
 const J1 = NodeId.parse("n-j1");
+const pt = (node: NodeId) => road.nodePoint(node);
 
 /** A line-building plan: optional approach edges, then `workMs` of clearing from `from` toward `to`. */
 function lineOrder(inc: Incident, agentId: AgentId, approach: string[], from: NodeId, to: NodeId, workMs: number, departMs = 0): SimInput {
@@ -30,25 +31,26 @@ function lineOrder(inc: Incident, agentId: AgentId, approach: string[], from: No
     workMs,
     back: [],
   });
-  return { ...order, plan: MissionPlan.parse({ ...order.plan, work: { kind: "build_line", fromNodeId: from, toNodeId: to } }) };
+  return { ...order, plan: MissionPlan.parse({ ...order.plan, work: { kind: "build_line", workNodeId: from, start: pt(from), end: pt(to) } }) };
 }
 
 describe("fire line geometry", () => {
   it("runs cell by cell from one node to the other, with one id for both directions", () => {
-    const cells = firelineCells(road, RW, J1);
+    const cells = firelineCells(pt(RW), pt(J1));
     expect(cells[0]).toBe(cellIndexOf(100, 800));
     expect(cells[cells.length - 1]).toBe(cellIndexOf(400, 800));
     for (let i = 1; i < cells.length; i++) {
       const [a, b] = [cells[i - 1]!, cells[i]!];
       expect(Math.max(Math.abs((a % 64) - (b % 64)), Math.abs(Math.floor(a / 64) - Math.floor(b / 64)))).toBe(1);
     }
-    expect(firelineCells(road, J1, RW)).toEqual([...cells].reverse());
-    expect(firelineId(RW, J1)).toBe(firelineId(J1, RW));
+    expect(firelineCells(pt(J1), pt(RW))).toEqual([...cells].reverse());
+    expect(firelineId(pt(RW), pt(J1))).toBe(firelineId(pt(J1), pt(RW)));
   });
 
   it("limits each crew to the cells within reach of its own end", () => {
-    const longLine = firelineCells(road, NodeId.parse("n-h"), NodeId.parse("n-n"));
-    const reach = reachableFirelineCells(road, NodeId.parse("n-h"), NodeId.parse("n-n"));
+    const [h, n] = [NodeId.parse("n-h"), NodeId.parse("n-n")];
+    const longLine = firelineCells(pt(h), pt(n));
+    const reach = reachableFirelineCells(road, h, pt(h), pt(n));
     expect(reach.length).toBeLessThan(longLine.length);
     expect(reach).toEqual(longLine.slice(0, reach.length));
     expect(SIM_DEFAULTS.lineReachM).toBe(400);
@@ -69,14 +71,14 @@ describe("building a fire line", () => {
     expect(early.firebreakCells).toContain(westEnd);
     expect(early.firebreakCells ?? []).not.toContain(eastEnd);
     expect(early.clearingCells?.length).toBe(1);
-    expect(early.firelines).toEqual([expect.objectContaining({ id: firelineId(RW, J1), resolved: false })]);
+    expect(early.firelines).toEqual([expect.objectContaining({ id: firelineId(pt(RW), pt(J1)), resolved: false })]);
 
     inc.advanceTo(240_000);
     const done = inc.projectCoordinator();
     expect(done.firebreakCells).toContain(eastEnd);
     expect(done.firelines?.[0]?.resolved).toBe(true);
     const fire = new Set([...(done.currentFire?.burningCells ?? []), ...(done.currentFire?.burnedCells ?? [])]);
-    for (const cell of firelineCells(road, RW, J1)) expect(fire.has(cell)).toBe(false);
+    for (const cell of firelineCells(pt(RW), pt(J1))) expect(fire.has(cell)).toBe(false);
   });
 
   it("rejects line work that does not start at the line's starting node", () => {

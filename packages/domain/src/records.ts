@@ -127,8 +127,8 @@ export type EvidenceReference = z.infer<typeof EvidenceReference>;
  * What timed work at the mission anchor accomplishes.
  * - `protect_structure`: site `completedWork` reduces structure damage (not burn spread).
  * - `suppress_fire`: containment work on one grid cell (burn progression; deterministic slice TBD in sim).
- * - `build_line`: clear a fire line between two map nodes, working outward from `fromNodeId` toward
- *   `toNodeId`. A second crew can work the same line from the other end; each starts on its own.
+ * - `build_line`: clear a fire line from `start` toward `end`, working from road node `workNodeId`.
+ *   A second crew can work the same line from the other end; each starts on its own.
  * Incident terminal `fire_extinguished` (EndReason) is a world outcome, not a crew work class.
  */
 export const MissionWork = z.discriminatedUnion("kind", [
@@ -142,8 +142,9 @@ export const MissionWork = z.discriminatedUnion("kind", [
   }),
   z.object({
     kind: z.literal("build_line"),
-    fromNodeId: NodeId,
-    toNodeId: NodeId,
+    workNodeId: NodeId,
+    start: MapPoint,
+    end: MapPoint,
   }),
 ]);
 export type MissionWork = z.infer<typeof MissionWork>;
@@ -161,7 +162,7 @@ export const ObjectiveKind = z.enum([
   "avoid_corridor",
   /** Travel in a world compass direction, stopping at a safe road node. */
   "move_direction",
-  /** Clear a fire line between two map nodes, starting at `constraints.line.fromNodeId`. */
+  /** Clear a fire line from `constraints.line.start` toward `constraints.line.end`. */
   "build_line",
 ]);
 export type ObjectiveKind = z.infer<typeof ObjectiveKind>;
@@ -191,8 +192,8 @@ export const ObjectiveConstraints = z.object({
    * Duration is still expressed via issued plan `workInterval` once committed.
    */
   gridCellIndex: z.number().int().nonnegative().max(4095).optional(),
-  /** For `build_line`: the line's two end nodes; the crew starts at `fromNodeId`. */
-  line: z.object({ fromNodeId: NodeId, toNodeId: NodeId }).optional(),
+  /** For `build_line`: the crew's end is `start`; the planner picks its work node. */
+  line: z.object({ start: MapPoint, end: MapPoint }).optional(),
 });
 export type ObjectiveConstraints = z.infer<typeof ObjectiveConstraints>;
 
@@ -217,9 +218,9 @@ export const Objective = z.object({
   if (objective.kind === "build_line") {
     const line = objective.constraints.line;
     if (line === undefined) {
-      context.addIssue({ code: z.ZodIssueCode.custom, path: ["constraints", "line"], message: "A fire line objective needs both end nodes." });
-    } else if (line.fromNodeId === line.toNodeId) {
-      context.addIssue({ code: z.ZodIssueCode.custom, path: ["constraints", "line"], message: "A fire line needs two different end nodes." });
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["constraints", "line"], message: "A fire line objective needs both end points." });
+    } else if (line.start.x === line.end.x && line.start.y === line.end.y) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["constraints", "line"], message: "A fire line needs two different end points." });
     }
   }
 });
