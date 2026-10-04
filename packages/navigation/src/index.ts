@@ -6,6 +6,7 @@ export { HazardModel } from "./hazard.js";
 export { Reach, ReturnTable, startsFromPosition, timeExpandedSearch, type SearchStart } from "./search.js";
 export { bucketTravelMs, offRoadSpeedMps, offRoadTravelMs } from "./travel.js";
 export { planMissions, planWithHazard, protectionTargets, workOptions } from "./mission.js";
+export { directionalTargets, planDirectionalMove } from "./directional.js";
 export { containmentTargets, nearestReachableNode } from "./containment.js";
 export { certifyPlan, type CertifyFailure, type CertifyInput, type CertifyResult } from "./certify.js";
 export { planRetreat, planReturn, type ReturnPlan } from "./retreat.js";

@@ -101,6 +101,7 @@ const KIND_OF: Record<string, ObjectiveKind | undefined> = {
   return: "return_to_refuge",
   hold: "hold",
   avoid: "avoid_corridor",
+  move: "move_direction",
 };
 
 /**
@@ -355,6 +356,9 @@ export class CommandGateway {
             targetLabel = pool.find((p) => p.id === m.id)!.name;
           }
         }
+        if (o.kind === "move" && o.direction === undefined) {
+          return this.ask(message, seq, env, "Which compass direction should the crew move?", actions);
+        }
         if (o.kind === "protect" && agent.role !== "protection_crew") {
           rejectedObjective = `${agent.callsign} does not do protection work.`;
         } else if (o.kind === "contain" && agent.role !== "protection_crew") {
@@ -375,10 +379,15 @@ export class CommandGateway {
             kind,
             targetId,
             constraints,
+            ...(o.kind === "move" && o.direction !== undefined
+              ? { movement: { direction: o.direction, ...(o.maxDistanceMeters === undefined ? {} : { maxDistanceMeters: o.maxDistanceMeters }) } }
+              : {}),
             issueSequence: SequenceNumber.parse(seq),
           });
           actions.push({ kind: "objective", objective });
-          objectiveText = `Sent to ${agent.callsign}: ${o.kind}${targetLabel === "" ? "" : ` ${targetLabel}`}. Its own feasibility check decides.`;
+          objectiveText = o.kind === "move"
+            ? `Sent to ${agent.callsign}: move ${objective.movement?.direction} up to ${objective.movement?.maxDistanceMeters} m. Its own feasibility check decides.`
+            : `Sent to ${agent.callsign}: ${o.kind}${targetLabel === "" ? "" : ` ${targetLabel}`}. Its own feasibility check decides.`;
         }
       }
     }
@@ -498,6 +507,9 @@ function mergeAnswer(original: IntentEnvelope, answer: IntentEnvelope): Partial<
   if (answer.explicitRecipient !== undefined) out.explicitRecipient = answer.explicitRecipient;
   if (answer.objective?.targetName !== undefined && original.objective !== undefined) {
     out.objective = { ...original.objective, targetName: answer.objective.targetName };
+  }
+  if (answer.objective?.direction !== undefined && original.objective !== undefined) {
+    out.objective = { ...original.objective, direction: answer.objective.direction };
   }
   return out;
 }
