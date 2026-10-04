@@ -1,5 +1,5 @@
 import { AgentId, SimTimeMs, type CoordinatorView, type DecisionEvent, type MissionPlan, type Objective } from "@ember/domain";
-import { ForecastService, toCoordinatorForecastView } from "@ember/forecast";
+import { ForecastService, snapshotScopeHash, toCoordinatorForecastView } from "@ember/forecast";
 import {
   CrewController,
   type AgentController,
@@ -44,7 +44,8 @@ export class IncidentSession {
   readonly controllerMs: number[] = [];
   private readonly road: RoadIndex;
   private readonly hooks: ReservationHooks;
-  private readonly coordinatorForecast: ForecastService;
+  private coordinatorForecast: ForecastService;
+  private initialCoordinatorForecast: ForecastService | null = null;
 
   constructor(options: SessionOptions) {
     this.incident = new Incident(options);
@@ -85,6 +86,19 @@ export class IncidentSession {
       if (skip.has(a.id)) continue;
       const controller = factory(a, this.incident.scenario.map, options.controllerConfig);
       if (controller !== null) this.controllers.set(a.id, controller);
+    }
+  }
+
+  /** Build initial forecasts before the live clock starts, without running any controller tick. */
+  prewarmForecasts(): void {
+    if (this.incident.simTimeMs !== 0) return;
+    for (const [id, controller] of this.controllers) {
+      controller.prewarmForecast?.(this.incident.projectAgent(id));
+    }
+    if (this.coordinatorForecast.current === null && this.initialCoordinatorForecast === null) {
+      const prepared = new ForecastService(AgentId.parse("coordinator"), this.incident.scenario.map);
+      prepared.update(this.incident.coordinator.snapshot(SimTimeMs.parse(0)), 0);
+      this.initialCoordinatorForecast = prepared;
     }
   }
 
@@ -146,6 +160,13 @@ export class IncidentSession {
   coordinatorView(): CoordinatorView {
     const now = this.incident.simTimeMs;
     const snapshot = this.incident.coordinator.snapshot(SimTimeMs.parse(now));
+    const prepared = this.initialCoordinatorForecast;
+    this.initialCoordinatorForecast = null;
+    const initial = prepared?.current;
+    if (prepared !== null && initial != null && initial.builtAtMs === now &&
+        initial.knowledgeRevision === snapshot.revision && initial.inputHash === snapshotScopeHash(snapshot)) {
+      this.coordinatorForecast = prepared;
+    }
     const ensemble = this.coordinatorForecast.update(snapshot, now);
     let explanation: string | null = null;
     if (ensemble.reliability === "unreliable") {

@@ -59,6 +59,7 @@ export class IncidentRegistry {
     const scenario = body.scenario ?? buildSyntheticScenario();
     const seed = this.defaultSeed ?? randomBytes(16).toString("hex");
     const session = new IncidentSession({ scenario, seed, ...body.session });
+    session.prewarmForecasts();
     const speechStore = new SpeechAudioStore();
     const grokTts = grokVoiceEnabled();
     const bridge = new ConversationBridge(session, { speechStore, grokTts });

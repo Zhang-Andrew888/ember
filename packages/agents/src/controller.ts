@@ -13,7 +13,7 @@ import {
   type Objective,
   type SiteId,
 } from "@ember/domain";
-import { ForecastService, admitsProtection, type ForecastEnsemble, type ForecastEvent } from "@ember/forecast";
+import { ForecastService, admitsProtection, snapshotScopeHash, type ForecastEnsemble, type ForecastEvent } from "@ember/forecast";
 import {
   ALWAYS_FREE,
   DEFAULT_NAV_CONFIG,
@@ -84,7 +84,8 @@ export class CrewController implements AgentController {
   protected readonly map: PublicMap;
   protected readonly road: RoadIndex;
   protected readonly cfg: ControllerConfig;
-  protected readonly forecast: ForecastService;
+  protected forecast: ForecastService;
+  private initialForecast: ForecastService | null = null;
   protected readonly evidence: EvidenceTracker;
   protected active: ActivePlan | null = null;
   protected objective: Objective | null = null;
@@ -120,6 +121,14 @@ export class CrewController implements AgentController {
     this.cfg = { ...DEFAULT_CONTROLLER_CONFIG, ...options.config };
     this.forecast = new ForecastService(options.agentId, options.map, this.cfg.forecast);
     this.evidence = new EvidenceTracker(options.map);
+  }
+
+  /** Prepare only the initial forecast; leave evidence, events and decisions for the first tick. */
+  prewarmForecast(proj: AgentProjection): void {
+    if (this.forecast.current !== null || this.initialForecast !== null || proj.state === "lost") return;
+    const prepared = new ForecastService(this.agentId, this.map, this.cfg.forecast);
+    prepared.update(proj.knowledge, proj.simTimeMs);
+    this.initialForecast = prepared;
   }
 
   /** This role's documented speed and work rate. */
@@ -210,6 +219,15 @@ export class CrewController implements AgentController {
   // ---------- forecast ----------
 
   protected refreshForecast(proj: AgentProjection, now: number): ForecastEnsemble {
+    const prepared = this.initialForecast;
+    this.initialForecast = null;
+    const initial = prepared?.current;
+    // A briefing relay or delayed first tick can change the inputs. Discard a stale warm-up
+    // instead of assimilating it: a cold controller must see exactly the same first ensemble.
+    if (prepared !== null && initial != null && initial.builtAtMs === now &&
+        initial.knowledgeRevision === proj.knowledge.revision && initial.inputHash === snapshotScopeHash(proj.knowledge)) {
+      this.forecast = prepared;
+    }
     const cur = this.forecast.current;
     const refreshMs = this.cfg.forecast?.refreshMs ?? 25_000;
     // While unreliable the prior is re-fitted only on the normal refresh; a rebuild is already pending.

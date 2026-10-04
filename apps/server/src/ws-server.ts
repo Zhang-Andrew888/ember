@@ -23,6 +23,7 @@ const MAX_MESSAGE_BYTES = 64 * 1024;
  */
 export async function startServer(options: SessionOptions & { port?: number }): Promise<ServerHandle> {
   const session = new IncidentSession(options);
+  session.prewarmForecasts();
   const bridge = new ConversationBridge(session);
   const hub = new SessionHub(session, bridge, new ViewRecorder());
   const live = new LiveRun(session, bridge, hub, { nowMs: () => performance.now() });

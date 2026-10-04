@@ -82,6 +82,8 @@ export interface ReportableStatus {
 export interface AgentController {
   readonly agentId: AgentId;
   readonly state: ControllerState;
+  /** Optional initial forecast preparation; must not issue actions or advance controller state. */
+  prewarmForecast?(projection: AgentProjection): void;
   tick(projection: AgentProjection, env?: ControllerEnvironment): TickOutput;
   receiveObjective(objective: Objective): void;
   resumeAutonomous(): void;
