@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CoordinatorView } from "@ember/domain";
+import { CoordinatorView, NodeId } from "@ember/domain";
 import { fixtureCoordinatorView } from "../../../../../tests/fixtures/coordinator-view.fixture.js";
 import { adaptToScenarioIds } from "../../net/mockBase.js";
 import { scenarioMap } from "../../map/activeScenario.js";
@@ -111,6 +111,12 @@ describe("buildRouteLines", () => {
         null,
       );
       expect(suppress[0]?.label).toBe("Crew 1 approaching (fire suppression)");
+      const line = buildRouteLines(
+        { ...view, agentPlans: [{ ...plan, work: { kind: "build_line", workNodeId: NodeId.parse("n-h"), start: { x: 800, y: 800 }, end: { x: 800, y: 1300 } } }] },
+        scenarioMap,
+        null,
+      );
+      expect(line[0]?.label).toBe("Crew 1 approaching (fire line construction)");
     });
   });
 });
