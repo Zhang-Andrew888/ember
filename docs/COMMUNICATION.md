@@ -29,7 +29,7 @@ For development, CI, and offline evaluation, `packages/communication` provides:
 - **`AudioScheduler`** — urgent-over-routine, recording suspends playback, relevance checks, coalescing, end-of-incident flush; reports `audio_unavailable` on playback failure.
 - **`PushToTalk`** — begin/release/lost-focus lifecycle with wall-clock timing on the server hub.
 
-The web lane wires a **mock voice capture adapter** and **exact-text speech playback stub** for UI testing. Production Grok Realtime + TTS remains the Slice 0/5 integration path described below.
+The web uses a **mock voice capture adapter** and **exact-text speech playback stub** for UI testing. Live voice records microphone audio for the server's `/incidents/:id/stt` endpoint and plays prepared xAI TTS audio (`apps/server/src/xai`, `apps/web/src/net/browserVoiceCapture.ts`, and `grokSpeechPlayback.ts`). Optional Grok intent interpretation is implemented on the server. Realtime speech-to-speech and live provider/microphone validation remain open; the Realtime design below describes that remaining integration.
 
 ## Session organization
 

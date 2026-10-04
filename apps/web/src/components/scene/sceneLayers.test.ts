@@ -48,6 +48,13 @@ describe("buildRouteLines", () => {
   });
 });
 
+describe("stale plans", () => {
+  it.each(["working", "lost", "idle", "retreating"] as const)("does not label a %s crew approaching", (state) => {
+    const changed = { ...view, agents: view.agents.map((agent) => agent.id === "crew-1" ? { ...agent, state } : agent) };
+    expect(buildRouteLines(changed, scenarioMap, null)).toEqual([]);
+  });
+});
+
 describe("buildForecastLayer", () => {
   it("is null before the first forecast build", () => {
     expect(buildForecastLayer({ ...view, coordinatorForecast: null }, scenarioMap)).toBeNull();
@@ -94,6 +101,31 @@ describe("buildForecastLayer", () => {
       scenarioMap,
     )!;
     expect(layer.bands[0]?.label).toBe("no modeled fire arrival");
+  });
+});
+
+describe("forecast incident bounds", () => {
+  const withWindow = (earliestIgnitionMs: number, latestIgnitionMs: number): CoordinatorView => CoordinatorView.parse({
+    ...view, coordinatorForecast: { ...view.coordinatorForecast!, edgeArrivals: [
+      { ...view.coordinatorForecast!.edgeArrivals[0]!, earliestIgnitionMs, latestIgnitionMs },
+    ] },
+  });
+  it("clips the display window without claiming that later arrival is impossible", () => {
+    const band = buildForecastLayer(withWindow(1_200_000, 3_000_000), scenarioMap)!.bands[0]!;
+    expect(band.label).toContain("20:00–25:00");
+    expect(band.label).toContain("window continues beyond incident");
+    expect(band.latestMs).toBe(1_500_000);
+    expect(band.spreadMs).toBe(1_800_000);
+  });
+  it("omits windows entirely outside the incident", () => {
+    expect(buildForecastLayer(withWindow(1_500_000, 3_000_000), scenarioMap)!.bands).toEqual([]);
+  });
+  it("hides the forecast when the incident ends, including early endings", () => {
+    expect(buildForecastLayer({ ...view, simTimeMs: 1_500_000 as never }, scenarioMap)).toBeNull();
+    const ended = CoordinatorView.parse({ ...view, incidentEnd: {
+      tick: 1, wallElapsedMs: 1000, matchingReasons: ["fire_extinguished"], displayReason: "fire_extinguished", finalSnapshotHash: "ended",
+    } });
+    expect(buildForecastLayer(ended, scenarioMap)).toBeNull();
   });
 });
 

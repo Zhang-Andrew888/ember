@@ -48,7 +48,7 @@ describe("components markup", () => {
       }),
     );
     expect(html).toContain("Connected");
-    expect(html).toContain("Audio idle");
+    expect(html).toContain("No voice report playing");
     expect(html).toContain("LIVE");
   });
 

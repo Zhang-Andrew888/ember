@@ -117,3 +117,18 @@ declare module "ws" {
     address(): { port: number } | string | null;
   }
 }
+
+// Process-entrypoint smoke tests exercise the real executable without adding @types/node.
+declare module "node:child_process" {
+  export interface ChildProcess {
+    readonly exitCode: number | null;
+    readonly stdout: { on(event: "data", listener: (chunk: { toString(): string }) => void): void };
+    readonly stderr: { on(event: "data", listener: (chunk: { toString(): string }) => void): void };
+    on(event: "error", listener: (error: Error) => void): void;
+    on(event: "exit", listener: (code: number | null) => void): void;
+    kill(signal: "SIGTERM" | "SIGKILL"): boolean;
+  }
+  export function spawn(command: string, args: string[], options: {
+    cwd: string; env: Record<string, string | undefined>; stdio: ["ignore", "pipe", "pipe"];
+  }): ChildProcess;
+}

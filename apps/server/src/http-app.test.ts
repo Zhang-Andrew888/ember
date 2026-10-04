@@ -252,4 +252,24 @@ describe("http-app transport", () => {
       await app.close();
     }
   });
+  it("returns a voice-disabled response while text and health stay available", async () => {
+    vi.stubEnv("XAI_API_KEY", "");
+    const app = await startHttpApp({});
+    try {
+      const base = `http://127.0.0.1:${app.port}`;
+      const response = await fetch(`${base}/incidents`, { method: "POST" });
+      const body = await response.json() as { incidentId: string; token: string };
+      const voice = await fetch(`${base}/incidents/${body.incidentId}/stt`, {
+        method: "POST", headers: { "x-incident-token": body.token, "content-type": "application/json" },
+        body: JSON.stringify({ audioBase64: "AA==" }),
+      });
+      expect(voice.status).toBe(503);
+      expect(await voice.json()).toEqual({ error: "grok_voice_disabled" });
+      expect((await fetch(`${base}/health`)).status).toBe(200);
+    } finally {
+      await app.close();
+      vi.unstubAllEnvs();
+    }
+  });
+
 });

@@ -11,7 +11,7 @@ const INCIDENT_WALL_LIMIT_MS = 5 * 60 * 1000;
  * the five-minute wall limit, so the incident clock runs this many times faster than the wall clock.
  * Kept as a local display constant: the web lane does not import simulation packages.
  */
-const INCIDENT_SIM_HORIZON_MS = 25 * 60 * 1000;
+export const INCIDENT_SIM_HORIZON_MS = 25 * 60 * 1000;
 export const TIME_COMPRESSION = INCIDENT_SIM_HORIZON_MS / INCIDENT_WALL_LIMIT_MS;
 
 function formatMmSs(ms: number): string {

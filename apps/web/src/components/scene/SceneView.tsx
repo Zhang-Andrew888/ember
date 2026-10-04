@@ -7,6 +7,7 @@ import { SceneLabelLayer, type LabelDescriptor } from "./SceneLabelLayer.js";
 import { SceneLegend } from "./SceneLegend.js";
 import { SceneCompass } from "./SceneCompass.js";
 import type { CameraControlsHandle } from "./CameraControls.js";
+import { sceneDebugEnabled } from "./debugPanelGate.js";
 import { sceneTerrain } from "./terrain/sceneTerrain.js";
 import { agentMapLabelMeta, agentMapLabelText, siteMapLabelMeta, siteMapLabelText } from "./mapLabels.js";
 import { formatObservationInspection } from "./staleness.js";
@@ -218,7 +219,7 @@ export function SceneView({
         fireCells={entities.fireCells}
         onInspectCell={setInspectedCell}
       />
-      {DebugPanel ? (
+      {DebugPanel && sceneDebugEnabled(typeof window === "undefined" ? "" : window.location.search) ? (
         <Suspense fallback={null}>
           <DebugPanel />
         </Suspense>
@@ -261,7 +262,7 @@ function CellInspectionPanel({
         ×
       </button>
       <dl>
-        <dt>Edge</dt>
+        <dt>Location</dt>
         <dd>
           Grid cell {cell.gridCellIndex}
         </dd>

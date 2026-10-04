@@ -2,7 +2,7 @@ import type { CoordinatorView } from "@ember/domain";
 import type { ScenarioMap } from "../../map/scenarioMap.js";
 import { resolveEdgePolyline, type SceneVector } from "../../map/positions.js";
 import { limitingReasonDisplayText } from "../../format/limitingReason.js";
-import { formatIncidentClock } from "../../format/time.js";
+import { formatIncidentClock, INCIDENT_SIM_HORIZON_MS } from "../../format/time.js";
 
 /**
  * Pure builders for the route-emphasis and forecast layers. They consume
@@ -43,6 +43,12 @@ export function buildRouteLines(
 ): RouteLine[] {
   const lines: RouteLine[] = [];
   for (const plan of view.agentPlans) {
+    const agent = view.agents.find((candidate) => candidate.id === plan.agentId);
+    // A recorded or delayed plan can outlive its crew's reported activity.
+    if (!agent || agent.state === "lost" || agent.state === "idle") continue;
+    if (plan.phase === "approach" && agent.state !== "approaching") continue;
+    if (plan.phase === "work" && agent.state !== "working") continue;
+    if (plan.phase === "return" && agent.state === "working") continue;
     const points: SceneVector[] = [];
     for (const leg of plan.legs) {
       const polyline = resolveEdgePolyline(map, leg.edgeId, leg.direction);
@@ -53,8 +59,7 @@ export function buildRouteLines(
       }
     }
     if (points.length < 2) continue;
-    const agent = view.agents.find((candidate) => candidate.id === plan.agentId);
-    const callsign = agent?.callsign ?? plan.agentId;
+    const callsign = agent.callsign;
     lines.push({
       key: `route-${plan.planId}`,
       agentId: plan.agentId,
@@ -77,7 +82,7 @@ export interface ForecastBand {
   readonly points: SceneVector[];
   readonly earliestMs: number | null;
   readonly latestMs: number | null;
-  /** latest - earliest: the uncertainty the ribbon width encodes; null when either end is unmodeled. */
+  /** Full modeled uncertainty before clipping the display window; null when either end is unmodeled. */
   readonly spreadMs: number | null;
   /** Scene-unit ribbon half-width. Wider = less certain arrival time. */
   readonly widthUnits: number;
@@ -123,18 +128,25 @@ const HEADLINE: Record<ForecastReliability, (members: number) => string> = {
   rebuilding: () => "Forecast rebuilding: bands may change",
 };
 
-/** Null before the coordinator's first forecast build. */
+/** Null before the first forecast build and after the incident finishes. */
 export function buildForecastLayer(view: CoordinatorView, map: ScenarioMap): ForecastLayer | null {
   const forecast = view.coordinatorForecast;
-  if (!forecast) return null;
+  if (!forecast || view.incidentEnd !== null || view.simTimeMs >= INCIDENT_SIM_HORIZON_MS) return null;
   const simTimeMs = view.simTimeMs as number;
   const bands: ForecastBand[] = [];
   for (const arrival of forecast.edgeArrivals) {
     const points = resolveEdgePolyline(map, arrival.edgeId, "forward");
     if (!points) continue;
-    const earliest = arrival.earliestIgnitionMs as number | null;
-    const latest = arrival.latestIgnitionMs as number | null;
-    const spread = earliest !== null && latest !== null ? Math.max(0, latest - earliest) : null;
+    const rawEarliest = arrival.earliestIgnitionMs as number | null;
+    const rawLatest = arrival.latestIgnitionMs as number | null;
+    // Do not turn an arrival after the incident into a prediction at its end.
+    if (rawEarliest !== null && rawEarliest >= INCIDENT_SIM_HORIZON_MS) continue;
+    if (rawEarliest === null && rawLatest !== null && rawLatest >= INCIDENT_SIM_HORIZON_MS) continue;
+    const earliest = rawEarliest;
+    const latest = rawLatest === null ? null : Math.min(rawLatest, INCIDENT_SIM_HORIZON_MS);
+    const clipped = rawLatest !== null && rawLatest > INCIDENT_SIM_HORIZON_MS;
+    // Keep the original uncertainty for the ribbon, even when its text window is clipped.
+    const spread = rawEarliest !== null && rawLatest !== null ? Math.max(0, rawLatest - rawEarliest) : null;
     bands.push({
       key: `forecast-${arrival.edgeId}`,
       edgeId: arrival.edgeId,
@@ -143,7 +155,7 @@ export function buildForecastLayer(view: CoordinatorView, map: ScenarioMap): For
       latestMs: latest,
       spreadMs: spread,
       widthUnits: bandWidthForSpread(spread),
-      label: bandLabel(earliest, latest, simTimeMs),
+      label: bandLabel(earliest, latest, simTimeMs) + (clipped ? "; window continues beyond incident" : ""),
     });
   }
   return {

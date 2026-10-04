@@ -259,7 +259,7 @@ export function App() {
       }
 
       if (IS_MOCK_MODE) {
-        const frames = mockWireRepliesForSay(text, simTimeMs, commandId);
+        const frames = mockWireRepliesForSay(text, simTimeMs, commandId, view);
         for (const [index, frame] of frames.entries()) {
           setTimeout(() => mockSocketRef.current?.deliver(frame), 200 + index * 120);
         }

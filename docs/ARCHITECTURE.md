@@ -21,7 +21,7 @@ flowchart LR
   VIEW --> UI
 ```
 
-Stack in repo: React 19, `@react-three/fiber` 9, Three.js, Vite, Node.js 22+, TypeScript strict, WebSocket transport (`ws`), Zod from `@ember/domain`, pnpm workspace with `pnpm-lock.yaml`. Fastify is listed on `ember-server` for the planned HTTP surface but is **not** the live entrypoint today—the loopback WebSocket hub in `ws-server.ts` is. Vitest covers model and server tests; Playwright is specified for browser scenarios but not yet wired in CI.
+Stack in repo: React 19, `@react-three/fiber` 9, Three.js, Vite, Node.js 22+, TypeScript strict, WebSocket transport (`ws`), Zod from `@ember/domain`, pnpm workspace with `pnpm-lock.yaml`. `apps/server/src/main.ts` starts the Fastify HTTP + WebSocket application in `http-app.ts`; `hub.ts` owns the live pump. `ws-server.ts` remains a secondary loopback-only WebSocket entrypoint. Vitest covers model and server tests; Playwright is specified for browser scenarios but not yet wired in CI.
 
 Run locally first. Package one server process serving the built browser app and handling WebSockets; use workers inside that process. A single long-lived deployment container is sufficient for the MVP. Do not introduce a database, message broker, Kubernetes, or serverless per-tick functions.
 

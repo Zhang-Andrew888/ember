@@ -10,15 +10,15 @@ This document describes what exists in `apps/server` and related packages after 
 | Per-agent controllers | `packages/agents` | Objectives, withdrawal, retreat, scout |
 | Reservations | `packages/navigation` | Single-capacity segments, verified yielding |
 | Conversation (no provider) | `packages/communication` + `apps/server/conversation.ts` | Gateway, `ScriptedInterpreter`, audio scheduler, push-to-talk |
-| Live loop | `apps/server/runner.ts`, `hub.ts`, `ws-server.ts` | Monotonic clock, 200 ms pump, validated WebSocket messages |
+| Live loop | `apps/server/src/main.ts`, `http-app.ts`, `hub.ts` | Monotonic clock, 200 ms pump, validated WebSocket messages |
 | Offline evaluation | `apps/server/evaluation.ts`, CLIs | Three policy variants, held-out seeds, failure injection |
 | Replay | `packages/replay` | Run records, bundle replay, full-fire reveal, metrics |
 
-Provider keys are not required for development or CI: interpretation uses `ScriptedInterpreter`; speech uses a recording sink. Real Grok Voice integration remains [Slice 0 / provider work](IMPLEMENTATION_PLAN.md).
+Provider keys are not required for development or CI: interpretation uses `ScriptedInterpreter`; speech uses a recording sink. Optional xAI integration is implemented in `apps/server/src/xai`: server-side speech transcription and synthesis, plus intent interpretation when enabled. The browser uses `/incidents/:id/stt` and prepared audio cues when voice is available; Realtime speech-to-speech and live microphone/provider validation remain open (see [implementation status](IMPLEMENTATION_PLAN.md)).
 
 ## Live WebSocket server
 
-`startServer()` in `ws-server.ts` binds a **loopback-only** WebSocket server. The simulation advances on a monotonic clock every 200 ms regardless of client count; a slow reader only delays its own outbound queue (there is no backpressure cap on unread data—acceptable for local demo, not for production).
+The main browser-facing entrypoint is `main.ts`, which starts `startHttpApp()` in `http-app.ts`. The secondary `startServer()` in `ws-server.ts` binds a **loopback-only** WebSocket server. The simulation advances on a monotonic clock every 200 ms regardless of client count; a slow reader only delays its own outbound queue (the hub closes clients whose bounded outbound queue overflows).
 
 **Client → server** (`protocol.ts`, Zod-validated, max frame 64 KiB):
 

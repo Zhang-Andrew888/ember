@@ -1,4 +1,5 @@
-import type { CommandReceipt } from "@ember/domain";
+import type { CommandReceipt, CoordinatorView } from "@ember/domain";
+import { displayState } from "../components/scene/models/markerCues.js";
 import { encodeServerWireMessage } from "./serverWireParse.js";
 
 function receipt(
@@ -32,14 +33,16 @@ function coordinatorTranscript(text: string, simTimeMs: number): string {
 }
 
 /** Deterministic mock replies when no live gateway is attached (mock/demo mode). */
-export function mockWireRepliesForSay(text: string, simTimeMs: number, commandId: string): readonly string[] {
+export function mockWireRepliesForSay(text: string, simTimeMs: number, commandId: string, view: CoordinatorView | null = null): readonly string[] {
   const trimmed = text.trim();
   const lower = trimmed.toLowerCase();
 
   if (/^\s*status\b/.test(lower) || lower.includes("status report")) {
     return [
       coordinatorTranscript(
-        "Crew 1 approaching Ridge Cabins; Crew 2 idle at Refuge West.",
+        view?.agents.filter((agent) => agent.role === "protection_crew").map((agent) =>
+          `${agent.callsign} ${displayState(agent.state, view.agentPlans.find((plan) => plan.agentId === agent.id)?.phase)}`,
+        ).join("; ") || "Waiting for the first crew status report.",
         simTimeMs,
       ),
       receipt("accepted", "Status relayed.", "Status query answered from current coordinator view.", commandId),

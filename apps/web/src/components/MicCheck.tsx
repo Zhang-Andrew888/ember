@@ -30,7 +30,7 @@ export function MicCheck({ onProbe }: MicCheckProps) {
   return (
     <div className="briefing__mic">
       <p className="briefing__mic-status" role="status">
-        {LABEL[state]}. Push-to-talk uses demo speech capture until Grok Voice is connected; text input always works.
+        {LABEL[state]}. Text input is always available.
       </p>
       <button type="button" onClick={check} disabled={checking}>
         {checking ? "Checking…" : "Check microphone"}

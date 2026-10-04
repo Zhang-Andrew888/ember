@@ -60,4 +60,25 @@ describe("components/scene/stackLabels - resolveLabelCollisions", () => {
     expect(result[0]).toEqual({ id: "hidden", x: 0, y: 0, visible: false });
     expect(result[1]).toEqual({ id: "visible", x: 0, y: 0, visible: true });
   });
+  it.each([[1440, 900], [1280, 720]])("keeps stacked refuge labels inside a %sx%s viewport", (width, height) => {
+    const points = ["south", "west", "crew"].map((id) => ({ id, x: 10, y: 5, width: 120, height: 20, visible: true }));
+    const result = resolveLabelCollisions(points, 3, [{ left: 0, right: 180, top: 0, bottom: 100 }], { width: width!, height: height! });
+    for (const label of result) {
+      expect(label.visible).toBe(true);
+      expect(label.x - 60).toBeGreaterThanOrEqual(4);
+      expect(label.x + 60).toBeLessThanOrEqual(width! - 4);
+      expect(label.y - 20).toBeGreaterThanOrEqual(4);
+      expect(label.y).toBeLessThanOrEqual(height! - 4);
+      expect(label.x - 60 >= 180 || label.y - 20 >= 100).toBe(true);
+    }
+    expect(new Set(result.map((label) => `${label.x},${label.y}`)).size).toBe(3);
+  });
+
+  it("hides a label when a narrow viewport has no room instead of clipping it", () => {
+    const placed = resolveLabelCollisions([
+      { id: "wide", x: 10, y: 20, width: 200, height: 20, visible: true },
+    ], 3, [], { width: 100, height: 80 });
+    expect(placed[0]?.visible).toBe(false);
+  });
+
 });

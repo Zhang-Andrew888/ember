@@ -30,7 +30,7 @@ describe("mapLabels", () => {
 
   it("site map labels omit last-seen phrasing", () => {
     const text = siteMapLabelText(site);
-    expect(text).toContain("Ridge Cabins");
+    expect(text).toContain("Ridge Cabins: no protection completed");
     expect(text).not.toMatch(/last seen/i);
   });
 

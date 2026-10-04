@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { fixtureCoordinatorView } from "../../../../tests/fixtures/coordinator-view.fixture.js";
 import { mockWireRepliesForSay } from "./mockCommandSimulator.js";
 import { parseServerWireMessage } from "./serverWireParse.js";
 
@@ -45,4 +46,19 @@ describe("net/mockCommandSimulator", () => {
     expect(receipt?.type).toBe("receipt");
     if (receipt?.type === "receipt") expect(receipt.receipt.status).toBe("clarification_required");
   });
+  it("reports the displayed crew states instead of inventing an approaching crew", () => {
+    for (const state of ["working", "lost", "idle"] as const) {
+      const view = { ...fixtureCoordinatorView, agents: [{ ...fixtureCoordinatorView.agents[0]!, state }] };
+      const [frame] = mockWireRepliesForSay("Crew 1, status report", 100_000, "status-current", view);
+      const message = parseServerWireMessage(frame!);
+      expect(message).toMatchObject({ type: "transcript", text: `Crew 1 ${state}` });
+    }
+  });
+
+  it("uses the reported return phase and admits when no view is available", () => {
+    const view = { ...fixtureCoordinatorView, agentPlans: fixtureCoordinatorView.agentPlans.map((plan) => ({ ...plan, phase: "return" as const })) };
+    expect(mockWireRepliesForSay("status", 0, "returning", view)[0]).toContain("Crew 1 returning");
+    expect(mockWireRepliesForSay("status", 0, "empty")[0]).toContain("Waiting for the first crew status report");
+  });
+
 });

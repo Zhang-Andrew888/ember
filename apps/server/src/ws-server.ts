@@ -32,7 +32,13 @@ export async function startServer(options: SessionOptions & { port?: number }): 
   wss.on("connection", (socket) => {
     const id = hub.connect();
     sockets.set(id, socket);
-    socket.on("message", (data) => hub.handle(id, data.toString(), live.wallElapsedMs));
+    socket.on("message", (data) => {
+      try {
+        hub.handle(id, data.toString(), live.wallElapsedMs);
+      } catch (error) {
+        reportFailure("message handler", error);
+      }
+    });
     socket.on("error", () => {
       // A protocol error (such as an oversized frame) closes the socket; "close" does the cleanup.
     });
@@ -42,18 +48,37 @@ export async function startServer(options: SessionOptions & { port?: number }): 
     });
     flush();
   });
+  const reportFailure = (where: string, error: unknown): void => {
+    process.stderr.write(`ember-server: ${where} failed: ${String(error)}\n`);
+    live.failures.push({ kind: "internal_error", atWallMs: live.wallElapsedMs });
+    try {
+      hub.notifyTechnicalFailure();
+    } catch {
+      // Best effort: a failed notice must not escape the event listener either.
+    }
+  };
   const flush = (): void => {
     for (const [id, socket] of sockets) {
-      if (hub.backpressureClosed.has(id)) {
-        socket.close(1013, "backpressure");
-        continue;
+      try {
+        if (hub.backpressureClosed.has(id)) {
+          socket.close(1013, "backpressure");
+          continue;
+        }
+        for (const m of hub.drain(id)) socket.send(m);
+      } catch (error) {
+        sockets.delete(id);
+        reportFailure("socket flush", error);
+        try {
+          socket.close(1011, "technical failure");
+        } catch {
+          // The peer may already be gone; other clients must still drain.
+        }
       }
-      for (const m of hub.drain(id)) socket.send(m);
     }
   };
   live.start();
   const timer = setInterval(() => {
-    live.pump();
+    live.safePump();
     flush();
   }, FLUSH_EVERY_MS);
   const address = wss.address();

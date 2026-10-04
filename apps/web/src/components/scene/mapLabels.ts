@@ -17,7 +17,10 @@ export function agentMapLabelMeta(agent: AgentMarker, simTimeMs: number | null):
 /** Map overlay text for a site: status and damage only; staleness is visual + tooltip. */
 export function siteMapLabelText(site: SiteMarker): string {
   const damageLabel = siteDamageLabel(site.damage);
-  return `${site.name}: ${siteProtectionStatusLabel(site.protectionStatus)}${damageLabel ? `, ${damageLabel}` : ""}`;
+  const protection = site.protectionStatus === "unprotected"
+    ? "no protection completed"
+    : siteProtectionStatusLabel(site.protectionStatus);
+  return `${site.name}: ${protection}${damageLabel ? `, ${damageLabel}` : ""}`;
 }
 
 export function siteMapLabelMeta(site: SiteMarker, simTimeMs: number | null): { stale: boolean; title?: string } {

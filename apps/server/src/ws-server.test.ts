@@ -68,4 +68,28 @@ describe("websocket server", () => {
     other.socket.close();
     await server.close();
   });
+  it.each(["handle", "pump"] as const)("contains a throwing %s and sends only a sanitized failure notice", async (operation) => {
+    const server = await startServer({ scenario: buildSyntheticScenario(), seed: "WS-FAILURE", uncontrolled: ["crew-1", "crew-2", "crew-3"] });
+    const client = await connect(server.port);
+    const log = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const fault = operation === "handle"
+      ? vi.spyOn(server.hub, "handle").mockImplementationOnce(() => { throw new Error("PRIVATE-provider-secret"); })
+      : vi.spyOn(server.live, "pump").mockImplementationOnce(() => { throw new Error("PRIVATE-provider-secret"); });
+    try {
+      if (operation === "handle") client.socket.send("trigger");
+      await until(() => JSON.stringify(client.received).includes("technical_failure"));
+      expect(JSON.stringify(client.received)).not.toContain("PRIVATE-provider-secret");
+      expect(server.live.failures).toContainEqual(expect.objectContaining({ kind: "internal_error" }));
+      expect(server.live.isHalted).toBe(operation === "pump");
+      const next = await connect(server.port);
+      await until(() => next.received.length > 0);
+      next.socket.close();
+    } finally {
+      fault.mockRestore();
+      log.mockRestore();
+      client.socket.close();
+      await server.close();
+    }
+  });
+
 });

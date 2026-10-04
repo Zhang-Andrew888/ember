@@ -54,14 +54,15 @@ export function SceneLabelLayer({
         const rect = canvasElement.getBoundingClientRect();
         const sized: SizedLabelPoint[] = labels.map((label) => {
           worldPoint.current.set(label.x, label.y, label.z);
+          const element = elementsRef.current.get(label.id);
           const screen = projectToScreen(camera, worldPoint.current, rect.width, rect.height);
           return {
             id: label.id,
             x: screen.x,
-            y: screen.y,
+            y: screen.y - 8,
             visible: screen.visible,
-            width: label.text.length * CHAR_WIDTH_PX + LABEL_PADDING_PX,
-            height: LABEL_HEIGHT_PX,
+            width: element?.offsetWidth || label.text.length * CHAR_WIDTH_PX + LABEL_PADDING_PX,
+            height: element?.offsetHeight || LABEL_HEIGHT_PX,
           };
         });
         const reservedBoxes: ReservedBox[] = reservedElementRefs
@@ -73,13 +74,13 @@ export function SceneLabelLayer({
             top: box.top - rect.top,
             bottom: box.bottom - rect.top,
           }));
-        const placed = resolveLabelCollisions(sized, undefined, reservedBoxes);
+        const placed = resolveLabelCollisions(sized, undefined, reservedBoxes, { width: rect.width, height: rect.height });
 
         for (const point of placed) {
           const element = elementsRef.current.get(point.id);
           if (!element) continue;
           element.style.display = point.visible ? "block" : "none";
-          element.style.transform = `translate(${point.x}px, ${point.y}px) translate(-50%, -140%)`;
+          element.style.transform = `translate(${point.x}px, ${point.y}px) translate(-50%, -100%)`;
         }
       }
       frameId = requestAnimationFrame(tick);

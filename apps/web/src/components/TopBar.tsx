@@ -24,7 +24,7 @@ const CONNECTION_LABEL: Record<ConnectionStatus, string> = {
 
 function audioStatusLabel(snapshot: SpeechPlaybackSnapshot): string {
   if (snapshot.state === "idle" && !snapshot.queuedUrgent && snapshot.queuedRoutineCount === 0) {
-    return "Audio idle";
+    return "No voice report playing";
   }
   if (snapshot.queuedUrgent && snapshot.state === "idle") return "Urgent audio queued";
   if (snapshot.state === "pending") return "Audio preparing";

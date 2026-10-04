@@ -5,7 +5,7 @@ import { isNearBottom } from "../conversation/stickToBottom.js";
 import { formatIncidentClock } from "../format/time.js";
 import { createBrowserVoiceCapture, type BrowserVoiceCapture } from "../net/browserVoiceCapture.js";
 import { GROK_CAPTURE_FAILURE_MESSAGE, settleGrokCapture } from "../net/settleGrokCapture.js";
-import { createVoiceCapture, type MicPermissionState, type VoiceCaptureAdapter } from "../net/voiceCapture.js";
+import { createVoiceCapture, type VoiceCaptureAdapter } from "../net/voiceCapture.js";
 import type { SpeechPlaybackSnapshot } from "../state/speechPlaybackStub.js";
 
 export interface ConversationPanelProps {
@@ -98,6 +98,7 @@ export function ConversationPanel({
         if (browserCaptureRef.current !== capture) return;
         releaseBrowserCapture(capture, pending);
         setCaptureState("idle");
+        setCaptureNotice("Microphone unavailable. Check browser permissions or use text input.");
         onPttCancel();
       });
     } else {
@@ -192,7 +193,6 @@ export function ConversationPanel({
   };
 
   const showOutgoingAck = speechSnapshot.state !== "idle" && !speechSnapshot.urgent;
-  const micState: MicPermissionState = adapterRef.current.micPermission;
 
   return (
     <section className="conversation-panel" aria-label="Conversation">
@@ -259,10 +259,10 @@ export function ConversationPanel({
         </button>
         <span id="push-to-talk-status" className="conversation-panel__mic-status">
           {grokStt !== undefined
-            ? "Grok STT: hold to record from your microphone; release to transcribe on the server."
+            ? "Hold to record your message; release to send."
             : demoMode
-              ? "Demo capture: hold for a canned voice line (no live speech recognition)."
-              : `Capture: ${micState}. Hold to send; release commits.`}
+              ? "Practice voice: hold and release to send a sample message."
+              : "Live voice is unavailable. Use text, or hold and release to send a sample message."}
         </span>
         {captureNotice !== null ? (
           <p id="push-to-talk-failure" role="status" className="conversation-panel__capture-notice">
