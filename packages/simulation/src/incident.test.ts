@@ -371,6 +371,8 @@ describe("coordinator current fire (#113)", () => {
     const observed = new Set(view.observedCells.map((c) => c.gridCellIndex));
     const current = new Set([...view.currentFire!.burningCells, ...view.currentFire!.burnedCells]);
     expect(observed.size).toBeLessThan(current.size);
+  });
+});
 
 describe("crews only, no scout (#117)", () => {
   it("has no scout agent in the live coordinator view of the default scenarios", () => {
