@@ -70,6 +70,7 @@ export function App() {
   const [startError, setStartError] = useState<string | null>(null);
   const [client, setClient] = useState<CoordinatorViewClient | null>(null);
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
+  const [mapPanelOpen, setMapPanelOpen] = useState(true);
   const [mapAssignMode, setMapAssignMode] = useState(false);
   const [mapDraft, setMapDraft] = useState<MapMovementDraft | null>(null);
   const [mapPickHint, setMapPickHint] = useState<string | null>(null);
@@ -403,6 +404,7 @@ export function App() {
       if (target instanceof HTMLElement && (target.tagName === "INPUT" || target.tagName === "TEXTAREA")) return;
       if (composerDisabled || selectedAgentId === null) return;
       event.preventDefault();
+      setMapPanelOpen(true);
       setMapAssignMode((value) => !value);
       setMapPickHint(null);
     };
@@ -425,6 +427,15 @@ export function App() {
       disabled={composerDisabled}
       onSend={handleSendMapCommand}
       onCancelDraft={() => {
+        setMapDraft(null);
+        setMapPickHint(null);
+      }}
+      open={mapPanelOpen}
+      onOpen={() => setMapPanelOpen(true)}
+      onClose={() => {
+        // Closing abandons any in-progress pick or unsent destination.
+        setMapPanelOpen(false);
+        setMapAssignMode(false);
         setMapDraft(null);
         setMapPickHint(null);
       }}

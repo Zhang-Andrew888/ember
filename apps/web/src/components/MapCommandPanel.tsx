@@ -13,6 +13,9 @@ export interface MapCommandPanelProps {
   readonly disabled: boolean;
   readonly onSend: () => void;
   readonly onCancelDraft: () => void;
+  readonly open: boolean;
+  readonly onOpen: () => void;
+  readonly onClose: () => void;
 }
 
 export function MapCommandPanel({
@@ -26,6 +29,9 @@ export function MapCommandPanel({
   disabled,
   onSend,
   onCancelDraft,
+  open,
+  onOpen,
+  onClose,
 }: MapCommandPanelProps) {
   const titleId = useId();
   const sendRef = useRef<HTMLButtonElement>(null);
@@ -43,8 +49,19 @@ export function MapCommandPanel({
   const crewLabel =
     selectedCallsign === null ? "Select a crew on the map or rail first." : `Selected crew: ${selectedCallsign}`;
 
+  if (!open) {
+    return (
+      <button type="button" className="map-command-panel__reopen" onClick={onOpen}>
+        Map movement order
+      </button>
+    );
+  }
+
   return (
     <section className="map-command-panel" aria-labelledby={titleId}>
+      <button type="button" className="map-command-panel__close" onClick={onClose} aria-label="Close">
+        ×
+      </button>
       <h2 id={titleId} className="map-command-panel__title">
         Map movement order
       </h2>

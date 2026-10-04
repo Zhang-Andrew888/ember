@@ -224,11 +224,31 @@ input {
   bottom: 0.75rem;
   z-index: 6;
   max-width: min(22rem, calc(100% - 1.5rem));
-  padding: 0.75rem 0.85rem;
+  padding: 0.75rem 1.75rem 0.75rem 0.85rem;
   border: 1px solid var(--color-border);
   border-radius: 8px;
   background: rgba(27, 39, 43, 0.94);
   font-size: 0.875rem;
+}
+
+.map-command-panel__close {
+  position: absolute;
+  top: 0.25rem;
+  right: 0.4rem;
+  background: none;
+  border: none;
+  color: var(--color-text);
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.map-command-panel__reopen {
+  position: absolute;
+  left: 0.75rem;
+  bottom: 0.75rem;
+  z-index: 6;
+  font-size: 0.8rem;
 }
 
 .map-command-panel__title {
