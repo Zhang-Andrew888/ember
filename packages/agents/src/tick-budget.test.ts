@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { AgentId } from "@ember/domain";
 import { Incident, buildSyntheticScenario } from "@ember/simulation";
-import { CrewController, ScoutController } from "./index.js";
+import { CrewController } from "./index.js";
 import { patch } from "./scenarios.testkit.js";
 
 vi.setConfig({ testTimeout: 300_000 });
@@ -22,10 +22,8 @@ function runFullTeam(simMs: number): number[] {
   const base = buildSyntheticScenario();
   const scenario = { ...base, map: { ...base.map, initialFireCells: patch(1500, 100) } };
   const inc = new Incident({ scenario, seed: "bench", overrides: { spreadMultiplier: 0.6, windShiftMs: 1e9, initialWindRad: 0 } });
-  const controllers = scenario.agents.map((a) =>
-    a.id === "scout"
-      ? new ScoutController({ agentId: AgentId.parse(a.id), callsign: "Scout", role: "scout", map: scenario.map })
-      : new CrewController({ agentId: AgentId.parse(a.id), callsign: a.id, role: "protection_crew", map: scenario.map }),
+  const controllers = scenario.agents.map(
+    (a) => new CrewController({ agentId: AgentId.parse(a.id), callsign: a.id, role: "protection_crew", map: scenario.map }),
   );
   const wallPerTick: number[] = [];
   while (!inc.ended && inc.simTimeMs < simMs) {

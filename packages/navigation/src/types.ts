@@ -12,7 +12,6 @@ export interface NavConfig {
   readonly turnaroundMs: number;
   readonly crewWorkRate: number;
   readonly reservationGuardMs: number;
-  readonly scoutDwellMs: number;
   readonly containmentReachM: number;
   readonly containmentWorkRequired: number;
 }
@@ -26,7 +25,6 @@ export const DEFAULT_NAV_CONFIG: NavConfig = {
   turnaroundMs: 5000,
   crewWorkRate: 1,
   reservationGuardMs: 5000,
-  scoutDwellMs: 10_000,
   containmentReachM: 300,
   containmentWorkRequired: 45,
 };

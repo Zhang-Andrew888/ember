@@ -2,10 +2,10 @@ import type { AgentId, EdgeId, MissionPlan } from "@ember/domain";
 import type { RoadIndex } from "@ember/simulation/model";
 import type { ReservationOracle } from "./types.js";
 
-/** Reservation priority, highest first: physical occupant, emergency, return, approach, scout. */
-export type PriorityClass = "emergency" | "return" | "approach" | "scout";
+/** Reservation priority, highest first: physical occupant, emergency, return, approach. */
+export type PriorityClass = "emergency" | "return" | "approach";
 
-const RANK: Record<PriorityClass, number> = { emergency: 1, return: 2, approach: 3, scout: 4 };
+const RANK: Record<PriorityClass, number> = { emergency: 1, return: 2, approach: 3 };
 
 export interface Window {
   readonly edgeId: EdgeId;
