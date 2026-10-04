@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { AgentId, NodeId, ObjectiveId, Observation, SequenceNumber, SimTimeMs, SiteId, type AgentPosition, type Objective } from "@ember/domain";
+import { AgentId, NodeId, Objective, ObjectiveId, Observation, SequenceNumber, SimTimeMs, SiteId, type AgentPosition } from "@ember/domain";
 import { Incident, authoredCommit, buildSyntheticScenario, type AgentProjection, type SimScenario } from "@ember/simulation";
 import { RoadIndex, cellIndexOf } from "@ember/simulation/model";
 import { KnowledgeStore } from "@ember/knowledge";
@@ -289,6 +289,18 @@ describe("coordinator objectives", () => {
     targetId: target,
     constraints: {},
     issueSequence: SequenceNumber.parse(1),
+  });
+
+  it("refuses a directional order when no road node lies within its bound", () => {
+    const scenario = scenarioWith({ fire: far });
+    const inc = new Incident({ scenario, seed: "move-refuse", overrides: calm });
+    const c = crew(scenario);
+    c.receiveObjective(Objective.parse({
+      ...objective("move_direction", null, "obj-move-refuse"),
+      movement: { direction: "north", maxDistanceMeters: 100 },
+    }));
+    const log = runControllers(inc, [c], 1000);
+    expect(log.decisions.find((entry) => entry.event.type === "objective_rejected")?.event.reasonCode).toBe("no_road_node_in_direction");
   });
 
   it("rejects an infeasible objective once with a reason and keeps the feasible plan", () => {

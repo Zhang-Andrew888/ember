@@ -210,6 +210,38 @@ describe("evidence and claims", () => {
 });
 
 describe("objective kinds", () => {
+  it.each(["north", "northeast", "east", "southeast", "south", "southwest", "west", "northwest"])(
+    "interprets named crew movement to %s",
+    (direction) => {
+      const { say } = makeGateway();
+      expect(say(`Crew 1, move ${direction}`).outcomes[0]?.actions.find((action) => action.kind === "objective")).toMatchObject({
+        objective: { kind: "move_direction", movement: { direction } },
+      });
+    },
+  );
+
+  it("sends one directional objective for named and active crews, including diagonals", () => {
+    const { say } = makeGateway();
+    const north = say("Crew 1, move north").outcomes[0]!;
+    expect(north.receipt.status).toBe("accepted");
+    expect(north.actions.filter((action) => action.kind === "objective")).toHaveLength(1);
+    expect(north.actions.find((action) => action.kind === "objective")).toMatchObject({
+      objective: { kind: "move_direction", recipientId: "crew-1", movement: { direction: "north", maxDistanceMeters: 600 } },
+    });
+    expect(say("Move North-West 400 meters").outcomes[0]?.actions.find((action) => action.kind === "objective")).toMatchObject({
+      objective: { kind: "move_direction", recipientId: "crew-1", movement: { direction: "northwest", maxDistanceMeters: 400 } },
+    });
+    expect(say("Crew 1, protect Waterworks").outcomes[0]?.actions.find((action) => action.kind === "objective")).toMatchObject({
+      objective: { kind: "protect_site", targetId: "site-b" },
+    });
+  });
+
+  it("asks for clarification when a movement direction is missing or ambiguous", () => {
+    const { say } = makeGateway();
+    expect(say("Crew 1, move").outcomes[0]?.receipt.status).toBe("clarification_required");
+    expect(say("Crew 1, move north or east").outcomes[0]?.receipt.status).toBe("clarification_required");
+  });
+
   it("maps protect, observe, return, hold and resume onto contract objectives and actions", () => {
     const { say } = makeGateway();
     const obj = (text: string) => say(text).outcomes[0]!.actions.find((a) => a.kind === "objective");

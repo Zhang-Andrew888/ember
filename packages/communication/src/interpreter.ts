@@ -1,5 +1,6 @@
 import type { Directory, IntentEnvelope } from "./intent.js";
 import { IntentEnvelope as IntentSchema } from "./intent.js";
+import { CompassDirection, type CompassDirection as CompassDirectionT } from "@ember/domain";
 
 export interface InterpretationRequest {
   readonly commandId: string;
@@ -22,6 +23,16 @@ export interface Interpreter {
 const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const CLAIM = /\b(?:is|are)\s+(?:definitely\s+|totally\s+|completely\s+)?(?:safe|clear|open|closed|burning|fine)\b/i;
+const DIRECTION = /\b(?:north(?:[\s-]?east|[\s-]?west)?|south(?:[\s-]?east|[\s-]?west)?|east|west)\b/gi;
+
+function directionsIn(text: string): CompassDirectionT[] {
+  const directions = new Set<CompassDirectionT>();
+  for (const match of text.matchAll(DIRECTION)) {
+    const parsed = CompassDirection.safeParse(match[0]);
+    if (parsed.success) directions.add(parsed.data);
+  }
+  return [...directions];
+}
 
 /**
  * Deterministic, provider-free interpreter for tests and local development. It parses callsigns,
@@ -70,10 +81,25 @@ export class ScriptedInterpreter implements Interpreter {
     }
 
     const site = req.directory.sites.find((s) => tokensOverlap(lower, s.name));
+    const movement = /\b(move|head|travel|proceed|go)\b/.test(lower);
+    const directions = movement || /^\s*(?:north|south|east|west)/i.test(text) ? directionsIn(text) : [];
     if (/\b(status|where are you|what are you doing|how long|when will|explain|your plan|what'?s your plan|why are you)\b/.test(lower) && !/\bprotect\b/.test(lower)) {
       envelope.kind = "status";
     } else if (/\b(protect|save|defend|work on|go to)\b/.test(lower)) {
       envelope.objective = { kind: "protect", ...(site === undefined ? targetGuess(lower) : { targetName: site.name }) };
+    } else if (movement || (directions.length > 0 && lower.trim().split(/\s+/).length <= 2)) {
+      if (directions.length > 1) envelope.clarification = "Which single compass direction should the crew move?";
+      const distance = lower.match(/\b(\d+(?:\.\d+)?)\s*(?:m|meters?|metres?)\b/);
+      const maxDistanceMeters = distance === null ? undefined : Number(distance[1]);
+      if (maxDistanceMeters !== undefined && (maxDistanceMeters <= 0 || maxDistanceMeters > 1200)) {
+        envelope.clarification = "How far should the crew move? Choose more than 0 and at most 1,200 meters.";
+      }
+      envelope.objective = {
+        kind: "move",
+        ...(directions.length === 1 ? { direction: directions[0]! } : {}),
+        ...(maxDistanceMeters === undefined || maxDistanceMeters <= 0 || maxDistanceMeters > 1200 ? {} : { maxDistanceMeters }),
+      };
+      if (!movement && names.length === 0) envelope.kind = "clarification_answer";
     } else if (/\b(scout|observe|check|look at)\b/.test(lower) && !usesReport) {
       const point = req.directory.scoutPoints.find((p) => lower.includes(p.name.toLowerCase()));
       envelope.objective = { kind: "observe", ...(point === undefined ? {} : { targetName: point.name }) };

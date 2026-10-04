@@ -3,7 +3,7 @@ import { AgentId, NodeId } from "@ember/domain";
 import { DEFAULT_FORECAST_CONFIG } from "@ember/forecast";
 import { FailingInterpreter, type IntentEnvelope } from "@ember/communication";
 import { buildSyntheticScenario, type SimScenario } from "@ember/simulation";
-import { cellIndexOf } from "@ember/simulation/model";
+import { cellIndexOf, RoadIndex } from "@ember/simulation/model";
 import { ConversationBridge, directoryFor } from "./conversation.js";
 import { IncidentSession } from "./session.js";
 
@@ -32,6 +32,26 @@ function farScenario(agents?: string[]): SimScenario {
 }
 
 describe("conversation over a session (no provider)", () => {
+  it("delivers a northward movement command and reports the crew's decision", () => {
+    const scenario = farScenario(["crew-1"]);
+    const session = new IncidentSession({ scenario, seed: "move-north", overrides: calm, controllerConfig: { forecast: steady } });
+    const bridge = new ConversationBridge(session);
+    const sent = bridge.say("Crew 1, move north", 0)[0]!;
+    expect(sent.receipt.status).toBe("accepted");
+    expect(sent.actions.filter((action) => action.kind === "objective")).toHaveLength(1);
+    session.runUntil(10_000, () => bridge.collect());
+    const decision = session.decisions.find((entry) => entry.event.agentId === "crew-1" && (entry.event.reasonCode === "objective_accepted" || entry.event.type === "objective_rejected"));
+    expect(decision?.event.reasonCode).toBe("objective_accepted");
+    expect(bridge.transcript.some((entry) => entry.kind === "agent" && /Crew 1/.test(entry.text))).toBe(true);
+    session.runUntil(100_000, () => bridge.collect());
+    const position = session.incident.projectAgent(AgentId.parse("crew-1")).position;
+    const road = new RoadIndex(scenario.map);
+    const point = position.kind === "node"
+      ? road.nodePoint(position.nodeId)
+      : road.pointAlong(road.mustEdge(position.edgeId), position.distanceAlongPolyline);
+    expect(point.y).toBeGreaterThan(800);
+  });
+
   it("applies a typed objective and speaks the committed result, not a guess", () => {
     const session = new IncidentSession({ scenario: farScenario(["crew-1", "crew-2"]), seed: "conv-1", overrides: calm, controllerConfig: { forecast: steady } });
     const bridge = new ConversationBridge(session);
